@@ -60,6 +60,10 @@ data/captures/
 *.midi
 !docs/**/*.mid
 
+# ---------- 测试产物（make_midi.py / ref_parse.py / e2e.js 生成）----------
+host/tests/shots/
+host/tests/ref.json
+
 # ---------- 硬件设计软件 ----------
 *.bak
 *.bak.*
