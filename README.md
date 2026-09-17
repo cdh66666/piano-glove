@@ -1,18 +1,19 @@
 # Piano Glove · 钢琴手套
 
-可穿戴手部设备：感知手指姿态 / 触键力度，并可通过力反馈引导手部动作，用于钢琴练习辅助与 MIDI 演奏。
+可穿戴手部设备：感知手指姿态与触键力度，映射为 MIDI 音符，戴上就能弹。
 
-> 状态：**项目初始化中**（仓库骨架已建，方案选型进行中，见 [docs/design-notes.md](docs/design-notes.md)）
+> 状态：**方案选型中**（定位已定稿，硬件/协议待定，见 [docs/design-notes.md](docs/design-notes.md)）
 
 ---
 
 ## 项目定位
 
-待确认（见 design-notes 的「待定问题」）：
+**演奏型 —— 以 MIDI 输出为核心。**
 
-- **A. 演奏型** —— 戴着手套，手指动作直接映射为 MIDI 音符，不依赖真钢琴也能弹。
-- **B. 教学型** —— 有压力 / 姿态感知 + 力反馈，纠正手型、指法、力度，需配合练习曲目。
-- **C. 二者兼顾** —— 先做感知与 MIDI 输出，力反馈作为第二阶段。
+- 核心链路：手指姿态感知 → 触键判定 → MIDI 事件 → 软音源 / DAW
+- 首要指标：端到端延迟 **< 15 ms**（超过会有明显手感延迟）
+- 交互约束：戴手套直接「凭空弹奏」，不依赖真钢琴
+- 力反馈**不在当前范围**（后续如需教学能力再单独评估，技术栈可复用既有绳驱方案）
 
 ---
 
@@ -33,12 +34,12 @@ piano-glove/
 | 模块 | 候选 | 备注 |
 | --- | --- | --- |
 | 主控 | ESP32-S3 | 原生 USB OTG，可直接做 USB-MIDI；蓝牙 MIDI 亦可 |
-| 弯曲感知 | 电阻式弯曲传感器 / 霍尔 + 磁铁 / 柔性应变片 | 需评估寿命、一致性、标定难度 |
-| 触键力度 | FSR 薄膜压力传感器（指尖） | 与弯曲量联合判定「真实触键」 |
-| 惯性测量 | IMU（腕部，单颗） | 手腕翻转 / 手位判定 |
-| 力反馈 | N20 电机绳驱（复用 `dual-esp32-motor-force-feedback` 方案）/ LRA 振动 | 绳驱可做真实阻力引导，振动仅能做提示 |
+| 弯曲感知 | 电阻式弯曲传感器 / 霍尔 + 磁铁 / 柔性应变片 | 每个手指至少 2 个自由度才能拿到稳定指姿，需评估寿命与一致性 |
+| 触键判定 | 指尖轻触开关 / FSR 薄膜压力传感器 / 纯姿态阈值判定 | 演奏型要用它区分「按键」与「手指路过」，误触发是最大体验杀手 |
+| 惯性测量 | IMU（腕部，单颗） | 手腕翻转 / 手位判定，用于八度与音区切换 |
+| ~~力反馈~~ | ~~N20 绳驱 / LRA~~ | **本期不做**，见项目定位 |
 
-> 绳驱力反馈与仓库 [`dual-esp32-motor-force-feedback`](https://github.com/cdh66666/dual-esp32-motor-force-feedback)、[`Cable_driven_massage`](https://github.com/cdh66666/Cable_driven_massage) 的技术栈高度重合，优先复用同步总线与闭环调试工具链。
+> 演奏型对「触键判定」的准确率要求远高于对力度的精度要求 —— 宁可丢掉细腻的力度层次，也不能有误触发。
 
 ---
 
@@ -63,8 +64,8 @@ cd host
 
 ## 关联仓库
 
-- [dual-esp32-motor-force-feedback](https://github.com/cdh66666/dual-esp32-motor-force-feedback) —— 力反馈驱动与 1 Mbaud 同步总线
-- [dual-n20-pot-motor-driver](https://github.com/cdh66666/dual-n20-pot-motor-driver) —— N20 闭环调试固件与 Web Serial 调参 UI
+- [dual-n20-pot-motor-driver](https://github.com/cdh66666/dual-n20-pot-motor-driver) —— 可直接复用的 **Web Serial 实时调参与曲线可视化**思路，本项目标定流程会用到
+- [dual-esp32-motor-force-feedback](https://github.com/cdh66666/dual-esp32-motor-force-feedback) —— 本期不涉及力反馈，仅作后续教学型扩展时的技术储备
 
 ---
 

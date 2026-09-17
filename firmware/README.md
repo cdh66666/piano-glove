@@ -9,17 +9,20 @@ firmware/
 ├── platformio.ini
 ├── src/
 │   ├── main.cpp          主循环 / 任务调度
-│   ├── sensors/          弯曲、压力、IMU 采样与滤波
-│   ├── haptics/          力反馈执行器控制（电机闭环 / LRA 驱动）
-│   ├── mapping/          传感器 → 手指姿态 / 触键力度 → MIDI 事件
-│   └── link/             上位机通信（串口 / USB / BLE）
+│   ├── sensors/          弯曲、触键、IMU 采样与轻量滤波
+│   ├── mapping/          传感器 → 手指姿态 → 触键判定 → MIDI 事件
+│   ├── midi/             USB-MIDI / BLE-MIDI 输出
+│   └── link/             上位机通信（串口 / USB），用于标定与调参
 ├── include/
 ├── lib/
 └── test/
 ```
 
+> 本期**不含**力反馈执行器模块。
+
 ## 待办
 
-- [ ] 确定主控型号与开发板（ESP32-S3？）
+- [ ] 确定主控型号与开发板（ESP32-S3？需确认 USB OTG 做 USB-MIDI 的可行性）
 - [ ] 建立 `platformio.ini`，跑通 LED 点灯
 - [ ] 接第一路弯曲传感器，串口输出原始值
+- [ ] 打通 USB-MIDI，让电脑收到一个音符
