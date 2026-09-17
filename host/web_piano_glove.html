@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>钢琴手套调试台 · PIANO_GLOVE 固件</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --ink:#1f2328; --sub:#57606a;
+    --blue:#1f6feb; --green:#1a7f37; --red:#cf222e; --amber:#9a6700; --violet:#6639ba;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+  header{background:linear-gradient(90deg,#1f6feb,#6639ba);color:#fff;padding:14px 20px}
+  header h1{margin:0;font-size:18px;font-weight:600}
+  header p{margin:4px 0 0;font-size:12px;opacity:.9}
+  main{padding:14px 16px 40px;display:grid;gap:12px;
+       grid-template-columns:repeat(auto-fit,minmax(360px,1fr));align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .panel h2{margin:0 0 10px;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+  .panel h2 small{font-weight:400;color:var(--sub);font-size:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+  button{font:inherit;padding:6px 12px;border:1px solid var(--line);background:#fff;color:var(--ink);
+         border-radius:7px;cursor:pointer}
+  button:hover{background:#f0f3f6}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.primary:hover{filter:brightness(1.07)}
+  button.danger{background:#fff;border-color:#f5b5b0;color:var(--red)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.on{background:var(--green);border-color:var(--green);color:#fff}
+  input,select{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+  input[type=number]{width:88px}
+  .msg{font-size:12px;color:var(--sub);min-height:18px}
+  .msg.ok{color:var(--green)} .msg.err{color:var(--red)} .msg.warn{color:var(--amber)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  th{color:var(--sub);font-weight:600}
+  tr.on{background:#eaf7ee}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;border:1px solid var(--line);color:var(--sub)}
+  .pill.ok{background:#eaf7ee;border-color:#a7e0bd;color:var(--green)}
+  .pill.bad{background:#fdecea;border-color:#f5b5b0;color:var(--red)}
+  pre{margin:0;background:#0f172a;color:#d7e3f4;border-radius:8px;padding:10px;height:220px;overflow:auto;
+      font:12px/1.5 Consolas,"Courier New",monospace;white-space:pre-wrap;word-break:break-all}
+  pre .pl{color:#8bd5a0}      /* 发送 */
+  pre .ok{color:#7ee787}      /* OK */
+  pre .err{color:#ff8f85}     /* ERR */
+  pre .d{color:#9db2cd}       /* 数据 */
+  progress{width:100%;height:10px}
+  .slots{display:grid;gap:6px}
+  .slot{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+  .slot .nm{width:96px;font-weight:600;font-size:12.5px}
+  .slot .id{width:44px;color:var(--sub);font-size:12px}
+  .bar{flex:1;height:14px;background:#eef1f4;border-radius:7px;position:relative;overflow:hidden}
+  .bar i{position:absolute;top:0;bottom:0;background:#cfe3ff;border-radius:7px}
+  .bar b{position:absolute;top:0;bottom:0;width:2px;background:var(--blue)}
+  .bar u{position:absolute;top:0;bottom:0;width:2px;background:var(--red);text-decoration:none}
+  .slot .val{width:96px;text-align:right;font:12px Consolas,monospace;color:var(--sub)}
+  .hint{font-size:12px;color:var(--sub);margin:6px 0 0}
+  kbd{background:#eef1f4;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>六自由度钢琴手套 · 调试台 <span class="pill" style="background:#ffffff22;border-color:#ffffff55;color:#fff">PIANO_GLOVE 固件协议</span></h1>
+  <p>板子: 微雪 Servo Driver with ESP32 (ESP32 + CP2102)　·　舵机: Feetech STS3032 ×6 (出厂 ID 全为 1)　·　串口 115200 文本命令</p>
+</header>
+
+<main>
+  <!-- ============ 连接 ============ -->
+  <section class="panel">
+    <h2>1. 连接 <small id="connHint">模拟模式无需硬件，可完整验证逻辑</small></h2>
+    <div class="row">
+      <button id="btnModeSim" class="primary">模拟模式</button>
+      <button id="btnModeReal">实机模式 (Web Serial)</button>
+    </div>
+    <div class="row">
+      <button id="btnConnect" class="primary">连接</button>
+      <button id="btnDisconnect" disabled>断开</button>
+      <label>波特率</label><input type="number" id="baud" value="115200" style="width:100px">
+      <label><input type="checkbox" id="autoPoll" checked> 自动刷新状态</label>
+    </div>
+    <div class="msg" id="connMsg">未连接。</div>
+    <p class="hint">实机模式需 Chrome/Edge 并允许串口访问。板子 USB 芯片是 CP2102；Windows 若提示「问题码 28」需先装
+      <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank">Silicon Labs CP210x 驱动</a>。</p>
+  </section>
+
+  <!-- ============ 固件信息 ============ -->
+  <section class="panel">
+    <h2>2. 固件信息 <small>INFO</small></h2>
+    <div class="row">
+      <button id="btnInfo">读取 INFO</button>
+      <button id="btnProfileST">切档 STS3032</button>
+      <button id="btnProfileSC">切档 SC09</button>
+      <button id="btnScan">扫描舵机</button>
+    </div>
+    <table id="infoTable"><tbody><tr><td class="msg">未读取</td></tr></tbody></table>
+  </section>
+
+  <!-- ============ 槽位表 ============ -->
+  <section class="panel" style="grid-column:span 2">
+    <h2>3. 槽位状态 <small>STATUS_ALL · 6 个手指槽位</small></h2>
+    <div class="row"><button id="btnStatusAll">刷新 STATUS_ALL</button>
+      <span class="msg" id="statusMsg"></span></div>
+    <table>
+      <thead><tr><th>槽位</th><th>手指</th><th>舵机ID</th><th>在线</th><th>最小</th><th>中位</th><th>最大</th><th>行程</th><th>有效</th><th>按压方向</th></tr></thead>
+      <tbody id="slotBody"></tbody>
+    </table>
+    <div class="slots" id="slotBars"></div>
+    <p class="hint">行程条: 蓝线=中位(standby) 红线=最大(max) 蓝块=行程区间。按压方向 <b>press</b> 表示「按下」走向哪一端(max/min)，可用 <code>SETDIR</code> 修改。</p>
+  </section>
+
+  <!-- ============ 编号向导 ============ -->
+  <section class="panel">
+    <h2>4. 舵机编号向导 <small>解决「出厂全是 ID 1 → 总线抢答」</small></h2>
+    <p class="hint">一次只接<b>一个</b>舵机: 检测 → 改成目标 ID → 复核 → 换下一个。</p>
+    <div class="row">
+      <label>目标 ID</label><input type="number" id="wizTarget" value="1" min="1" max="253">
+      <button id="btnWizDetect">检测当前舵机</button>
+      <button id="btnWizAssign" class="primary">设为该 ID</button>
+    </div>
+    <div class="row">
+      <button id="btnWizScanAll">扫描全部 ID (1~10)</button>
+    </div>
+    <div class="msg" id="wizMsg">待机。</div>
+    <table><tbody id="wizFound"><tr><td class="msg">未扫描</td></tr></tbody></table>
+  </section>
+
+  <!-- ============ 校准 ============ -->
+  <section class="panel" style="grid-column:span 2">
+    <h2>5. 校准 <small>CAL AUTO START → 活动手指 → STATUS 看采样 → FINISH → SAVE</small></h2>
+    <div class="row">
+      <button id="btnCalStatus">CAL STATUS</button>
+      <button id="btnCalClear" class="danger">清空 (CAL CLEAR)</button>
+      <button id="btnCalStart" class="primary">开始采样 (CAL AUTO START)</button>
+      <button id="btnCalFinish">结束采样 (FINISH)</button>
+      <button id="btnCalSave">保存 (CAL SAVE)</button>
+      <button id="btnCalCancel" class="danger">取消 (CANCEL)</button>
+    </div>
+    <div class="row"><label>采样时长</label><input type="number" id="calSecs" value="15" min="3" max="120"> 秒
+      <span class="msg" id="calMsg">未开始</span></div>
+    <progress id="calProg" value="0" max="100"></progress>
+    <table>
+      <thead><tr><th>槽位</th><th>手指</th><th>ID</th><th>采样数</th><th>最小</th><th>最大</th><th>最新</th><th>进度</th></tr></thead>
+      <tbody id="calBody"></tbody>
+    </table>
+    <p class="hint">采样期间固件持续读取位置反馈；<b>START 需要 6 个槽位的舵机都能读到反馈</b>，否则报
+      <code>feedback_missing_slot=…</code>。校准未完成时 <code>ARM</code> 会被拒绝。</p>
+  </section>
+
+  <!-- ============ 动作 ============ -->
+  <section class="panel">
+    <h2>6. 动作 / 测试 <small>ARM 后才允许 PRESS·RELEASE·MOVE·DEMO</small></h2>
+    <div class="row">
+      <button id="btnArm" class="primary">ARM 使能</button>
+      <button id="btnDisarm">DISARM</button>
+      <button id="btnSafe" class="danger">SAFE 急停</button>
+      <button id="btnStandby" class="danger">STANDBY</button>
+      <button id="btnDemo">DEMO 播放</button>
+    </div>
+    <div class="row"><label>扭矩</label>
+      <select id="tqTarget"><option value="0">全部(0)</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+      <button id="btnTqOn">扭矩 ON</button><button id="btnTqOff">扭矩 OFF</button>
+    </div>
+    <table>
+      <thead><tr><th>槽位</th><th>手指</th><th>按下</th><th>松开</th><th>方向</th></tr></thead>
+      <tbody id="pressBody"></tbody>
+    </table>
+    <div class="row">
+      <label>MOVE</label><input type="number" id="mvId" value="1" style="width:64px">
+      <input type="number" id="mvPos" value="511" style="width:76px">
+      <input type="number" id="mvSpd" value="500" style="width:76px">
+      <input type="number" id="mvAcc" value="20" style="width:60px">
+      <button id="btnMove">发送 (MOVE id pos speed acc ARM)</button>
+    </div>
+  </section>
+
+  <!-- ============ 终端 ============ -->
+  <section class="panel" style="grid-column:span 2">
+    <h2>7. 命令终端 <small>直接发文本命令（HELP 看命令表）</small></h2>
+    <div class="row">
+      <input id="rawCmd" style="flex:1;min-width:220px" placeholder="例如  INFO / PING 1 / CAL STATUS / TORQUE 0 1">
+      <button id="btnRaw" class="primary">发送</button>
+      <button id="btnClearLog">清空日志</button>
+      <button id="btnCopyLog">复制日志</button>
+    </div>
+    <div class="row" id="quick"></div>
+    <pre id="log"></pre>
+  </section>
+</main>
+
+<script>
+/* =========================================================================
+ *  PIANO_GLOVE 固件调试台
+ *  协议: 115200 8N1, ASCII 文本命令, 以 \r\n 结尾; 回复按行 (\r\n) 返回
+ *  已实测确认的命令:
+ *    HELP / INFO / PROFILE SC09|STS3032 / SCAN / PING <id>
+ *    STATUS <id> / STATUS_ALL / MAP <slot> <id> / SETDIR <slot> max|min
+ *    SETID <old> <new> CONFIRM
+ *    CAL STATUS|CLEAR|SAVE|CAPTURE <slot> MIN STANDBY MAX|AUTO START|STATUS|FINISH|CANCEL
+ *    TORQUE <slot|id> <0|1> / ARM / DISARM / SAFE / STANDBY CONFIRM
+ *    PRESS <slot> / RELEASE <slot> / MOVE <id> <pos> <speed> <acc> ARM / DEMO
+ *    ENROLL START|STATUS|STOP|RESET
+ *  槽位(默认): 0=拇指侧向 1=拇指按键 2=食指 3=中指 4=无名指 5=小指 → 舵机 ID 1~6
+ * ========================================================================= */
+
+const SLOTS = ["拇指侧向","拇指按键","食指","中指","无名指","小指"];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+/* ---------------- 日志 ---------------- */
+function logLine(txt, cls){
+  const el = $("#log");
+  const t = new Date().toLocaleTimeString();
+  const line = document.createElement("div");
+  line.className = cls || "";
+  line.textContent = "[" + t + "] " + txt;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function logRecv(text){
+  text.split(/\r?\n/).forEach(l=>{
+    if(!l.trim()) return;
+    logLine("← " + l, /^OK\b/.test(l) ? "ok" : /^ERR\b/.test(l) ? "err" : "d");
+  });
+}
+
+/* ---------------- 模拟固件（无硬件也能跑通全流程） ---------------- */
+class MockFirmware {
+  constructor(){
+    this.profile = "STS3032"; this.range = 4095; this.calibrated = 0; this.armed = 0;
+    this.autoActive = 0; this.torque = {}; this.cal = {}; this.enroll = {active:0,next:1,phase:"OFF"};
+    // 模拟: 出厂舵机都是 ID 1, 但只有一个接着
+    this.ids = [1];
+    this.pos = {1: 512};
+    for(let s=0;s<6;s++) this.cal[s] = {min:1023, standby:511, max:0, valid:0, press: (s===1?"min":"max"), samples:0, last:0};
+  }
+  present(id){ return this.ids.includes(id); }
+  rng(){ return this.profile === "SC09" ? 1023 : 4095; }
+  handle(cmd){
+    const parts = cmd.trim().split(/\s+/);
+    const v = (parts[0]||"").toUpperCase();
+    const a = parts.slice(1);
+    if(v==="HELP") return ["OK HELP INFO PROFILE AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO"];
+    if(v==="INFO") return ["OK INFO fw=PIANO_GLOVE_1 profile=" + this.profile + " range=" + this.rng() +
+      " ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated + " armed=" + this.armed +
+      " auto_active=" + this.autoActive + " enroll_active=" + this.enroll.active + " enroll_next=" + this.enroll.next +
+      " enroll_temp=10 enroll_phase=" + this.enroll.phase];
+    if(v==="PROFILE"){
+      const n = (a[0]||"").toUpperCase();
+      if(n==="SC09"||n==="STS3032"){ this.profile = n; return ["OK PROFILE name=" + n + " range=" + this.rng()]; }
+      return ["ERR PROFILE must_be_SC09_or_STS3032"];
+    }
+    if(v==="PING"){
+      const id = parseInt(a[0]||"0",10);
+      return [ (this.present(id)) ? "OK PING id=" + id : "ERR PING id=" + id ];
+    }
+    if(v==="SCAN"){
+      const out = ["SCAN_BEGIN profile=" + this.profile + " max=20"];
+      this.ids.slice().sort((x,y)=>x-y).forEach(i=>out.push("FOUND id=" + i));
+      out.push("SCAN_END count=" + this.ids.length);
+      return out;
+    }
+    if(v==="STATUS"){
+      const id = parseInt(a[0]||"0",10);
+      if(!this.present(id)) return ["ERR STATUS id=" + id + " offline=1"];
+      return ["OK STATUS id=" + id + " profile=" + this.profile + " pos=" + (this.pos[id]||512) +
+        " speed=0 load=0 voltage_raw=57 temperature=32 current=0 moving=0 mode=0"];
+    }
+    if(v==="STATUS_ALL"){
+      const out = [];
+      for(let s=0;s<6;s++){
+        const id = s+1, c = this.cal[s], online = this.present(id) ? 1 : 0;
+        out.push("SLOT slot=" + s + " name=" + SLOTS[s] + " id=" + id + " online=" + online +
+          (online ? " pos=" + (this.pos[id]||512) + " speed=0 load=0 voltage_raw=57 temperature=32 current=0" : "") +
+          " min=" + c.min + " standby=" + c.standby + " max=" + c.max + " valid=" + c.valid + " press=" + c.press);
+      }
+      out.push("OK STATUS_ALL profile=" + this.profile + " armed=" + this.armed);
+      return out;
+    }
+    if(v==="MAP"){ const s=+a[0], id=+a[1]; return ["OK MAP slot=" + s + " id=" + id]; }
+    if(v==="SETDIR"){ const s=+a[0], d=(a[1]||"").toLowerCase(); if(!this.cal[s]) return ["ERR SETDIR usage_slot_max_or_min"];
+      if(d!=="max"&&d!=="min") return ["ERR SETDIR usage_slot_max_or_min"]; this.cal[s].press=d; return ["OK SETDIR slot="+s+" press="+d]; }
+    if(v==="SETID"){
+      const o=+a[0], n=+a[1];
+      if((a[2]||"").toUpperCase()!=="CONFIRM") return ["ERR SETID usage_old_new_CONFIRM"];
+      if(!this.present(o)) return ["ERR SETID old_not_found"];
+      if(this.present(n)) return ["ERR SETID new_id_occupied"];
+      this.ids = this.ids.map(i=>i===o?n:i); this.pos[n]=this.pos[o]||512; delete this.pos[o];
+      return ["OK SETID old_id=" + o + " new_id=" + n];
+    }
+    if(v==="CAL"){
+      const sub=(a[0]||"").toUpperCase();
+      if(sub==="STATUS"){
+        const out=[]; let complete=0;
+        for(let s=0;s<6;s++){ const c=this.cal[s];
+          out.push("CAL slot=" + s + " name=" + SLOTS[s] + " id=" + (s+1) + " min=" + c.min + " standby=" + c.standby +
+            " max=" + c.max + " valid=" + c.valid + " press=" + c.press);
+          if(c.valid) complete++;
+        }
+        out.push("OK CAL count=" + complete + " complete=" + (complete===6?1:0));
+        return out;
+      }
+      if(sub==="CLEAR"){ for(let s=0;s<6;s++){const c=this.cal[s]; c.min=this.rng(); c.max=0; c.standby=Math.floor(this.rng()/2); c.valid=0; c.samples=0; c.last=0;}
+        this.calibrated=0; this.armed=0; return ["OK CAL CLEAR torque=off"]; }
+      if(sub==="CAPTURE"){
+        const s=+a[1]; if(!this.cal[s]) return ["ERR CAL CAPTURE usage_slot_MIN_STANDBY_MAX"];
+        if(!this.present(s+1)) return ["ERR CAL CAPTURE servo_read_failed"];
+        this.cal[s].min=+a[2]; this.cal[s].standby=+a[3]; this.cal[s].max=+a[4]; this.cal[s].valid=1;
+        return ["OK CAL CAPTURE slot=" + s];
+      }
+      if(sub==="AUTO"){
+        const mode=(a[1]||"STATUS").toUpperCase();
+        if(mode==="START"){
+          const missing = [0,1,2,3,4,5].find(s=>!this.present(s+1));
+          if(missing!==undefined) return ["ERR CAL AUTO feedback_missing_slot=" + missing + "_id=" + (missing+1) + " fix_ids_or_wiring_first"];
+          this.autoActive=1; for(let s=0;s<6;s++){this.cal[s].samples=0; this.cal[s].min=this.rng(); this.cal[s].max=0;}
+          return ["OK CAL AUTO START"];
+        }
+        if(mode==="FINISH"){ this.autoActive=0; for(let s=0;s<6;s++){const c=this.cal[s]; if(c.samples>3 && c.max>c.min) c.valid=1;}
+          return ["OK CAL AUTO FINISH torque=off"]; }
+        if(mode==="CANCEL"){ this.autoActive=0; return ["OK CAL AUTO CANCEL torque=off"]; }
+        const out=[]; for(let s=0;s<6;s++){const c=this.cal[s];
+          out.push("CAL_AUTO slot=" + s + " samples=" + c.samples + " min=" + c.min + " max=" + c.max + " last=" + c.last);}
+        out.push("OK CAL AUTO STATUS active=" + this.autoActive);
+        return out;
+      }
+      if(sub==="SAVE"){
+        const bad = [0,1,2,3,4,5].find(s=>!this.cal[s].valid);
+        if(bad!==undefined) return ["ERR CAL incomplete_slot=" + bad];
+        this.calibrated = 1;
+        return ["OK CAL SAVE calibrated=1"];
+      }
+      return ["ERR CAL subcommand_unknown"];
+    }
+    if(v==="TORQUE"){ const t=a[0]===undefined?0:a[0]; const on=parseInt(a[1]||"0",10);
+      if(on!==0&&on!==1) return ["ERR TORQUE usage_slot_or_id_0_or_1"];
+      this.torque[t]=on; return ["OK TORQUE target=" + t + " enabled=" + on]; }
+    if(v==="ARM"){ if(!this.calibrated) return ["ERR ARM calibration_incomplete"]; this.armed=1; return ["OK ARM armed=1"]; }
+    if(v==="DISARM"){ this.armed=0; return ["OK DISARM armed=0"]; }
+    if(v==="SAFE"){ this.armed=0; this.torque={}; return ["OK SAFE torque=off armed=0"]; }
+    if(v==="STANDBY"){ if((a[0]||"").toUpperCase()!=="CONFIRM") return ["ERR STANDBY requires_CONFIRM"];
+      this.armed=0; return ["OK STANDBY torque=off"]; }
+    if(v==="PRESS"||v==="RELEASE"){ if(!this.armed) return ["ERR " + v + " motion_not_armed"];
+      return ["OK " + v + " slot=" + (a[0]||0)]; }
+    if(v==="MOVE"){ if(!this.armed) return ["ERR MOVE motion_not_armed"];
+      return ["OK MOVE id=" + (a[0]||0) + " pos=" + (a[1]||0)]; }
+    if(v==="DEMO"){ if(!this.armed||!this.calibrated) return ["ERR DEMO arm_and_calibrate_first"]; return ["OK DEMO start"]; }
+    if(v==="ENROLL"){ const sub=(a[0]||"STATUS").toUpperCase();
+      if(sub==="START"){ this.enroll={active:1,next:1,phase:"WAIT_EMPTY"};
+        return ["OK ENROLL START active=1 next=1 temp=10 phase=WAIT_EMPTY requirement=first_1_to_10_then_add_id1_as_2_to_6_then_10_to_1"]; }
+      if(sub==="STOP"){ this.enroll.active=0; this.enroll.phase="OFF"; return ["OK ENROLL STOP active=0 next=1 torque=off"]; }
+      return ["OK ENROLL STATUS active=" + this.enroll.active + " next=" + this.enroll.next + " phase=" + this.enroll.phase + " last=inactive"];
+    }
+    if(v==="AUTO"){ return ["AUTO_BEGIN ids=1-6 attempts=3", "AUTO_ID id=1 pings=3 identity=1 type=" + this.profile,
+      "AUTO_PROFILE name=" + this.profile + " found=" + this.ids.length + " ids=" + this.ids.join(",") +
+      " missing=none unstable=none", "AUTO_RESULT profile=" + this.profile + " found=" + this.ids.length + " ready=1 action=none",
+      "OK AUTO profile=" + this.profile + " ready=1 range=" + this.rng()]; }
+    return ["ERR UNKNOWN_COMMAND verb=" + v];
+  }
+  /* 模拟采样推进: 位置在量程内游走 */
+  tick(){
+    if(!this.autoActive) return;
+    this.ids.forEach(id=>{
+      const s = id-1; const c = this.cal[s];
+      if(!c) return;
+      const p = 300 + Math.floor(Math.random()* (this.rng()-600));
+      this.pos[id] = p; c.last = p; c.samples++;
+      if(p < c.min) c.min = p;
+      if(p > c.max) c.max = p;
+    });
+  }
+}
+
+/* ---------------- 传输层: 实机 Web Serial / 模拟 ---------------- */
+class Transport {
+  constructor(){ this.mode = "sim"; this.port = null; this.reader = null; this.buf = ""; this.connected = false;
+    this.mock = new MockFirmware(); this.listeners = []; this.mockTimer = setInterval(()=>this.mock.tick(), 120); }
+
+  onLine(fn){ this.listeners.push(fn); }
+  emit(line){ this.listeners.forEach(f=>f(line)); }
+
+  async connectReal(baud){
+    if(!("serial" in navigator)) throw new Error("此浏览器不支持 Web Serial（请用 Chrome/Edge 桌面版）");
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({ baudRate: baud });
+    this.connected = true; this.mode = "real";
+    this._readLoop();
+  }
+  async _readLoop(){
+    const dec = new TextDecoder();
+    while(this.connected && this.port && this.port.readable){
+      this.reader = this.port.readable.getReader();
+      try{
+        while(true){
+          const {value, done} = await this.reader.read();
+          if(done) break;
+          this.buf += dec.decode(value, {stream:true});
+          let i;
+          while((i = this.buf.indexOf("\n")) >= 0){
+            const line = this.buf.slice(0, i).replace(/\r$/,"");
+            this.buf = this.buf.slice(i+1);
+            if(line.trim()) this.emit(line);
+          }
+        }
+      }catch(e){ /* 断开 */ }
+      finally { try{ this.reader.releaseLock(); }catch(e){} }
+    }
+  }
+  async connectSim(){ this.mode = "sim"; this.connected = true; }
+  async disconnect(){
+    this.connected = false;
+    try{ if(this.reader) await this.reader.cancel(); }catch(e){}
+    try{ if(this.port) await this.port.close(); }catch(e){}
+    this.port = null; this.reader = null;
+  }
+  /* 发一条命令, 收集回复行; resolve 为收到的行数组 */
+  send(cmd, timeoutMs = 1500){
+    logLine("→ " + cmd, "pl");
+    if(this.mode === "sim"){
+      const lines = this.mock.handle(cmd);
+      return new Promise(res=>{
+        let i = 0;
+        const step = ()=>{ if(i < lines.length){ this.emit(lines[i]); logRecv(lines[i]); i++; setTimeout(step, 8); }
+                           else res(lines); };
+        setTimeout(step, 30);
+      });
+    }
+    return new Promise(res=>{
+      const got = [];
+      const off = (line)=>{ got.push(line); logRecv(line); };
+      this.listeners.push(off);
+      const done = ()=>{ this.listeners = this.listeners.filter(f=>f!==off); res(got); };
+      this._write(cmd).catch(e=>{ logLine("写串口失败: " + e.message, "err"); done(); });
+      setTimeout(done, timeoutMs);
+    });
+  }
+  async _write(cmd){
+    const w = this.port.writable.getWriter();
+    await w.write(new TextEncoder().encode(cmd + "\r\n"));
+    w.releaseLock();
+  }
+}
+
+const T = new Transport();
+
+/* ---------------- 状态 ---------------- */
+const S = { info:{}, slots:{}, cal:{}, found:[] };
+
+/* ---------------- 连接 UI ---------------- */
+function setMode(m){
+  $("#btnModeSim").className = m==="sim" ? "primary" : "";
+  $("#btnModeReal").className = m==="real" ? "primary" : "";
+  $("#connHint").textContent = m==="sim" ? "模拟模式无需硬件，可完整验证逻辑" : "实机模式：Web Serial 直连，波特率 115200";
+}
+setMode("sim");
+
+$("#btnModeSim").onclick = ()=>setMode("sim");
+$("#btnModeReal").onclick = ()=>setMode("real");
+
+$("#btnConnect").onclick = async ()=>{
+  const baud = parseInt($("#baud").value,10) || 115200;
+  try{
+    if($("#btnModeReal").className === "primary"){ await T.connectReal(baud); }
+    else { await T.connectSim(); }
+    $("#btnConnect").disabled = true; $("#btnDisconnect").disabled = false;
+    $("#connMsg").className = "msg ok";
+    $("#connMsg").textContent = "已连接（" + (T.mode==="sim"?"模拟固件":"实机 · " + baud + " bps") + "）";
+    logLine("已连接: " + T.mode, "ok");
+    await refreshAll();
+    startPolling();
+  }catch(e){
+    $("#connMsg").className = "msg err";
+    $("#connMsg").textContent = "连接失败: " + e.message;
+    logLine("连接失败: " + e.message, "err");
+  }
+};
+$("#btnDisconnect").onclick = async ()=>{
+  stopPolling(); await T.disconnect();
+  $("#btnConnect").disabled = false; $("#btnDisconnect").disabled = true;
+  $("#connMsg").className = "msg"; $("#connMsg").textContent = "已断开。";
+};
+
+/* ---------------- 解析 ---------------- */
+const kv = s => Object.fromEntries([...s.matchAll(/(\w+)=([^\s]+)/g)].map(m=>[m[1],m[2]]));
+
+async function refreshInfo(){
+  const lines = await T.send("INFO", 1500);
+  const line = lines.find(l=>l.startsWith("OK INFO"));
+  if(!line){ $("#infoTable").innerHTML = '<tbody><tr><td class="msg err">无 INFO 回复</td></tr></tbody>'; return; }
+  S.info = kv(line);
+  const rows = [
+    ["固件版本", S.info.fw], ["舵机档位", S.info.profile + "（量程 " + S.info.range + "）"],
+    ["WiFi 热点 / 地址", S.info.ap + " / " + S.info.ip],
+    ["已校准 / 已使能", S.info.calibrated + " / " + S.info.armed],
+    ["自动采样 / ENROLL", S.info.auto_active + " / active=" + S.info.enroll_active + " next=" + S.info.enroll_next + " phase=" + S.info.enroll_phase]
+  ];
+  $("#infoTable").innerHTML = "<tbody>" + rows.map(r=>`<tr><th style="width:150px">${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join("") + "</tbody>";
+}
+
+async function refreshSlots(){
+  const lines = await T.send("STATUS_ALL", 4000);
+  const out = {};
+  lines.filter(l=>l.startsWith("SLOT")).forEach(l=>{ const d = kv(l); out[+d.slot] = d; });
+  if(!Object.keys(out).length){ $("#statusMsg").className="msg err"; $("#statusMsg").textContent="无 SLOT 数据"; return; }
+  S.slots = out;
+  $("#statusMsg").className = "msg ok";
+  const online = Object.values(out).filter(d=>d.online==="1").length;
+  $("#statusMsg").textContent = "在线 " + online + "/6";
+  renderSlots(); renderPress();
+}
+
+function renderSlots(){
+  const tb = $("#slotBody"), bars = $("#slotBars");
+  tb.innerHTML = ""; bars.innerHTML = "";
+  const rng = +(S.info.range || 4095);
+  for(let s=0;s<6;s++){
+    const d = S.slots[s] || {name:SLOTS[s], id:s+1, online:0, min:"-", standby:"-", max:"-", valid:0, press:"-"};
+    const on = d.online === "1";
+    tb.insertAdjacentHTML("beforeend", `<tr class="${on?"on":""}"><td>${s}</td><td>${esc(d.name||SLOTS[s])}</td>
+      <td>${d.id}</td><td><span class="pill ${on?"ok":"bad"}">${on?"在线":"离线"}</span></td>
+      <td>${d.min}</td><td>${d.standby}</td><td>${d.max}</td><td>${(+d.max>+d.min)? (+d.max - +d.min):0}</td>
+      <td>${d.valid==="1"?"✔":"—"}</td><td>${d.press||"-"}</td></tr>`);
+    const mn = +d.min||0, mx = +d.max||0, st = +d.standby||0;
+    const pct = v => Math.max(0, Math.min(100, v/rng*100));
+    const w = Math.max(0, pct(mx)-pct(mn));
+    bars.insertAdjacentHTML("beforeend", `<div class="slot"><span class="nm">${s} ${esc(d.name||SLOTS[s])}</span>
+      <span class="id">ID${d.id}</span>
+      <span class="bar"><i style="left:${pct(mn)}%;width:${w}%"></i><b style="left:${pct(st)}%"></b><u style="left:${pct(mx)}%"></u></span>
+      <span class="val">${mn}·${st}·${mx}${+d.max>+d.min?"  ("+Math.round(w)+"%)":""}</span></div>`);
+  }
+}
+
+function renderPress(){
+  const tb = $("#pressBody"); tb.innerHTML = "";
+  for(let s=0;s<6;s++){
+    tb.insertAdjacentHTML("beforeend", `<tr><td>${s}</td><td>${SLOTS[s]}</td>
+      <td><button data-press="${s}">PRESS</button></td><td><button data-rel="${s}">RELEASE</button></td>
+      <td><select data-dir="${s}"><option value="max">max</option><option value="min">min</option></select></td></tr>`);
+  }
+  tb.querySelectorAll("[data-press]").forEach(b=>b.onclick = ()=>T.send("PRESS " + b.dataset.press, 1200));
+  tb.querySelectorAll("[data-rel]").forEach(b=>b.onclick = ()=>T.send("RELEASE " + b.dataset.rel, 1200));
+  tb.querySelectorAll("[data-dir]").forEach(sel=>{
+    sel.value = (S.slots[+sel.dataset.dir]||{}).press || "max";
+    sel.onchange = ()=>T.send("SETDIR " + sel.dataset.dir + " " + sel.value, 1200);
+  });
+}
+
+async function refreshAll(){ await refreshInfo(); await refreshSlots(); }
+
+/* ---------------- 自动刷新 ---------------- */
+let pollTimer = null;
+function startPolling(){ stopPolling(); if(!$("#autoPoll").checked) return;
+  pollTimer = setInterval(async ()=>{ if(T.connected){ await refreshSlots(); await refreshCal(true); } }, 2500); }
+function stopPolling(){ if(pollTimer) clearInterval(pollTimer); pollTimer = null; }
+$("#autoPoll").onchange = ()=> startPolling();
+
+/* ---------------- 按钮 ---------------- */
+$("#btnInfo").onclick = refreshInfo;
+$("#btnProfileST").onclick = async ()=>{ await T.send("PROFILE STS3032", 2000); await refreshInfo(); };
+$("#btnProfileSC").onclick = async ()=>{ await T.send("PROFILE SC09", 2000); await refreshInfo(); };
+$("#btnStatusAll").onclick = refreshSlots;
+
+/* 扫描: 固件自带 SCAN 会漏报, 因此逐个 PING (1~10) 更可靠 */
+$("#btnScan").onclick = async ()=>{
+  $("#statusMsg").className = "msg warn";
+  $("#statusMsg").textContent = "逐个探测中…（每个 ID 约 0.6s）";
+  const found = [];
+  for(let id=1; id<=10; id++){
+    const lines = await T.send("PING " + id, 1200);
+    if(lines.some(l=>l.startsWith("OK PING"))) found.push(id);
+  }
+  S.found = found;
+  $("#statusMsg").className = found.length ? "msg ok" : "msg err";
+  $("#statusMsg").textContent = "探测到 ID: " + (found.length ? found.join(", ") : "无（检查接线/供电/ID 撞车）");
+};
+
+/* ---- 编号向导 ---- */
+$("#btnWizDetect").onclick = async ()=>{
+  $("#wizMsg").className = "msg warn"; $("#wizMsg").textContent = "探测中…";
+  const found = [];
+  for(let id=1; id<=10; id++){
+    const lines = await T.send("PING " + id, 1200);
+    if(lines.some(l=>l.startsWith("OK PING"))) found.push(id);
+  }
+  S.found = found;
+  $("#wizFound").innerHTML = "<tr><td>" + (found.length
+    ? "当前在线: <b>" + found.join(", ") + "</b>（只应有一个；多个说明 ID 撞车或没拔干净）"
+    : "总线上没有舵机 —— 请插入要编号的那一个") + "</td></tr>";
+  $("#wizMsg").className = found.length===1 ? "msg ok" : "msg warn";
+  $("#wizMsg").textContent = found.length===1 ? "可执行改号" : "请确保总线上只有一个舵机";
+  if(found.length===1) $("#wizTarget").value = found[0];
+};
+$("#btnWizAssign").onclick = async ()=>{
+  const target = parseInt($("#wizTarget").value,10);
+  if(!S.found.length){ $("#wizMsg").className="msg err"; $("#wizMsg").textContent="先点「检测当前舵机」"; return; }
+  const cur = S.found[0];
+  if(cur === target){ $("#wizMsg").className="msg ok"; $("#wizMsg").textContent="已经是 ID " + target + "，无需改号"; return; }
+  $("#wizMsg").className = "msg warn"; $("#wizMsg").textContent = "改号 " + cur + " → " + target + " …（成功后舵机可能重启，稍等）";
+  await T.send("SETID " + cur + " " + target + " CONFIRM", 8000);
+  await new Promise(r=>setTimeout(r, 1200));
+  const chk = await T.send("PING " + target, 1500);
+  const ok = chk.some(l=>l.startsWith("OK PING"));
+  $("#wizMsg").className = ok ? "msg ok" : "msg err";
+  $("#wizMsg").textContent = ok ? "✔ 改号成功：当前舵机 ID = " + target + "　→ 请拔下贴上标签，再插下一个"
+                                : "✘ 复核失败：可能接触不良或改号未生效，重试一次";
+  S.found = ok ? [target] : [];
+};
+$("#btnWizScanAll").onclick = ()=>{ $("#wizTarget").value = 1; $("#btnWizDetect").click(); };
+
+/* ---- 校准 ---- */
+async function refreshCal(silent){
+  const lines = await T.send("CAL STATUS", 2000);
+  const out = {};
+  lines.filter(l=>l.startsWith("CAL slot")).forEach(l=>{ const d = kv(l); out[+d.slot] = d; });
+  if(Object.keys(out).length){ S.cal = out; renderCalTable(); }
+  return out;
+}
+function renderCalTable(snap){
+  const tb = $("#calBody"); if(!tb) return;
+  tb.innerHTML = "";
+  const rng = +(S.info.range || 4095);
+  for(let s=0;s<6;s++){
+    const c = S.cal[s] || {}, a = (snap||{})[s] || {};
+    const mn = +(a.min ?? c.min ?? 0), mx = +(a.max ?? c.max ?? 0), last = a.last;
+    const prog = Math.round(Math.max(0,Math.min(100, (mx-mn)/rng*100)));
+    tb.insertAdjacentHTML("beforeend", `<tr><td>${s}</td><td>${esc(c.name||SLOTS[s])}</td><td>${c.id||s+1}</td>
+      <td>${a.samples ?? "—"}</td><td>${mn}</td><td>${mx}</td><td>${last ?? "—"}</td>
+      <td><div class="bar" style="height:12px"><i style="left:${Math.round(mn/rng*100)}%;width:${prog}%"></i></div>${prog}%</td></tr>`);
+  }
+}
+$("#btnCalStatus").onclick = ()=>refreshCal(false);
+$("#btnCalClear").onclick = async ()=>{ await T.send("CAL CLEAR", 4000); await refreshCal(); $("#calMsg").textContent="已清空校准数据"; };
+$("#btnCalCancel").onclick = async ()=>{ await T.send("CAL AUTO CANCEL", 2000); $("#calMsg").className="msg"; $("#calMsg").textContent="已取消采样"; };
+
+let calTimer = null;
+$("#btnCalStart").onclick = async ()=>{
+  const secs = parseInt($("#calSecs").value,10) || 15;
+  const lines = await T.send("CAL AUTO START", 4000);
+  if(lines.some(l=>l.startsWith("ERR"))){
+    $("#calMsg").className = "msg err";
+    $("#calMsg").textContent = "启动失败（见日志：常见是某些槽位没有反馈/ID 撞车）";
+    return;
+  }
+  $("#calMsg").className = "msg ok";
+  $("#calProg").value = 0;
+  const t0 = Date.now();
+  clearInterval(calTimer);
+  calTimer = setInterval(async ()=>{
+    const snap = {};
+    (await T.send("CAL AUTO STATUS", 3000)).filter(l=>l.startsWith("CAL_AUTO"))
+      .forEach(l=>{ const d = kv(l); snap[+d.slot] = d; });
+    renderCalTable(snap);
+    const el = (Date.now()-t0)/1000;
+    $("#calProg").value = Math.min(100, el/secs*100);
+    const samp = Object.values(snap).reduce((s,d)=>s+(+d.samples||0),0);
+    $("#calMsg").textContent = "采样中 " + el.toFixed(0) + "/" + secs + " 秒，累计样本 " + samp +
+      "　（请反复做：拇指直按、拇指侧压、四指伸直↔握拳）";
+    if(el >= secs){ clearInterval(calTimer); await T.send("CAL AUTO FINISH", 4000);
+      await refreshCal(); $("#calProg").value = 100;
+      $("#calMsg").className = "msg ok"; $("#calMsg").textContent = "采样结束，点「保存 (CAL SAVE)」写入固件"; }
+  }, 1200);
+};
+$("#btnCalFinish").onclick = async ()=>{ clearInterval(calTimer); await T.send("CAL AUTO FINISH", 4000); await refreshCal(); $("#calMsg").textContent="已结束采样"; };
+$("#btnCalSave").onclick = async ()=>{ const r = await T.send("CAL SAVE", 4000);
+  $("#calMsg").className = r.some(l=>l.startsWith("OK")) ? "msg ok" : "msg err";
+  $("#calMsg").textContent = r.some(l=>l.startsWith("OK")) ? "校准已保存" : "保存失败（可能仍有槽位不完整）";
+  await refreshInfo(); };
+
+/* ---- 动作 ---- */
+$("#btnArm").onclick = async ()=>{ await T.send("ARM", 2000); await refreshInfo(); };
+$("#btnDisarm").onclick = async ()=>{ await T.send("DISARM", 2000); await refreshInfo(); };
+$("#btnSafe").onclick = async ()=>{ await T.send("SAFE", 2000); await refreshInfo(); };
+$("#btnStandby").onclick = async ()=>{ await T.send("STANDBY CONFIRM", 2000); await refreshInfo(); };
+$("#btnDemo").onclick = ()=>T.send("DEMO", 2000);
+$("#btnTqOn").onclick = ()=>T.send("TORQUE " + $("#tqTarget").value + " 1", 1500);
+$("#btnTqOff").onclick = ()=>T.send("TORQUE " + $("#tqTarget").value + " 0", 1500);
+$("#btnMove").onclick = ()=>T.send("MOVE " + $("#mvId").value + " " + $("#mvPos").value + " " +
+  $("#mvSpd").value + " " + $("#mvAcc").value + " ARM", 2000);
+
+/* ---- 终端 ---- */
+$("#btnRaw").onclick = ()=>T.send($("#rawCmd").value.trim(), 3000);
+$("#rawCmd").addEventListener("keydown", e=>{ if(e.key==="Enter") $("#btnRaw").click(); });
+$("#btnClearLog").onclick = ()=>{ $("#log").innerHTML = ""; };
+$("#btnCopyLog").onclick = ()=>navigator.clipboard.writeText($("#log").innerText);
+
+/* ---- 快捷命令 ---- */
+["HELP","INFO","SCAN","STATUS_ALL","CAL STATUS","CAL AUTO STATUS","ENROLL STATUS","AUTO"].forEach(c=>{
+  const b = document.createElement("button"); b.textContent = c;
+  b.onclick = ()=>T.send(c, 8000); $("#quick").appendChild(b);
+});
+
+/* 初始渲染 */
+renderSlots(); renderPress();
+logLine("调试台就绪。默认「模拟模式」：直接点「连接」即可在无硬件情况下走完 校准→ARM→PRESS 全流程。", "ok");
+</script>
+</body>
+</html>

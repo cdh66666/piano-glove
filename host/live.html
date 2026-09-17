@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>舵机编号向导 · 实时进度</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f6f7f9; color: #222; }
+  header { padding: 14px 20px; background: #1f6feb; color: #fff; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header small { opacity: .85; }
+  #bar { display: flex; gap: 8px; padding: 12px 20px; flex-wrap: wrap; }
+  .step { padding: 6px 14px; border-radius: 16px; background: #e4e7ec; color: #555; font-size: 13px; }
+  .step.done { background: #1a7f37; color: #fff; }
+  .step.cur  { background: #d29922; color: #fff; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  pre { margin: 0; padding: 14px 20px 30px; font: 13px/1.55 Consolas, "Courier New", monospace;
+        white-space: pre-wrap; word-break: break-all; }
+  .ok   { color: #1a7f37; font-weight: 600; }
+  .err  { color: #cf222e; font-weight: 600; }
+  .warn { color: #9a6700; font-weight: 600; }
+  #state { position: fixed; right: 14px; top: 14px; font-size: 12px; background: #ffffffcc;
+           padding: 4px 10px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>舵机 ID 自动编号向导 <small>—— 按提示插拔舵机即可，无需敲命令</small></h1>
+</header>
+<div id="state">连接中…</div>
+<div id="bar"></div>
+<pre id="log">加载中…</pre>
+<script>
+const TARGETS = ["拇指侧压", "拇指下压", "食指", "中指", "无名指", "小指"];
+let lastLen = -1;
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function colorize(line){
+  if (/✔|全部完成/.test(line)) return '<span class="ok">'+esc(line)+'</span>';
+  if (/✘|ERR|失败/.test(line))  return '<span class="err">'+esc(line)+'</span>';
+  if (/⚠|请拔掉|请接入|请把这个舵机/.test(line)) return '<span class="warn">'+esc(line)+'</span>';
+  return esc(line);
+}
+function renderBar(txt){
+  const bar = document.getElementById("bar");
+  let cur = -1, done = 0;
+  const m = [...txt.matchAll(/✔ 已编号为 ID (\d+)/g)];
+  done = new Set(m.map(x => +x[1])).size;
+  const wait = txt.match(/>>> 第 (\d) 轮[^]*?$/);
+  cur = wait ? +wait[1] : (done >= 6 ? -1 : done + 1);
+  bar.innerHTML = TARGETS.map((n, i) => {
+    const k = i + 1;
+    const cls = k <= done ? "step done" : (k === cur ? "step cur" : "step");
+    return '<span class="'+cls+'">'+k+" · "+n+(k<=done?" ✔":"")+'</span>';
+  }).join("");
+}
+async function tick(){
+  try {
+    const r = await fetch("assign_log.txt?t=" + Date.now(), {cache: "no-store"});
+    if (!r.ok) throw new Error(r.status);
+    const txt = await r.text();
+    const pre = document.getElementById("log");
+    const stick = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+    pre.innerHTML = txt.split("\n").map(colorize).join("\n");
+    renderBar(txt);
+    if (stick) pre.scrollTop = pre.scrollHeight;
+    document.getElementById("state").textContent = "实时更新中 " + new Date().toLocaleTimeString();
+    document.getElementById("state").style.color = "#1a7f37";
+  } catch (e) {
+    document.getElementById("state").textContent = "读取失败: " + e.message;
+    document.getElementById("state").style.color = "#cf222e";
+  }
+}
+tick();
+setInterval(tick, 1500);
+</script>
+</body>
+</html>

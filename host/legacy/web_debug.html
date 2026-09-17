@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>钢琴手套 · 网页调试端</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --line:#e3e6ec; --text:#1f2430; --muted:#6b7280;
+    --accent:#2563eb; --accent-soft:#e8effd; --ok:#0f9d58; --warn:#e8710a; --err:#d93025;
+    --c1:#378add; --c2:#1d9e75; --c3:#7f77dd; --c4:#ba7517; --c5:#d85a30; --c6:#d4537e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  h1{font-size:16px;font-weight:600;margin:0;margin-right:auto}
+  .wrap{display:grid;grid-template-columns:minmax(340px,400px) 1fr;gap:14px;padding:14px}
+  @media (max-width:980px){.wrap{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .panel h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--text);
+    display:flex;align-items:center;gap:8px}
+  .panel h2 small{font-weight:400;color:var(--muted);font-size:12px}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .row:last-child{margin-bottom:0}
+  label{color:var(--muted);font-size:12px}
+  button{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:8px;
+    padding:6px 12px;font-size:13px;cursor:pointer;transition:.15s}
+  button:hover:not(:disabled){border-color:#c3cad6;background:#fafbfc}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover:not(:disabled){background:#1d4ed8;border-color:#1d4ed8}
+  button.danger{border-color:#f0b4ae;color:var(--err)}
+  button.danger:hover:not(:disabled){background:#fdecea}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  input[type=number],select{border:1px solid var(--line);border-radius:8px;padding:5px 8px;
+    font-size:13px;background:#fff;color:var(--text);font-family:inherit}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:0;border-radius:0;padding:5px 11px;font-size:12px}
+  .seg button+button{border-left:1px solid var(--line)}
+  .pill{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+  .pill.gray{background:#f0f1f4;color:var(--muted)}
+  .pill.ok{background:#e6f4ea;color:var(--ok)}
+  .pill.warn{background:#fef3e6;color:var(--warn)}
+  .status{font-size:12px;color:var(--muted);min-height:18px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--muted);font-weight:500;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+  td{padding:5px 6px;border-bottom:1px solid #f2f4f7;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  .bar{height:6px;background:#eef0f4;border-radius:99px;overflow:hidden;min-width:64px}
+  .bar i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .05s linear}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;vertical-align:middle}
+  .notes{display:flex;gap:6px;flex-wrap:wrap}
+  .note{flex:1 1 0;min-width:74px;text-align:center;border:1px solid var(--line);border-radius:8px;
+    padding:6px 4px;background:#fbfcfd;transition:.1s}
+  .note b{display:block;font-size:13px}
+  .note span{font-size:11px;color:var(--muted)}
+  .note.active{background:#fff3ec;border-color:#f0997b;box-shadow:inset 0 0 0 1px #f0997b}
+  .note.active b{color:#993c1d}
+  .kbd{display:flex;gap:3px;margin-top:8px}
+  .key{flex:1 1 0;text-align:center;font-size:11px;padding:5px 2px;border-radius:6px;
+    background:#fff;border:1px solid var(--line);color:var(--muted)}
+  .key.active{background:#e8effd;border-color:var(--accent);color:var(--accent);font-weight:600}
+  .hint{font-size:12px;color:var(--muted);line-height:1.55}
+  code{background:#f2f4f7;padding:1px 5px;border-radius:5px;font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .calib-row{display:grid;grid-template-columns:92px 1fr 62px;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+  .calib-row .num{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  #scope{width:100%;height:150px;display:block;background:#fff;border:1px solid var(--line);border-radius:10px}
+  svg.hand{width:100%;height:auto;max-height:430px;display:block}
+</style>
+</head>
+<body>
+<header>
+  <h1>钢琴手套 · 网页调试端</h1>
+  <span id="modePill" class="pill">模拟模式</span>
+  <span id="connPill" class="pill gray">未连接</span>
+  <div class="seg" id="modeSeg">
+    <button data-mode="sim" class="on">模拟模式</button>
+    <button data-mode="real">实机模式 (Web Serial)</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- 左栏 -->
+  <div>
+    <div class="panel">
+      <h2>连接 <small id="connHint">模拟模式无需硬件</small></h2>
+      <div class="row">
+        <button id="btnConnect" class="primary">连接(模拟)</button>
+        <button id="btnDisconnect" disabled>断开</button>
+        <label style="margin-left:auto">波特率</label>
+        <input type="number" id="baud" value="115200" style="width:104px">
+      </div>
+      <div class="status" id="connStatus">未连接。模拟模式下所有运动学行为(行程、跟随速度、滞后)都会仿真，可先验证逻辑与节奏。</div>
+    </div>
+
+    <div class="panel">
+      <h2>校准 <small id="calibHint">点开始后拖动滑块模拟手指活动</small></h2>
+      <div class="row">
+        <button id="btnCalib" class="primary" disabled>开始校准 (10s)</button>
+        <button id="btnAutoCalib" disabled>一键自动扫行程</button>
+        <button id="btnImport" disabled>导入 calib.json</button>
+        <button id="btnExport" disabled>导出 calib.json</button>
+        <input type="file" id="fileImport" accept=".json" style="display:none">
+      </div>
+      <div class="status" id="calibStatus">尚未校准。</div>
+    </div>
+
+    <div class="panel">
+      <h2>驱动模式 <small>80% 行程正弦往复</small></h2>
+      <div class="row">
+        <label>目标</label>
+        <select id="target" disabled>
+          <option>全部手指</option>
+          <option>拇指(下压+侧压)</option>
+          <option>食指</option><option>中指</option><option>无名指</option><option>小指</option>
+        </select>
+        <span class="pill gray" id="drivePill">停止</span>
+      </div>
+      <div class="row">
+        <label style="min-width:34px">频率</label>
+        <input type="range" id="freq" min="0" max="6" step="0.5" value="1">
+        <b id="freqVal" style="min-width:52px;text-align:right">1.0 Hz</b>
+      </div>
+      <div class="row">
+        <button id="btnDrive" class="primary" disabled>开始驱动</button>
+        <button id="btnCenter" disabled>回中位</button>
+        <button id="btnStop" class="danger">急停</button>
+      </div>
+      <div class="status" id="driveStatus">未校准前不可驱动。</div>
+    </div>
+
+    <div class="panel">
+      <h2>歌曲模式 <small>do=拇指直按 · re=拇指斜按(1+2协同)</small></h2>
+      <div class="row">
+        <label>曲目</label>
+        <select id="song"><option>两只老虎</option></select>
+        <label>BPM</label>
+        <input type="number" id="bpm" value="100" min="40" max="200" style="width:64px">
+        <button id="btnSong" class="primary" disabled>开始播放</button>
+      </div>
+      <div class="notes" id="noteRow"></div>
+      <div class="kbd" id="kbdRow"></div>
+    </div>
+
+    <div class="panel">
+      <h2>手动测试 <small>模拟模式下拖动即为手指活动</small></h2>
+      <div id="manualRow"></div>
+    </div>
+  </div>
+
+  <!-- 右栏 -->
+  <div>
+    <div class="panel">
+      <h2>手指状态 <small>拇指双舵机协同: 下压 + 侧压 = 斜按</small></h2>
+      <div class="grid2">
+        <svg class="hand" viewBox="0 0 420 400" role="img" aria-label="手指姿态示意">
+          <title>手指姿态实时示意</title>
+          <defs>
+            <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffe8d6"/><stop offset="1" stop-color="#f7d3b6"/>
+            </linearGradient>
+          </defs>
+          <rect x="118" y="150" width="172" height="196" rx="34" fill="url(#skin)" stroke="#dcae8a" stroke-width="1"/>
+          <rect x="128" y="300" width="76" height="34" rx="14" fill="#f7d3b6" stroke="#dcae8a" stroke-width="1"/>
+          <line x1="128" y1="318" x2="204" y2="318" stroke="#dcae8a" stroke-width="1"/>
+          <g id="fingers"></g>
+          <g id="thumbGroup">
+            <rect id="thumbBar" x="-15" y="-78" width="30" height="80" rx="15" fill="url(#skin)" stroke="#dcae8a" stroke-width="1"/>
+          </g>
+          <circle id="keydot" cx="300" cy="330" r="0" fill="#ff8a65" opacity=".28"/>
+          <text x="210" y="378" text-anchor="middle" font-size="12" fill="#6b7280">手背视图 · 按下时手指向掌心弯曲(视觉上缩短)</text>
+        </svg>
+        <div>
+          <table>
+            <thead><tr><th>舵机</th><th>作用</th><th>位置</th><th>行程</th></tr></thead>
+            <tbody id="servoTable"></tbody>
+          </table>
+          <div class="hint" id="thumbInfo" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>位置反馈示波器 <small>最近 5 秒 · 6 路</small></h2>
+      <canvas id="scope" width="1200" height="300"></canvas>
+      <div class="row" style="margin-top:8px">
+        <span class="hint" id="followHint">—</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>说明</h2>
+      <div class="hint">
+        拇指由 <b>1 号(下压)</b> 与 <b>2 号(侧压)</b> 两个舵机共同控制：只动 1 号 = 拇指正下方直按；1、2 号同时动 = 拇指斜向下按。
+        程序里 <code>NOTE_ACTIONS</code> 把 <b>do</b> 映射为只压 1 号、<b>re</b> 映射为 1+2 号协同，其余音符对应食/中/无/小指。<br>
+        实机模式使用浏览器 Web Serial 直接读写 STS3032（请用 Chrome / Edge 打开本页，并允许串口访问）；模拟模式无需硬件，用于验证行程、节奏与可行性。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ 常量: 与 Python 程序保持一致 ============ */
+const SERVOS = [1,2,3,4,5,6];
+const ROLE = {1:"拇指·下压",2:"拇指·侧压",3:"食指",4:"中指",5:"无名指",6:"小指"};
+const COLOR = {1:"#378add",2:"#1d9e75",3:"#7f77dd",4:"#ba7517",5:"#d85a30",6:"#d4537e"};
+const LATERAL_RATIO = 0.85;     // 侧压舵机行程比例
+const RANGE_USE = 0.80;         // 使用校准范围的 80%
+const SERVO_MAX_SPEED = 6000;   // 模拟舵机最大速度 (counts/s), 仅模拟模式
+const CTRL_HZ = 50;             // 控制循环
+const ACTUATORS = {"全部手指":[1,2,3,4,5,6],"拇指(下压+侧压)":[1,2],"食指":[3],"中指":[4],"无名指":[5],"小指":[6]};
+const NOTE_ACTIONS = {1:{1:1.0}, 2:{1:1.0,2:LATERAL_RATIO}, 3:{3:1.0}, 4:{4:1.0}, 5:{5:1.0}, 6:{6:1.0}, "-5":{5:1.0}};
+const NOTE_LABEL = {1:"do",2:"re",3:"mi",4:"fa",5:"sol",6:"la"};
+const NOTE_DESC  = {1:"拇指直按 1号",2:"拇指斜按 1+2号",3:"食指 3号",4:"中指 4号",5:"无名指 5号",6:"小指 6号"};
+const SONGS = {"两只老虎":[
+  [1,1],[2,1],[3,1],[1,1], [1,1],[2,1],[3,1],[1,1],
+  [3,1],[4,1],[5,2],       [3,1],[4,1],[5,2],
+  [5,.5],[6,.5],[5,.5],[4,.5],[3,1],[1,1],
+  [5,.5],[6,.5],[5,.5],[4,.5],[3,1],[1,1],
+  [2,1],[5,1],[1,2],       [2,1],[5,1],[1,2]
+]};
+
+/* ============ 状态 ============ */
+const S = {
+  mode:"sim", connected:false, calibrated:false,
+  servo:{},           // id -> {pos,target,min:0,max:4095,cmin:null,cmax:null}
+  calibrating:false, calibT0:0, calibStart:{}, calibEnd:{},
+  driving:false, freq:1, singing:false, activeNote:null, songT0:0, songIdx:0,
+  lastErr:0, hist:[], followErr:0, msg:""
+};
+SERVOS.forEach(id=>{
+  S.servo[id] = {pos:1000+id*60, target:1000+id*60, min:0, max:4095, cmin:null, cmax:null, manual:1000+id*60};
+});
+
+/* ============ DOM ============ */
+const $ = s=>document.querySelector(s);
+const connPill=$("#connPill"), connStatus=$("#connStatus"), connHint=$("#connHint");
+const calibStatus=$("#calibStatus"), driveStatus=$("#driveStatus");
+const btnConnect=$("#btnConnect"), btnDisconnect=$("#btnDisconnect");
+const btnCalib=$("#btnCalib"), btnAutoCalib=$("#btnAutoCalib");
+const btnImport=$("#btnImport"), btnExport=$("#btnExport");
+const btnDrive=$("#btnDrive"), btnCenter=$("#btnCenter"), btnStop=$("#btnStop");
+const btnSong=$("#btnSong"), targetSel=$("#target"), freqRange=$("#freq"), freqVal=$("#freqVal");
+const drivePill=$("#drivePill"), modePill=$("#modePill"), modeSeg=$("#modeSeg");
+const bpmInput=$("#bpm"), songSel=$("#song");
+
+/* ============ 工具 ============ */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function setManual(id,val){
+  S.servo[id].manual = clamp(Math.round(val),0,4095);
+  const inp=document.getElementById("m"+id), lab=document.getElementById("mn"+id);
+  if(inp) inp.value = S.servo[id].manual;
+  if(lab) lab.textContent = S.servo[id].manual;
+}
+function movable(id){const s=S.servo[id];return s.cmin!=null&&s.cmax!=null&&s.cmax>s.cmin;}
+function center(id){const s=S.servo[id];return (s.cmin+s.cmax)/2;}
+function amp(id){const s=S.servo[id];return (s.cmax-s.cmin)*RANGE_USE/2;}
+function pressTarget(id,depth=1){return Math.round(center(id)-amp(id)*depth);}
+function liftTarget(id){return Math.round(center(id)+amp(id));}
+function pct(id){const s=S.servo[id];if(s.cmin==null||s.cmax<=s.cmin)return null;return 100*(s.pos-s.cmin)/(s.cmax-s.cmin);}
+
+function setMsg(el,t,kind){ el.textContent=t; el.style.color = kind==="err"?"#d93025":kind==="ok"?"#0f9d58":""; }
+function setPill(el,text,kind){ el.textContent=text; el.className="pill"+(kind?" "+kind:""); }
+function enableRun(on){ [btnCalib,btnAutoCalib,btnDrive,btnCenter,btnSong,btnImport].forEach(b=>b.disabled=!on); targetSel.disabled=!on; }
+
+/* ============ 串口 (实机模式) ============ */
+const bus = {
+  port:null, reader:null, writer:null, buf:[], reading:false, closed:false,
+  async open(baud){
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({baudRate:baud});
+    this.writer = this.port.writable.getWriter();
+    this.reader = this.port.readable.getReader();
+    this.closed=false; this.reading=true; this._loop();
+  },
+  async _loop(){
+    try{
+      while(this.reading){
+        const {value,done} = await this.reader.read();
+        if(done) break;
+        if(value) for(const b of value) this.buf.push(b);
+        if(this.buf.length>4096) this.buf.splice(0,this.buf.length-2048);
+      }
+    }catch(e){}
+  },
+  checksum(arr){let s=0;for(const b of arr)s+=b;return (~s)&0xff;},
+  async _write(pkt){ await this.writer.write(new Uint8Array(pkt)); },
+  async _waitPacket(timeoutMs){
+    const t0=performance.now();
+    while(performance.now()-t0<timeoutMs){
+      for(let i=0;i<this.buf.length-3;i++){
+        if(this.buf[i]===0xff&&this.buf[i+1]===0xff){
+          const len=this.buf[i+3];
+          if(this.buf.length>=i+4+len){
+            const pkt=this.buf.slice(i,i+4+len);
+            this.buf.splice(0,i+4+len);
+            return pkt;
+          }
+        }
+      }
+      await new Promise(r=>setTimeout(r,1));
+    }
+    return null;
+  },
+  async readReg(id,addr,len){
+    const body=[id,4,0x02,addr,len];
+    await this._write([0xff,0xff,...body,this.checksum(body)]);
+    const pkt=await this._waitPacket(25);
+    if(!pkt) throw new Error(`[${id}] 读超时`);
+    if(pkt[4]!==0) throw new Error(`[${id}] 舵机错误码 ${pkt[4]}`);
+    const data=pkt.slice(5,pkt.length-1);
+    return data.length>=2 ? (data[0]|(data[1]<<8)) : data[0];
+  },
+  async writeReg(id,addr,bytes){
+    const body=[id,3+bytes.length,0x03,addr,...bytes];
+    await this._write([0xff,0xff,...body,this.checksum(body)]);
+    const pkt=await this._waitPacket(25);
+    if(!pkt) throw new Error(`[${id}] 写超时`);
+    return true;
+  },
+  async close(){
+    this.reading=false;
+    try{ if(this.reader) await this.reader.cancel(); }catch(e){}
+    try{ if(this.writer) this.writer.releaseLock(); }catch(e){}
+    try{ if(this.port) await this.port.close(); }catch(e){}
+    this.reader=this.writer=this.port=null;
+  }
+};
+
+/* ============ 底层读写 (模拟 / 实机统一) ============ */
+async function readPos(){
+  if(S.mode==="real"){ for(const id of SERVOS){ try{ S.servo[id].pos = await bus.readReg(id,56,2); }catch(e){ S.msg="读位置: "+e.message; } } }
+  else { SERVOS.forEach(id=>{ S.servo[id].pos = Math.round(S.servo[id].pos); }); }
+}
+async function writePos(id,val){
+  const s=S.servo[id];
+  s.target = clamp(Math.round(val), s.min, s.max);
+  if(S.mode==="real"){
+    try{ const v=clamp(Math.round(s.target),0,4095); await bus.writeReg(id,42,[v&0xff,(v>>8)&0xff]); }
+    catch(e){ S.msg="写位置: "+e.message; }
+  }
+}
+async function setTorque(id,on){
+  if(S.mode==="real"){ try{ await bus.writeReg(id,40,[on?1:0]); }catch(e){ S.msg="扭矩: "+e.message; } }
+}
+async function torqueAll(on){ for(const id of SERVOS) await setTorque(id,on); }
+
+/* ============ 模拟动力学 ============ */
+function stepSim(dt){
+  for(const id of SERVOS){
+    const s=S.servo[id];
+    if(S.driving||S.singing){
+      const d=s.target-s.pos, mx=SERVO_MAX_SPEED*dt;
+      s.pos += clamp(d,-mx,mx);
+    }else{
+      s.pos += (s.manual-s.pos)*Math.min(1,dt*8);
+    }
+    s.pos=clamp(s.pos,s.min,s.max);
+  }
+}
+
+/* ============ 控制循环 ============ */
+let lastT=performance.now();
+function tick(){
+  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  if(S.mode==="sim") stepSim(dt);
+
+  if(S.driving){
+    const t=(now-S.driveT0)/1000;
+    for(const id of ACTUATORS[targetSel.value]){
+      const depth = id===2 ? LATERAL_RATIO : 1.0;
+      const tgt = S.freq<=0 ? center(id) : center(id)+amp(id)*depth*Math.sin(2*Math.PI*S.freq*t);
+      writePos(id,tgt);
+    }
+  }
+  if(S.singing) songStep(now);
+  if(S.calibrating) calibStep();
+
+  updateHand(); updateTable(); updateScope(); updateStatusLine();
+  requestAnimationFrame(tick);
+}
+
+/* ============ 校准 ============ */
+function beginCalib(auto){
+  if(!S.connected) return;
+  S.calibrating=true; S.calibT0=performance.now();
+  S.calibStart={}; S.calibEnd={}; SERVOS.forEach(id=>{S.calibStart[id]=null;S.calibEnd[id]=null;});
+  torqueAll(false);
+  btnCalib.disabled=true; btnAutoCalib.disabled=true; btnDrive.disabled=true; btnSong.disabled=true;
+  calibStatus.textContent = auto ? "自动扫行程中…(每个舵机 1.5s 慢速往复)"
+                                 : "校准中! 请在 10 秒内做全范围手指活动(拇指要同时做下压与侧压)";
+  if(auto) autoSweepStart = performance.now();
+}
+let autoSweepStart=-1;
+function calibStep(){
+  const el=(performance.now()-S.calibT0)/1000;
+  if(S.mode==="sim" && autoSweepStart>0){
+    const t=(performance.now()-autoSweepStart)/1000;
+    SERVOS.forEach((id,i)=>{
+      const phase=clamp((t-i*1.2)/1.5,0,1);
+      const s=S.servo[id];
+      s.manual = 600 + (3400-600)*(phase>=1?0.5:0.5-0.5*Math.cos(2*Math.PI*phase));
+    });
+  }
+  SERVOS.forEach(id=>{
+    const p=S.mode==="real"?S.servo[id].pos:Math.round(S.servo[id].manual);
+    if(S.calibStart[id]===null||p<S.calibStart[id])S.calibStart[id]=p;
+    if(S.calibEnd[id]===null||p>S.calibEnd[id])S.calibEnd[id]=p;
+  });
+  calibStatus.textContent=`校准中… 剩余 ${Math.max(0,10-el).toFixed(1)}s  ` +
+    SERVOS.map(id=>`${id}:${S.calibStart[id]}~${S.calibEnd[id]}`).join(" ");
+  if(el>=10.5){ finishCalib(); }
+}
+function finishCalib(){
+  S.calibrating=false; autoSweepStart=-1;
+  let ok=true, bad=[];
+  SERVOS.forEach(id=>{
+    const a=S.calibStart[id], b=S.calibEnd[id];
+    if(a===null||b===null||(b-a)<50){ ok=false; bad.push(id); }
+    else { S.servo[id].cmin=a; S.servo[id].cmax=b; }
+  });
+  if(ok){ S.calibrated=true; setMsg(calibStatus,
+      "校准完成: "+SERVOS.map(id=>`${id}号 ${S.servo[id].cmin}~${S.servo[id].cmax}`).join("  "),"ok"); }
+  else { setMsg(calibStatus,`校准失败: ${bad.join("、")} 号范围过小或没有反馈, 请重试。`,"err"); }
+  enableRun(true);
+}
+btnCalib.onclick=()=>beginCalib(false);
+btnAutoCalib.onclick=()=>beginCalib(true);
+
+btnExport.onclick=()=>{
+  const data={}; SERVOS.forEach(id=>{ if(movable(id)) data[id]={min:S.servo[id].cmin,max:S.servo[id].cmax}; });
+  if(!Object.keys(data).length){ setMsg(calibStatus,"还没有校准数据。","err"); return; }
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="calib.json"; a.click();
+  URL.revokeObjectURL(a.href);
+  setMsg(calibStatus,"已导出 calib.json, 放到 Python 程序同目录即可共用校准。","ok");
+};
+btnImport.onclick=()=>$("#fileImport").click();
+$("#fileImport").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+      const d=JSON.parse(r.result); let n=0;
+      for(const k of Object.keys(d)){ const id=Number(k);
+        if(S.servo[id]&&d[k].min!=null&&d[k].max!=null){ S.servo[id].cmin=d[k].min; S.servo[id].cmax=d[k].max; n++; } }
+      if(n){ S.calibrated=true; enableRun(true); setMsg(calibStatus,`已导入 ${n} 个舵机的校准范围。`,"ok"); }
+      else setMsg(calibStatus,"文件里没有可用数据。","err");
+    }catch(err){ setMsg(calibStatus,"导入失败: "+err.message,"err"); } };
+  r.readAsText(f); e.target.value="";
+};
+
+/* ============ 驱动 ============ */
+btnDrive.onclick=()=>{
+  if(!S.driving){
+    if(!S.calibrated){ setMsg(driveStatus,"请先完成校准。","err"); return; }
+    S.driving=true; S.driveT0=performance.now();
+    torqueAll(true);
+    btnDrive.textContent="停止驱动"; btnDrive.classList.remove("primary");
+    setPill(drivePill,"驱动中","ok");
+    setMsg(driveStatus,`目标 [${targetSel.value}] · ${S.freq.toFixed(1)} Hz · 80% 行程`);
+  }else stopDrive();
+};
+function stopDrive(){
+  S.driving=false; btnDrive.textContent="开始驱动"; btnDrive.classList.add("primary");
+  setPill(drivePill,"停止","gray"); torqueAll(false);
+  setMsg(driveStatus,"驱动已停止, 扭矩已关闭。");
+}
+btnCenter.onclick=async()=>{ if(!S.calibrated)return; await torqueAll(true);
+  SERVOS.forEach(id=>{ writePos(id,center(id)); if(S.mode==="sim") setManual(id,center(id)); });
+  setMsg(driveStatus,"已回中位。"); };
+btnStop.onclick=async()=>{ stopDrive(); stopSong(); await torqueAll(false); setMsg(driveStatus,"急停! 全部扭矩已关闭。","err"); };
+freqRange.oninput=()=>{ S.freq=parseFloat(freqRange.value); freqVal.textContent=S.freq.toFixed(1)+" Hz"; };
+targetSel.onchange=()=>{ if(S.driving){ S.driveT0=performance.now(); setMsg(driveStatus,`目标已切到 [${targetSel.value}]`); } };
+
+/* ============ 歌曲 ============ */
+let song = SONGS["两只老虎"];
+let noteIdx=0, noteEndAt=0;
+function buildNoteRow(){
+  const row=$("#noteRow"), kbd=$("#kbdRow"); row.innerHTML=""; kbd.innerHTML="";
+  [1,2,3,4,5,6].forEach(n=>{
+    const d=document.createElement("div"); d.className="note"; d.id="note"+n;
+    d.innerHTML=`<b>${NOTE_LABEL[n]}</b><span>${NOTE_DESC[n]}</span>`; row.appendChild(d);
+    const k=document.createElement("div"); k.className="key"; k.id="key"+n;
+    k.textContent=NOTE_LABEL[n]; kbd.appendChild(k);
+  });
+}
+buildNoteRow();
+btnSong.onclick=()=>{ if(!S.singing){ startSong(); } else stopSong(); };
+function startSong(){
+  if(!S.calibrated){ setMsg(driveStatus,"请先完成校准。","err"); return; }
+  S.singing=true; noteIdx=0; noteEndAt=performance.now(); S.songT0=performance.now();
+  torqueAll(true); SERVOS.forEach(id=>writePos(id,liftTarget(id)));
+  btnSong.textContent="停止播放"; btnSong.classList.remove("primary");
+}
+function stopSong(){
+  if(!S.singing) return;
+  S.singing=false; S.activeNote=null;
+  SERVOS.forEach(id=>{ if(movable(id)){ writePos(id, center(id)); if(S.mode==="sim") setManual(id,center(id)); } });
+  torqueAll(false);
+  btnSong.textContent="开始播放"; btnSong.classList.add("primary");
+}
+function songStep(now){
+  if(now>=noteEndAt){
+    const prev=S.activeNote;
+    if(prev&&NOTE_ACTIONS[prev]) for(const id of Object.keys(NOTE_ACTIONS[prev])) writePos(id,liftTarget(+id));
+    if(noteIdx>=song.length){ stopSong(); setMsg(driveStatus,"播放结束, 扭矩已关闭。","ok"); return; }
+    const [note,beats]=song[noteIdx++];
+    const beatMs=60000/Math.max(40,bpmInput.value|0);
+    const act=NOTE_ACTIONS[note]||{};
+    S.activeNote=note;
+    for(const id of Object.keys(act)) writePos(+id, pressTarget(+id, act[id]));
+    noteEndAt = now + beats*beatMs;
+  }
+}
+
+/* ============ 界面渲染 ============ */
+function fingerAngle(id){ const p=pct(id); return p==null?null:clamp(p,0,140)/100; }
+function updateHand(){
+  const fg=$("#fingers");
+  const geo=[{id:3,x:150,len:118},{id:4,x:188,len:132},{id:5,x:226,len:116},{id:6,x:262,len:94}];
+  let html="";
+  for(const g of geo){
+    const d=fingerAngle(g.id) ?? 0;
+    const len=g.len*(1-0.5*d), y=150;
+    html+=`<g transform="translate(${g.x},${y})">
+      <rect x="-14" y="${-len}" width="28" height="${len}" rx="14" fill="url(#skin)" stroke="#dcae8a" stroke-width="1"/>
+      <rect x="-9" y="${-len+10}" width="18" height="${Math.max(4,len-22)}" rx="9" fill="#ffffff55"/>
+    </g>`;
+    if(d>0.06){
+      html+=`<circle cx="${g.x}" cy="${y-len+4}" r="${4+6*d}" fill="#ff8a65" opacity="${0.15+0.35*d}"/>`;
+    }
+  }
+  fg.innerHTML=html;
+
+  const down=fingerAngle(1)??0, lat=fingerAngle(2)??0;
+  const ang=-38 + 62*down + 16*lat;
+  $("#thumbGroup").setAttribute("transform",
+    `translate(${118 - 6*lat - 10*down},${238 + 26*down + 8*lat}) rotate(${ang})`);
+  $("#keydot").setAttribute("cx", 302 - 90*lat);
+  $("#keydot").setAttribute("cy", 318 + 26*down);
+  $("#keydot").setAttribute("r", (14 + 26*down + 16*lat).toFixed(1));
+  $("#thumbInfo").innerHTML =
+    `拇指姿态: 下压 ${(down*100).toFixed(0)}% · 侧压 ${(lat*100).toFixed(0)}% → `+
+    ((down>0.35&&lat>0.25) ? "<b>斜向下按</b>(1+2 号协同)" : down>0.35 ? "正下方直按(仅 1 号)" :
+     lat>0.25 ? "侧向压(仅 2 号)" : "抬起");
+}
+function updateTable(){
+  let html="";
+  for(const id of SERVOS){
+    const s=S.servo[id], p=pct(id);
+    html+=`<tr>
+      <td><span class="dot" style="background:${COLOR[id]}"></span> ${id}</td>
+      <td>${ROLE[id]}</td>
+      <td>${Math.round(s.pos)}${S.mode==="real"?"":""}</td>
+      <td>${p==null?"—":`<div class="bar"><i style="width:${clamp(p,0,100).toFixed(0)}%;background:${COLOR[id]}"></i></div>`}</td>
+    </tr>`;
+  }
+  $("#servoTable").innerHTML=html;
+}
+const scope=$("#scope"), sctx=scope.getContext("2d");
+let lastHist=0;
+function updateScope(){
+  const now=performance.now();
+  if(now-lastHist>20){
+    lastHist=now;
+    const rec={t:now};
+    for(const id of SERVOS) rec[id]=S.servo[id].pos;
+    S.hist.push(rec);
+    while(S.hist.length&&now-S.hist[0].t>5000) S.hist.shift();
+  }
+  const W=scope.width,H=scope.height;
+  sctx.clearRect(0,0,W,H);
+  sctx.strokeStyle="#eef0f4"; sctx.lineWidth=1;
+  for(let i=1;i<5;i++){ const y=H*i/5; sctx.beginPath(); sctx.moveTo(0,y); sctx.lineTo(W,y); sctx.stroke(); }
+  if(!S.hist.length) return;
+  const t0=S.hist[0].t, t1=Math.max(t0+1000, now);
+  for(const id of SERVOS){
+    sctx.beginPath(); sctx.strokeStyle=COLOR[id]; sctx.lineWidth=1.6;
+    S.hist.forEach((r,i)=>{
+      const x=(r.t-t0)/(t1-t0)*W;
+      const y=H-(clamp(r[id],0,4095)/4095)*H;
+      i?sctx.lineTo(x,y):sctx.moveTo(x,y);
+    });
+    sctx.stroke();
+  }
+}
+let lastPos={};
+function updateStatusLine(){
+  if(S.msg){ setMsg(connStatus, S.msg, "err"); }
+  const err=[];
+  for(const id of SERVOS){
+    if(lastPos[id]!=null){
+      const d=Math.abs(S.servo[id].pos - (S.servo[id].target??S.servo[id].pos));
+      if(d>120) err.push(d);
+    }
+    lastPos[id]=S.servo[id].pos;
+  }
+  const lag = err.length ? err.reduce((a,b)=>a+b,0)/err.length : 0;
+  S.followErr = lag;
+  const neededHz = S.driving&&S.freq>0 ? (function(){
+    let mx=0; for(const id of ACTUATORS[targetSel.value]){ if(movable(id)) mx=Math.max(mx, amp(id)*2*S.freq*2*(id===2?LATERAL_RATIO:1)); }
+    return mx; })() : 0;
+  $("#followHint").innerHTML = S.driving&&S.freq>0
+    ? `当前频率 ${S.freq.toFixed(1)} Hz 需要舵机约 <b>${neededHz.toFixed(0)}</b> counts/s 的角速度; 平均跟随误差 <b>${lag.toFixed(0)}</b> counts`+
+      (lag>150?" → <span style='color:#d93025'>明显跟不上, 建议降频或减小行程</span>":" → 跟随良好")
+    : "驱动时可在此查看跟随能力与滞后。";
+}
+
+/* ============ 手动滑块 ============ */
+const manualRow=$("#manualRow");
+SERVOS.forEach(id=>{
+  const d=document.createElement("div"); d.className="calib-row";
+  d.innerHTML=`<span style="color:${COLOR[id]}">${id} ${ROLE[id]}</span>
+    <input type="range" min="0" max="4095" value="${S.servo[id].manual}" id="m${id}">
+    <span class="num" id="mn${id}">${S.servo[id].manual}</span>`;
+  manualRow.appendChild(d);
+  const inp=d.querySelector("input");
+  inp.addEventListener("input",()=>{
+    S.servo[id].manual=+inp.value; $("#mn"+id).textContent=inp.value;
+    if(S.mode==="real"&&!S.driving&&!S.singing&&!S.calibrating){ writePos(id,+inp.value); }
+  });
+});
+
+/* ============ 连接 / 模式 ============ */
+modeSeg.onclick=e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  [...modeSeg.children].forEach(x=>x.classList.toggle("on",x===b));
+  S.mode=b.dataset.mode;
+  modePill.textContent = S.mode==="sim"?"模拟模式":"实机模式";
+  connHint.textContent = S.mode==="sim"?"模拟模式无需硬件":"需 Chrome/Edge, 点击后选择串口";
+  btnConnect.textContent = S.mode==="sim"?"连接(模拟)":"选择串口并连接";
+  setMsg(connStatus, S.mode==="sim"
+    ? "模拟模式: 运动学(行程/速度/滞后)本地仿真, 可先验证逻辑与节奏。"
+    : "实机模式: 使用 Web Serial 直连 STS3032 总线, 请确保舵机已上电、调试板已插好。");
+};
+btnConnect.onclick=async()=>{
+  if(S.connected) return;
+  try{
+    if(S.mode==="real"){
+      if(!navigator.serial) throw new Error("当前环境不支持 Web Serial, 请改用 Chrome/Edge 打开本页");
+      await bus.open(parseInt($("#baud").value,10)||115200);
+      await readPos();
+    }
+    S.connected=true;
+    setPill(connPill,"已连接","ok");
+    btnConnect.disabled=true; btnDisconnect.disabled=false;
+    enableRun(true);
+    setMsg(connStatus,(S.mode==="sim"?"模拟设备已连接。":"串口已连接, 波特率 "+(parseInt($("#baud").value,10)))+" 请先校准。","ok");
+  }catch(e){ setMsg(connStatus,"连接失败: "+e.message,"err"); }
+};
+btnDisconnect.onclick=async()=>{
+  await torqueAll(false);
+  if(S.mode==="real"){ try{ await bus.close(); }catch(e){} }
+  S.connected=false; S.calibrated=false; stopDrive(); stopSong();
+  setPill(connPill,"未连接","gray");
+  btnConnect.disabled=false; btnDisconnect.disabled=true; enableRun(false);
+  setMsg(connStatus,"已断开。");
+};
+
+/* ============ 启动 ============ */
+if(!navigator.serial) modeSeg.children[1].title="当前环境不支持 Web Serial, 请用 Chrome/Edge 打开";
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
