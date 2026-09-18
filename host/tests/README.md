@@ -29,7 +29,7 @@ python ref_parse.py       # 参考实现解析 -> ref.json
 node compare.js           # 两边结果比对
 
 # 2) 端到端流程自测（模拟固件，无需硬件）
-node e2e.js               # 输出 114 项 PASS/FAIL，截图存到 shots/
+node e2e.js               # 输出 98 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
 
 # 3) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
 node shots.js

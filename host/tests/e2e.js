@@ -44,8 +44,10 @@ const server = http.createServer((req, res) => {
 const errors = [];
 const logs = [];
 let failures = 0;
+let checks = 0;
 function check(name, cond, extra){
   const tag = cond ? "  PASS" : "  FAIL";
+  checks++;
   if(!cond) failures++;
   console.log(tag + "  " + name + (extra !== undefined ? "   [" + extra + "]" : ""));
 }
@@ -468,6 +470,8 @@ function check(name, cond, extra){
   await browser.close();
   server.close();
   console.log("\n截图目录: " + OUT);
-  console.log(failures === 0 ? "\n全部通过 ✔" : "\n失败 " + failures + " 项 ✘");
+  console.log(failures === 0
+    ? "\n全部通过 ✔  共 " + checks + " 项"
+    : "\n失败 " + failures + " / " + checks + " 项 ✘");
   process.exit(failures === 0 ? 0 : 1);
 })().catch(e => { console.error("测试脚本崩溃:", e); process.exit(2); });
