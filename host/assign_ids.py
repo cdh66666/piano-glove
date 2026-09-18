@@ -16,13 +16,45 @@ import sys
 import time
 
 import serial
+import serial.tools.list_ports
 
-PORT = "COM11"
+PORT = "auto"   # 串口号会变；改为自动识别（发 INFO 看谁回 OK INFO）
 BAUD = 115200
 MAX_ID = 10                      # 扫描范围
 TARGETS = [1, 2, 3, 4, 5, 6]
 LABELS = ["拇指侧压(slot0)", "拇指下压(slot1)", "食指", "中指", "无名指", "小指"]
 TRACE = {}                       # 记录: 出现过但未编号的 ID
+
+
+LOGFILE = "assign_log.txt"
+
+
+def _autodetect():
+    """扫所有串口, 谁回 OK INFO 谁就是手套主板（只发 INFO, 不会动舵机）"""
+    tried = []
+    for p in serial.tools.list_ports.comports():
+        try:
+            s = serial.Serial(p.device, BAUD, timeout=0.2)
+        except Exception as e:
+            tried.append(f"{p.device}(打不开)")
+            continue
+        try:
+            time.sleep(0.2)
+            s.reset_input_buffer()
+            s.write(b"INFO\r\n")
+            time.sleep(0.6)
+            if b"OK INFO" in s.read(4096):
+                return p.device
+            tried.append(p.device)
+        except Exception:
+            tried.append(p.device)
+        finally:
+            s.close()
+    raise RuntimeError(
+        "没找到手套主板（挨个串口发 INFO 都没回 OK INFO）。已试过：" + ", ".join(tried) +
+        "\n  · 改 PORT 手动指定，例如 PORT = \"COM3\"\n"
+        "  · 或跑 probe_ports.py 看哪个端口有反应"
+    )
 
 
 LOGFILE = "assign_log.txt"
@@ -71,9 +103,29 @@ class Bus:
         self.open()
 
     def open(self):
+        global PORT
+        if PORT in (None, "", "auto"):
+            PORT = _autodetect()
+            log(f"    自动识别到手套主板: {PORT}")
+        # 打开串口时 DTR/RTS 跳变会给板子一个复位脉冲，紧接着发的第一条命令必丢。
+        # 所以先发一条 INFO "叫醒" 它，收到回复才算真的通了。
         self.s = serial.Serial(PORT, BAUD, timeout=0.2)
-        time.sleep(0.3)
-        self.s.reset_input_buffer()
+        for _ in range(4):
+            time.sleep(0.45)
+            self.s.reset_input_buffer()
+            self.s.write(b"INFO\r\n")
+            t0, buf = time.time(), b""
+            while time.time() - t0 < 2.0:
+                d = self.s.read(4096)
+                if d:
+                    buf += d
+                elif buf:
+                    break
+            if b"OK INFO" in buf:
+                self.s.reset_input_buffer()
+                return
+            time.sleep(0.5)
+        raise RuntimeError(f"{PORT} 打开了但板子不回应 INFO —— 端口被别的程序占着？或拔插一次 USB")
 
     def reopen(self):
         """USB 重新枚举/端口失效后自动恢复"""

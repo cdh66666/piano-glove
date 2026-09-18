@@ -108,7 +108,7 @@ python glove_fw.py monitor                 # 轮询实时反馈
 python glove_fw.py raw "CAL STATUS"        # 发任意命令
 ```
 
-板子串口默认 `COM11`，可在 `glove_fw.py` 顶部 `DEFAULT_PORT` 或用 `--port COMx` 指定。
+板子串口**自动识别**：`glove_fw.py` 会挨个串口发 `INFO`，回 `OK INFO` 的那个就是手套。串口号随 USB 枚举变化，别写死；要指定就 `--port COMx`。
 
 ---
 

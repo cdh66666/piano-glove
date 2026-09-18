@@ -2,7 +2,7 @@
 """
 PIANO_GLOVE 固件调试工具（微雪 Servo Driver with ESP32 主控板）
 =============================================================
-板子跑的固件自带一套文本命令协议（115200, USB-C/COM11）, 本工具把它封装成
+板子跑的固件自带一套文本命令协议（115200, USB-UART，自动识别端口）, 本工具把它封装成
 命令行 + 一键校准向导。
 
 固件命令表(HELP 输出):
@@ -51,12 +51,67 @@ import time
 
 try:
     import serial
+    import serial.tools.list_ports
 except ImportError:
     print("需要 pyserial:  pip install pyserial")
     sys.exit(1)
 
-DEFAULT_PORT = "COM11"
+# 串口号会随 USB 枚举顺序变化（插拔、换 USB 口都会变），所以默认自动识别：
+# 挨个串口发 INFO，谁回 OK INFO 谁就是手套主板。
+DEFAULT_PORT = "auto"
 DEFAULT_BAUD = 115200
+
+
+def _query_info(ser, wait=1.2):
+    """向已打开的串口发一条 INFO，返回回复内容（没回复就返回 b""）"""
+    ser.reset_input_buffer()
+    ser.write(b"INFO\r\n")
+    t0, buf = time.time(), b""
+    while time.time() - t0 < wait:
+        d = ser.read(4096)
+        if d:
+            buf += d
+        elif buf:
+            break
+    return buf
+
+
+def autodetect_port(baud=DEFAULT_BAUD, rounds=3):
+    """扫所有串口找手套主板。只发 INFO，不会动舵机。
+
+    为什么要扫多轮：**打开/关闭串口本身会给板子一个复位脉冲**（CP2102 自动复位电路），
+    刚被复位过的板子要 1~2 秒才起来，那一刻发 INFO 是没反应的。所以每轮之间要留间隔重试。
+    """
+    ports = [p.device for p in serial.tools.list_ports.comports()]
+    unreachable = []
+    for rnd in range(rounds):
+        for dev in ports:
+            try:
+                s = serial.Serial(dev, baud, timeout=0.2)
+            except Exception:
+                if rnd == rounds - 1 and dev not in unreachable:
+                    unreachable.append(dev)
+                continue
+            try:
+                time.sleep(0.5)
+                if b"OK INFO" in _query_info(s):
+                    return dev
+            except Exception:
+                pass
+            finally:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+            time.sleep(0.25)
+        if rnd < rounds - 1:
+            time.sleep(0.9)
+    raise RuntimeError(
+        "没找到手套主板（挨个串口发 INFO 都没回 OK INFO）。扫过：" + ", ".join(ports) +
+        ("；打不开的：" + ", ".join(unreachable) if unreachable else "") +
+        "\n  · 打不开通常是被别的程序占着 —— 先关掉浏览器调试台 / 串口监视器\n"
+        "  · 也可以 --port COMx 手动指定，或跑 probe_ports.py 看哪个端口有反应"
+    )
 
 SLOT_NAMES = ["拇指侧向", "拇指按键", "食指", "中指", "无名指", "小指"]
 SLOT_IDS = [1, 2, 3, 4, 5, 6]
@@ -75,11 +130,43 @@ class PianoGlove:
         self.port_name, self.baud = port, baud
         self.ser = None
 
-    def open(self):
-        self.ser = serial.Serial(self.port_name, self.baud, timeout=0.2)
-        time.sleep(0.2)
-        self.ser.reset_input_buffer()
-        return self
+    def open(self, tries=4):
+        if self.port_name in (None, "", "auto"):
+            self.port_name = autodetect_port(self.baud)
+            print(f"[自动识别] 手套主板在 {self.port_name}")
+        # 打开串口时 DTR/RTS 的跳变会给板子一个复位脉冲（CP2102 自动复位电路），
+        # 紧接着发的第一条命令必然丢。所以这里先发一条 INFO "叫醒" 它，收到回复才算打开成功。
+        err = None
+        for _ in range(tries):
+            try:
+                self.ser = serial.Serial(self.port_name, self.baud, timeout=0.2)
+                time.sleep(0.45)
+                self.ser.reset_input_buffer()
+                self.ser.write(b"INFO\r\n")
+                t0, buf = time.time(), b""
+                while time.time() - t0 < 2.0:
+                    d = self.ser.read(4096)
+                    if d:
+                        buf += d
+                    elif buf:
+                        break
+                if b"OK INFO" in buf:
+                    self.ser.reset_input_buffer()
+                    return self
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
+                time.sleep(0.5)
+            except Exception as e:
+                err = e
+                time.sleep(0.5)
+        raise RuntimeError(
+            f"打开了 {self.port_name} 但板子不回应 INFO"
+            + (f"（{err}）" if err else "")
+            + "\n  · 端口被别的程序占着？先关掉浏览器调试台 / 串口监视器\n"
+            "  · 或者拔插一次 USB"
+        )
 
     def close(self):
         if self.ser:

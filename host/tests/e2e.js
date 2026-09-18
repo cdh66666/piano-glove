@@ -175,6 +175,30 @@ function check(name, cond, extra){
   check("单指测试按钮恢复可用", await page.isEnabled('#testBody2 button[data-press="0"]'));
   await shot("06-test");
 
+  /* ---------- 4B. 响应延迟实测 ---------- */
+  console.log("\n=== 4B. 响应延迟实测 ===");
+  check("延迟卡闸门已开", await page.isVisible("#latBody"));
+  await click("#btnLatPing");
+  await page.waitForTimeout(3500);
+  check("PING 测出结果表", await page.isVisible("#latResult"));
+  check("PING 结果出现 1 块", (await page.$$("#latList .latitem")).length === 1, (await page.$$("#latList .latitem")).length);
+  check("结果里给出延迟与上限", /\d+ ms/.test(await txt("#latList")) && (await txt("#latList")).includes("条/秒"), (await txt("#latList")).replace(/\s+/g, " ").slice(0, 70));
+  check("结论点明是模拟模式（数字不可信）", (await txt("#latVerdict")).includes("模拟模式"), (await txt("#latVerdict")).slice(0, 40));
+
+  await click("#btnLatMove");
+  await page.waitForTimeout(3500);
+  check("MOVE 测试追加一块", (await page.$$("#latList .latitem")).length === 2, (await page.$$("#latList .latitem")).length);
+
+  await click("#btnLatBurst");
+  await page.waitForTimeout(4500);
+  check("压测追加一块", (await page.$$("#latList .latitem")).length === 3, (await page.$$("#latList .latitem")).length);
+  check("压测后串口仍存活", (await txt("#latList")).includes("PING 通"), (await txt("#latList")).replace(/\s+/g, " ").slice(-70));
+  check("按钮测完都恢复可用",
+    (await page.isEnabled("#btnLatPing")) && (await page.isEnabled("#btnLatMove")) && (await page.isEnabled("#btnLatBurst")));
+  const latW = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  check("延迟结果不撑破页面（无横向溢出）", latW[0] <= latW[1] + 1, latW.join(" / "));
+  await shot("06b-latency");
+
   /* ---------- 5. 演奏 ---------- */
   console.log("\n=== 5. MIDI 演奏 ===");
   await click('#tabbar button[data-p="play"]');

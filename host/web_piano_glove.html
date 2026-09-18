@@ -75,6 +75,12 @@ th{color:var(--sub);font-weight:500;font-size:12px}
 tr.on{background:#f2fbf5}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
+/* 延迟实测结果块 —— 不用表格, 避免窄屏横向滚动 */
+.latitem{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:#fafbfc}
+.latitem .lat-h{font-size:13px;font-weight:600;margin-bottom:5px}
+.latitem .lat-b{font-size:12.5px;color:var(--sub);line-height:1.7}
+.latitem .lat-b b{color:var(--ink)}
+
 .dots{display:flex;gap:5px;flex-wrap:wrap}
 .dot{width:34px;height:34px;border-radius:9px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;
      font-size:13px;color:var(--sub);background:#fafbfc;cursor:pointer;font-weight:500}
@@ -284,6 +290,33 @@ pre#log .sys{color:#c9a5ff}
         <thead><tr><th>编号</th><th>手指</th><th>单独试</th><th>按下方向</th></tr></thead>
         <tbody id="testBody2"></tbody></table></div>
       <p class="hint">按方向不对就用右侧下拉改，会立刻写到固件（<code>SETDIR</code>）。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="stepno">4B</span>测一下响应速度</h2>
+    <p class="desc">这是决定「MIDI 演奏到底能跑多快」的关键数字。测完下面会直接给结论，不用自己算。</p>
+    <div class="gate" id="latGate"><b>先完成第 3 步</b>校准完成后才能测。</div>
+    <div id="latBody" style="display:none">
+      <div class="row">
+        <button id="btnLatPing" class="primary" style="flex:1">① 测通信往返（不动手指，最安全）</button>
+      </div>
+      <div class="row">
+        <button id="btnLatMove" style="flex:1">② 测动作往返（会动手指）</button>
+      </div>
+      <div class="row">
+        <button id="btnLatBurst" style="flex:1">③ 压测：连发 60 条，看会不会把固件压死</button>
+      </div>
+      <div class="msg" id="latMsg">先点 ① —— 它只发 <code>PING</code>，不会让舵机动。</div>
+
+      <div id="latResult" style="display:none;margin-top:12px">
+        <div id="latList"></div>
+        <div class="msg" id="latVerdict"></div>
+      </div>
+      <p class="hint">
+        为什么要测：一次演奏 = 按下 + 抬起两条命令。6 根手指跑 <b>6 Hz</b> 就是
+        6 × 6 × 2 = <b>72 条/秒</b>。固件如果每条命令都要死等一个固定窗口，这个数就上不去。
+      </p>
     </div>
   </div>
 </section>
@@ -676,25 +709,51 @@ class Transport{
     await w.write(new TextEncoder().encode(cmd + "\r\n"));
     w.releaseLock();
   }
-  /* 发一条命令并收集回复行 */
-  send(cmd, timeoutMs = 2500){
+  /* 发一条命令并收集回复行
+     - 收到第一行后, 只要安静 quietMs 毫秒就认为回复结束并立刻返回（不再死等 timeoutMs）
+     - 结果计时写进 T.last: {first=首字节往返ms, ms=整条回复耗时, lines=行数}
+       first 就是「命令往返延迟」, 决定演奏能跑多快 */
+  send(cmd, timeoutMs = 2500, quietMs = 140){
     logLine("→ " + cmd, "pl");
+    const t0 = performance.now();
     if(this.mode === "sim"){
       const lines = this.mock.handle(cmd);
       return new Promise(res=>{
         let i = 0;
-        const step = ()=>{ if(i < lines.length){ this.emit(lines[i]); logRecv(lines[i]); i++; setTimeout(step, 6); }
-                           else res(lines); };
+        const step = ()=>{
+          if(i < lines.length){ this.emit(lines[i]); logRecv(lines[i]); i++; setTimeout(step, 6); }
+          else{
+            const ms = 24 + lines.length * 6;
+            this.last = {first:24, ms, lines:lines.length};
+            res(lines);
+          }
+        };
         setTimeout(step, 24);
       });
     }
     return new Promise(res=>{
       const got = [];
-      const off = line => { got.push(line); logRecv(line); };
+      let tFirst = 0, tLast = t0, settled = false;
+      const off = line => {
+        if(!got.length) tFirst = performance.now();
+        got.push(line); logRecv(line); tLast = performance.now();
+      };
       this.listeners.push(off);
-      const done = ()=>{ this.listeners = this.listeners.filter(f=>f !== off); res(got); };
+      const done = ()=>{
+        if(settled) return;
+        settled = true;
+        clearTimeout(kill); clearInterval(watch);
+        this.listeners = this.listeners.filter(f=>f !== off);
+        this.last = {first: tFirst ? tFirst - t0 : null, ms: Math.max(tFirst || 0, tLast) - t0, lines: got.length};
+        res(got);
+      };
+      const kill  = setTimeout(done, timeoutMs);
+      const watch = setInterval(()=>{
+        const now = performance.now();
+        if(got.length){ if(now - tLast >= quietMs) done(); }
+        else if(now - t0 >= timeoutMs - 200) done();     // 一直没回复, 提前收尾
+      }, 12);
       this._write(cmd).catch(e=>{ logLine("写串口失败: " + e.message, "err"); done(); });
-      setTimeout(done, timeoutMs);
     });
   }
   /* 只发不等 —— 演奏时用, 避免被固件延迟卡住 */
@@ -756,6 +815,7 @@ function updateGates(){
   if(simBus) simBus.style.display = conn && isSim() ? "flex" : "none";
   const calOk = S.info.calibrated === "1";
   need(conn && calOk, "#testGate", "#testBody");
+  need(conn && calOk, "#latGate",  "#latBody");
   need(conn && calOk, "#playGate", "#playBody");
 }
 
@@ -1156,6 +1216,148 @@ $("#btnDisarm").onclick  = async () => { await T.send("DISARM", 3000); await ref
 $("#btnSafe").onclick    = async () => { await T.send("SAFE", 3000);  await refreshInfo(); refreshChips();
   $("#armMsg").className = "msg warn"; $("#armMsg").textContent = "已急停，舵机全部断电。" };
 $("#btnStandby") && ($("#btnStandby").onclick = async () => { await T.send("STANDBY CONFIRM", 3000); });
+
+/* ---------- 4B 响应延迟实测 ----------
+   命令往返 = 写入串口 → 收到第一行回复。这个数字决定演奏能跑多快。
+   6 根手指 × 6 Hz × (按下+抬起) = 72 条/秒。 */
+function _median(a){
+  if(!a.length) return null;
+  const b = a.slice().sort((x,y) => x - y), n = b.length;
+  return n % 2 ? b[(n-1)/2] : (b[n/2 - 1] + b[n/2]) / 2;
+}
+function latSay(kind, html){ const m = $("#latMsg"); m.className = "msg " + (kind || ""); m.innerHTML = html; }
+
+async function measureRoundTrip(cmd, n){
+  const rs = [];
+  let lost = 0;
+  for(let i=0;i<n;i++){
+    latSay("warn", "正在测 " + (i+1) + " / " + n + " …（<code>" + esc(cmd) + "</code>）");
+    const lines = await T.send(cmd, 4000);
+    if(!lines.length){ lost++; continue; }
+    if(T.last && T.last.first != null) rs.push(T.last.first);
+  }
+  return {rs, lost};
+}
+
+function perSecOf(rs){
+  const md = _median(rs);
+  return md ? Math.round(1000 / md) : 0;
+}
+function latRow(title, rs, lost, n){
+  const mn = Math.min(...rs), mx = Math.max(...rs), md = _median(rs);
+  const f = v => Math.round(v) + " ms";
+  const perSec = perSecOf(rs);
+  return '<div class="latitem">' +
+    '<div class="lat-h">' + esc(title) + " · " + n + " 次" +
+      (lost ? ' <span class="chip bad">丢 ' + lost + "</span>" : ' <span class="chip ok">全通</span>') + "</div>" +
+    '<div class="lat-b">延迟　最小 <b>' + f(mn) + "</b>　中位 <b>" + f(md) + "</b>　最大 <b>" + f(mx) + "</b></div>" +
+    '<div class="lat-b">速度　这条路上限 <b>' + perSec + "</b> 条/秒" +
+      (isSim() ? "" : "（6 Hz 需要 72）") + "</div>" +
+    "</div>";
+}
+
+function latPush(html){
+  const box = $("#latList");
+  box.insertAdjacentHTML("beforeend", html);
+  while(box.children.length > 6) box.removeChild(box.firstElementChild);   // 只留最近 6 条
+  $("#latResult").style.display = "";
+}
+/* 结论单独一行显示, 不覆盖进度提示 */
+function latVerdict(perSec, label){
+  const m = $("#latVerdict");
+  const say = (kind, html) => { m.className = "msg " + kind; m.innerHTML = html; $("#latResult").style.display = ""; };
+  if(isSim()){
+    say("warn", "<b>这是模拟模式，数字没有参考价值。</b>模拟固件是零延迟的，实机一定比这慢。" +
+      "把板子插上、选「实机」重测才有意义。");
+    return;
+  }
+  const need = 72, half = 36;
+  if(perSec >= need){
+    say("ok", "✔ <b>" + label + "能跑满 6 Hz</b>（需要 72 条/秒，实测上限约 " + perSec +
+      " 条/秒）。第 5 步的演奏页可以直接用，不用改固件。");
+  }else if(perSec >= half){
+    const sf = Math.max(0.1, Math.floor(perSec / need * 100) / 100);
+    say("warn", "⚠ <b>实测上限约 " + perSec + " 条/秒</b>，是 6 Hz 所需（72）的 " +
+      Math.round(perSec / need * 100) + "%。<br>两条路：<b>降速演奏</b>（第 5 步速度倍率压到 " + sf +
+      " 以下），或者<b>改固件</b>去掉每条命令的固定等待窗口。");
+  }else{
+    say("err", "✘ <b>只有约 " + perSec + " 条/秒</b>，离 6 Hz 需要的 72 条/秒差太远。<br>" +
+      "这个数字下「上位机逐条发命令」这条路基本走不通 —— <b>需要在固件里加一个按频率往复驱动的原生命令</b>，" +
+      "把定时交给板子做。已记在 design-notes 的风险清单里。");
+  }
+}
+
+$("#btnLatPing").onclick = async () => {
+  const b = $("#btnLatPing"); b.disabled = true;
+  latSay("warn", "开始测通信往返（<code>PING</code> × 20）…");
+  try{
+    const {rs, lost} = await measureRoundTrip("PING 1", 20);
+    if(!rs.length){ latSay("err", "20 次 PING 全都没回复 —— 先确认板子通电、第 6 步日志里有没有回包。"); return; }
+    latPush(latRow("PING（不动舵机）", rs, lost, 20));
+    latVerdict(perSecOf(rs), "纯通信");
+  }catch(e){ latSay("err", "测到一半出错：" + esc(e.message)); }
+  finally{ b.disabled = false; }
+};
+
+$("#btnLatMove").onclick = async () => {
+  if(S.info.armed !== "1"){ latSay("err", "还没使能。先点上面第 4 步的「使能（ARM）」。"); return; }
+  const b = $("#btnLatMove"); b.disabled = true;
+  latSay("warn", "开始测动作往返（<code>MOVE</code> × 20）—— 手指会动，先把手套摘下来放桌上更安全。");
+  try{
+    const {rs, lost} = await measureRoundTrip("MOVE 1 200", 20);
+    if(!rs.length){ latSay("err", "MOVE 一条都没回复。去第 6 步看看固件到底回了什么。"); return; }
+    latPush(latRow("MOVE（含动作）", rs, lost, 20));
+    latVerdict(perSecOf(rs), "单条动作");
+  }catch(e){ latSay("err", "测到一半出错：" + esc(e.message)); }
+  finally{ b.disabled = false; }
+};
+
+/* 压测：不等回复猛发 —— 这才是演奏页真实的工作方式 */
+$("#btnLatBurst").onclick = async () => {
+  if(S.info.armed !== "1"){ latSay("err", "还没使能。先点「使能（ARM）」。"); return; }
+  const b = $("#btnLatBurst"); b.disabled = true;
+  const N = 60, sim = isSim();
+  latSay("warn", "连喷 " + N + " 条 MOVE，期间不等回复（模拟真实演奏）…");
+  let replies = 0;
+  const counter = () => { replies++; };
+  T.listeners.push(counter);
+  const t0 = performance.now();
+  try{
+    for(let i=0;i<N;i++) T.fire("MOVE 1 " + (240 + (i % 6) * 24));
+    const sendMs = performance.now() - t0;
+    await sleep(1200);                                // 等固件把积压的回复吐完
+    T.listeners = T.listeners.filter(f => f !== counter);
+    let alive = false;
+    try{ alive = (await T.send("PING 1", 4000)).some(l => l.startsWith("OK PING")); }catch(e){}
+
+    const got = sim ? N : replies;                    // 模拟固件同步应答, 不会丢
+    /* 模拟模式下 60 条在 1ms 内发完, 不显示成「0 条/秒」这种没意义的数 */
+    const msTxt = sendMs < 1 ? "&lt; 1" : Math.round(sendMs);
+    const rateTxt = sendMs < 1 ? "远超 1000" : Math.round(N / sendMs * 1000);
+    latPush('<div class="latitem"><div class="lat-h">压测：连发 ' + N + " 条</div>" +
+      '<div class="lat-b">发送耗时 <b>' + msTxt + "</b> ms（上位机发得动 <b>" + rateTxt + "</b> 条/秒）</div>" +
+      '<div class="lat-b">固件回了 <b>' + got + "/" + N + "</b> 条 · " +
+        (alive ? '<span class="chip ok">之后仍能 PING 通</span>'
+               : '<span class="chip bad">之后无响应</span>') + "</div></div>");
+
+    const loss = N - got;
+    if(sim){
+      latSay("warn", "<b>模拟模式，数字仅供对照。</b>实机上这里最怕两件事：回复堆积（固件来不及处理）和串口输入缓冲溢出。");
+    }else if(!alive){
+      latSay("err", "✘ <b>压测之后固件不再响应</b> —— 连续命令把它压死了。演奏页「不等回复」的策略在当前固件上不可用。");
+    }else if(loss > N * 0.2){
+      latSay("warn", "⚠ 漏了 <b>" + loss + "/" + N + "</b> 条回复，但命令通道还活着。" +
+        "说明固件是丢回复而不是卡死 —— 演奏能跑，但要按最慢的那根手指对齐节奏。");
+    }else{
+      latSay("ok", "✔ 上位机发得动 " + rateTxt + " 条/秒，固件消化完仍正常响应（漏 " + loss +
+        " 条回复）。播放路径是通的。");
+    }
+  }catch(e){
+    T.listeners = T.listeners.filter(f => f !== counter);
+    latSay("err", "压测出错：" + esc(e.message));
+  }
+  finally{ b.disabled = false; }
+};
 
 /* ======================= 5. 演奏 ======================= */
 /* ---------- 5.1 MIDI 解析 (零依赖) ----------
