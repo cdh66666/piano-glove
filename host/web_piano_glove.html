@@ -458,6 +458,39 @@ pre#log .sys{color:#c9a5ff}
           <span id="playTime">0.0s</span><span id="playRate">—</span>
         </div>
 
+        <!-- ======== 音乐 ↔ 演奏动作 同轴显示 ======== -->
+        <div style="margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 10px 8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+            <b style="font-size:13px">🎼 音乐 ↔ 演奏动作</b>
+            <select id="rollMode" style="font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink)">
+              <option value="all">整曲总览</option>
+              <option value="follow">跟随播放头</option>
+            </select>
+          </div>
+          <canvas id="roll" width="760" height="380"
+            style="width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:9px;background:var(--panel)"></canvas>
+          <div id="rollLegend" style="display:flex;flex-wrap:wrap;gap:3px 10px;font-size:11px;color:var(--sub);margin-top:8px"></div>
+          <p class="hint" style="margin-top:6px">
+            上半张是<b>曲子本身</b>（横轴时间、纵轴音高），下半张是<b>手套的动作</b>（6 行 = 6 根手指）。
+            同一根手指用同一种颜色，竖线是当前播放位置 —— 上下对齐看，就知道每个音是哪根手指按的。
+            灰色的小块是手套来不及按、被丢掉的音（只有 6 个自由度，保节奏优先）。
+          </p>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <label><input type="checkbox" id="sndOn" checked> 🔊 播放声音</label>
+          <input type="range" id="sndVol" min="0" max="100" value="70" style="flex:1;min-width:80px">
+          <span id="sndVolLabel" style="width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)">70%</span>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="sndAll"> 连被丢掉的音也一起响（听完整曲子，用于对比）</label>
+        </div>
+        <p class="hint" style="margin-top:-2px">
+          声音是<b>浏览器现场合成</b>的（三角波 + 一点二次谐波），不需要额外的音频文件。
+          默认只响手套<b>真的按下去</b>的那些音，所以「听到的 = 看到的 = 手套做的」；
+          勾上面那项可以把丢掉的音也补响，用来对比「完整曲子」和「手套演奏」差多少。
+        </p>
+
         <svg viewBox="0 0 210 168" id="handSvg" style="width:100%;max-width:260px;display:block;margin:12px auto 0">
           <rect x="60" y="78" width="92" height="76" rx="20" fill="#eef1f5" stroke="#dbe2ea" stroke-width="1"/>
           <rect id="f-pinky"  x="130" y="36" width="19" height="50" rx="9.5" fill="#cfd8e3"/>
@@ -1937,7 +1970,8 @@ function parseMidi(buf){
 /* 手套只有 6 个自由度, 而钢琴曲常有几十个音同时响。
    目标: 保住节奏和速度感, 允许丢音, 绝不允许卡住。 */
 function buildPlan(notes, mode){
-  const events = [];                 // {t, slot, on, vel}
+  const events = [];                 // {t, slot, on, vel, note, durMs}
+  const droppedNotes = [];           // 被丢掉的音, 只在卷帘图上画灰影, 不产生动作
   const busyUntil = new Array(6).fill(-1);
   const pitchRank  = new Array(6).fill(0);
   let dropped = 0;
@@ -1957,14 +1991,24 @@ function buildPlan(notes, mode){
     }else{
       slot = pickFree(busyUntil, n.t, (lastSlot + 1) % 6);
     }
-    if(slot < 0){ dropped++; continue; }
+    if(slot < 0){
+      dropped++;
+      /* 记下丢掉的音 —— 卷帘图上画成灰影，这样「曲子里有什么」和「手套按得了什么」
+         能同框对比，一眼看出丢音集中在哪一段。 */
+      droppedNotes.push({ t:n.t, d:n.d, note:n.note });
+      continue;
+    }
     lastSlot = slot;
     /* 按住时长: 太短手指几乎不动、手套没有"弹"的感觉; 太长又来不及接下一个音。
        取音符时长的 80%, 夹在 55~200ms, 接近真人触键的时长。 */
     const gap = Math.max(55, Math.min(n.d * 0.8, 200));
     busyUntil[slot] = n.t + gap;
-    events.push({t:n.t,       slot, on:true,  vel:n.vel / 127});
-    events.push({t:n.t + gap, slot, on:false, vel:0});
+    /* 事件里带上 note / durMs：
+       - note 既给卷帘图定位纵轴，也给 Web Audio 算频率；
+       - durMs 决定这个音衰减多久。
+       声音和动作**共用同一条事件流**，所以听到的 = 看到的 = 手套做的。 */
+    events.push({t:n.t,       slot, on:true,  vel:n.vel / 127, note:n.note, durMs:gap});
+    events.push({t:n.t + gap, slot, on:false, vel:0,           note:n.note, durMs:0});
     used[slot]++;
   }
   events.sort((a,b) => a.t - b.t || (a.on ? -1 : 1));
@@ -1975,7 +2019,7 @@ function buildPlan(notes, mode){
     while(events[i].t - events[j].t > 1000) j++;
     peak = Math.max(peak, i - j + 1);
   }
-  return {events, dropped, used, peakRate:peak};
+  return {events, dropped, used, peakRate:peak, droppedNotes};
 }
 function pickFree(busyUntil, t, prefer){
   if(busyUntil[prefer] <= t) return prefer;
@@ -2083,6 +2127,9 @@ function analyze(){
     (risky ? "　<b>注意</b>：模拟模式不受限，但实机上板子每条命令有固定处理时间，这个速率可能发不完 —— 演奏时我会自动丢音保节奏。"
            : "　这个速率板子应该能跟上。");
   $("#btnPlay").disabled = false;
+  /* 分析完立刻画一张总览 —— 不用等到按播放，
+     用户就能先看清「这首曲子手套要做什么、哪些音它按不了」。 */
+  refreshRoll(0);
 }
 const st = (k,v) => "<div><span>" + k + "</span><b>" + v + "</b></div>";
 const fmtTime = ms => {
@@ -2155,6 +2202,8 @@ function stopPlay(safe){
   $("#btnPlay").innerHTML = "▶ 开始演奏";
   setDepths([0,0,0,0,0,0]);
   $("#playRate").textContent = "—";
+  silence();                 // 停手也要停声，别让音还挂在响
+  drawRoll(0);               // 播放头回起点
   if(safe && T.connected){ T.fire("SAFE"); setTimeout(refreshInfo, 400); }
 }
 
@@ -2173,9 +2222,10 @@ $("#btnPlay").onclick = async () => {
     await refreshInfo();
   }
 
-  const speed = (parseInt($("#speed").value,10) || 100) / 100;
+  const speed = curSpeed();
   const ev = S.plan.events;
   S.playing = true; S.cursor = 0; S.fired = 0;
+  S.dCursor = 0; S.sndFired = 0;          // 丢音游标 / 起音计数（自测要用）
   S.lastRateAt = performance.now(); S.lastRateCount = 0;
   S.t0 = performance.now(); S.startedAt = performance.now();
   $("#btnPlay").innerHTML = "⏸ 暂停";
@@ -2201,6 +2251,9 @@ $("#btnPlay").onclick = async () => {
       const d = e.on ? (useVel ? Math.max(0.35, e.vel) : 1) * amp : 0;
       depth[e.slot] = d;
       T.fire("MOVE " + slotIdOf(e.slot) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
+      /* 同一个事件流里顺手起音 —— 声音和动作在**同一帧**产生，
+         所以「听到的节拍」和「看到的动作」不会错开。 */
+      if(e.on) tone(e.note, e.durMs, e.vel);
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */
@@ -2208,10 +2261,22 @@ $("#btnPlay").onclick = async () => {
       while(S.cursor < ev.length && ev[S.cursor].t <= t) S.cursor++;
     }
 
+    /* 可选：把「因手指不够被丢掉」的音也补响一遍。
+       开了它就能对比「完整曲子」和「手套实际演奏」差多少 ——
+       画面上一眼看得出丢在哪，耳朵上也听得出。 */
+    if($("#sndAll").checked && S.plan.droppedNotes){
+      const dn = S.plan.droppedNotes;
+      while(S.dCursor < dn.length && dn[S.dCursor].t <= t){
+        const n = dn[S.dCursor++];
+        tone(n.note, Math.max(55, Math.min(n.d * 0.8, 200)), 0.55);
+      }
+    }
+
     setDepths(depth);
     const total = ev.length ? ev[ev.length - 1].t / 1000 : 0;
     $("#playFill").style.width = Math.min(100, (t / 1000) / Math.max(0.1, total) * 100) + "%";
     $("#playTime").textContent = (t/1000).toFixed(1) + "s / " + total.toFixed(1) + "s";
+    drawRoll(t);                 // 播放头：和声音、动作共用同一个时间基准
 
     if(now - S.lastRateAt > 900){
       const rate = Math.round((S.fired - S.lastRateCount) / ((now - S.lastRateAt) / 1000));
@@ -2220,13 +2285,230 @@ $("#btnPlay").onclick = async () => {
     }
 
     if(S.cursor >= ev.length && t >= ev[ev.length-1].t + 260){
-      if(loopOn()){ S.cursor = 0; S.t0 = performance.now(); }
+      if(loopOn()){ S.cursor = 0; S.dCursor = 0; S.t0 = performance.now(); }
       else { stopPlay(false); $("#planMsg").className = "msg ok"; $("#planMsg").textContent = "演奏结束。"; return; }
     }
     S.raf = requestAnimationFrame(frame);
   }
   S.raf = requestAnimationFrame(frame);
 };
+
+/* ---------- 5.5 声音：浏览器现场合成 ---------- */
+/* 为什么不用 <audio> 播音频文件：
+   1. 单文件零依赖，不能引外部音源；
+   2. 音符事件本来就是逐条产生的，直接由 note 算频率，声音与动作**同源同刻**，
+      不会出现「音频和动作对不齐」这种最难查的错；
+   3. 用户不用另外准备音频文件，导入 MIDI 就能听。 */
+const SND = { ctx:null, master:null, live:[] };
+
+function volLevel(){ return (parseInt($("#sndVol").value, 10) || 0) / 100; }
+function noteHz(note){ return 440 * Math.pow(2, (note - 69) / 12); }
+
+function audioCtx(){
+  if(!SND.ctx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    SND.ctx = new AC();
+    SND.master = SND.ctx.createGain();
+    SND.master.gain.value = volLevel();
+    SND.master.connect(SND.ctx.destination);
+  }
+  /* 自动播放策略会把 AudioContext 挂起，必须在用户手势里 resume。
+     resume() 返回 Promise，被策略挡住时会 reject —— 吞掉，别让它变成未捕获拒绝。 */
+  if(SND.ctx.state === "suspended") SND.ctx.resume().catch(() => {});
+  return SND.ctx;
+}
+
+/* 一个音 = 三角波基频 + 一点二次谐波，走「快起 + 指数衰减」包络。
+   不追求仿真钢琴，要的是每个音的**起音时刻**干脆清楚 ——
+   这样「听到的节拍」和「看到的动作」才对得上。 */
+function tone(note, durMs, vel){
+  if(!$("#sndOn").checked) return;
+  S.sndFired = (S.sndFired || 0) + 1;      // 给自测断言用：声音确实被调度了
+  const ctx = audioCtx(); if(!ctx) return;
+  const t0  = ctx.currentTime + 0.01;
+  const amp = Math.max(0.08, Math.min(1, vel || 0.8));
+  const end = t0 + Math.max(0.14, durMs / 1000) + 0.30;
+
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.30 * amp, t0 + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  const o1 = ctx.createOscillator(); o1.type = "triangle"; o1.frequency.value = noteHz(note);
+  const o2 = ctx.createOscillator(); o2.type = "sine";     o2.frequency.value = noteHz(note) * 2;
+  const g2 = ctx.createGain(); g2.gain.value = 0.22;
+
+  o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(SND.master);
+  o1.start(t0); o2.start(t0);
+  o1.stop(end + 0.02); o2.stop(end + 0.02);
+  SND.live.push(o1, o2);
+  o1.onended = () => {                       // 播完自己出队，别让数组无限长
+    let i = SND.live.indexOf(o1); if(i >= 0) SND.live.splice(i, 1);
+    i = SND.live.indexOf(o2);     if(i >= 0) SND.live.splice(i, 1);
+  };
+}
+function silence(){
+  SND.live.forEach(o => { try{ o.stop(0); }catch(e){} });
+  SND.live.length = 0;
+}
+$("#sndVol").oninput = () => {
+  $("#sndVolLabel").textContent = $("#sndVol").value + "%";
+  if(SND.master) SND.master.gain.value = volLevel();
+};
+$("#sndOn").onchange = () => { if(!$("#sndOn").checked) silence(); };
+
+/* ---------- 5.6 音乐 ↔ 动作 同轴卷帘 ---------- */
+const SLOT_COLOR = ["#1a6ef0", "#7c4dff", "#12a150", "#b5730a", "#e5484d", "#0e9aa7"];
+const ROWH = 20;
+const ROLL = { w:760, h:380, off:null, sig:"", t0:0, span:1, head:0 };
+
+function curSpeed(){ return (parseInt($("#speed").value, 10) || 100) / 100; }
+
+function rollGeo(){
+  /* 上半张 = 卷帘，下半张 = 6 条动作轨；左边留一条给槽位名和刻度 */
+  return { x0:56, x1:ROLL.w - 12, yTop:16, yBot:ROLL.h - ROWH * 6 - 24 };
+}
+function rollTotal(){
+  const ev = S.plan ? S.plan.events : null;
+  return (ev && ev.length) ? ev[ev.length - 1].t + 300 : 1000;
+}
+/* 时间窗：总览 = 从头画到尾；跟随 = 8 秒窗口，起点**吸附到 2 秒网格**，
+   这样静态层只在跨格时重画，不必每帧重绘几百个矩形。 */
+function rollWindow(centerMs){
+  const total = rollTotal();
+  if($("#rollMode").value !== "follow"){ ROLL.t0 = 0; ROLL.span = Math.max(1, total); return; }
+  const win = Math.min(total, 8000);
+  let t0 = (centerMs || 0) - win / 2;
+  t0 = Math.max(0, Math.min(Math.max(0, total - win), t0));
+  ROLL.t0 = Math.floor(t0 / 2000) * 2000;
+  ROLL.span = win;
+}
+function rollSig(){
+  const dn = (S.plan && S.plan.droppedNotes) ? S.plan.droppedNotes.length : 0;
+  const en = (S.plan && S.plan.events) ? S.plan.events.length : 0;
+  return $("#rollMode").value + "|" + en + ":" + dn;
+}
+function rollNeedsRedraw(centerMs){
+  if(rollSig() !== ROLL.sig) return true;
+  if($("#rollMode").value !== "follow") return false;
+  const total = rollTotal(), win = Math.min(total, 8000);
+  const t0 = Math.max(0, Math.min(Math.max(0, total - win), (centerMs || 0) - win / 2));
+  return Math.abs(Math.floor(t0 / 2000) * 2000 - ROLL.t0) > 0.5;
+}
+
+function drawRollStatic(){
+  const c = $("#roll"); if(!c || !S.plan) return;
+  const L = rollGeo(), W = L.x1 - L.x0;
+  const X = t => L.x0 + (t - ROLL.t0) / ROLL.span * W;
+
+  if(!ROLL.off){
+    ROLL.off = document.createElement("canvas");
+    ROLL.off.width = ROLL.w; ROLL.off.height = ROLL.h;
+  }
+  const g = ROLL.off.getContext("2d");
+  g.clearRect(0, 0, ROLL.w, ROLL.h);
+
+  /* 纵轴范围：把丢音也纳入，免得灰影画到框外 */
+  const ons = S.plan.events.filter(e => e.on);
+  const ns = ons.map(e => e.note).concat((S.plan.droppedNotes || []).map(n => n.note));
+  let lo = Math.min.apply(null, ns), hi = Math.max.apply(null, ns);
+  if(!isFinite(lo)){ lo = 60; hi = 72; }
+  if(hi - lo < 12){ const m = (hi + lo) / 2; lo = m - 6; hi = m + 6; }
+  const Y = n => L.yBot - (n - lo) / (hi - lo) * (L.yBot - L.yTop);
+
+  const pxPerSec = W / (ROLL.span / 1000);
+  const stepMs = pxPerSec > 55 ? 500 : pxPerSec > 26 ? 1000 : pxPerSec > 12 ? 2000 : 5000;
+
+  /* 时间网格 */
+  g.strokeStyle = "#eef1f5"; g.lineWidth = 1;
+  g.fillStyle = "#9aa4b2"; g.font = "10px sans-serif"; g.textBaseline = "alphabetic";
+  for(let t = Math.ceil(ROLL.t0 / stepMs) * stepMs; t < ROLL.t0 + ROLL.span; t += stepMs){
+    const x = Math.round(X(t)) + .5;
+    g.beginPath(); g.moveTo(x, L.yTop); g.lineTo(x, L.yBot + ROWH * 6); g.stroke();
+    g.fillText((t / 1000).toFixed(t % 1000 ? 1 : 0) + "s", x + 2, L.yTop - 4);
+  }
+  /* 丢掉的音：灰影。只画在上半张 —— 它没有对应的动作。 */
+  g.fillStyle = "#d7dde5";
+  (S.plan.droppedNotes || []).forEach(n => {
+    const x = X(n.t), w = Math.max(2, n.d / ROLL.span * W);
+    if(x + w < L.x0 || x > L.x1) return;
+    g.fillRect(x, Y(n.note) - 3, Math.max(2, Math.min(w, L.x1 - x)), 6);
+  });
+  /* 真的演奏了的音：按手指着色 */
+  ons.forEach(e => {
+    const x = X(e.t), w = Math.max(3, e.durMs / ROLL.span * W);
+    if(x + w < L.x0 || x > L.x1) return;
+    g.fillStyle = SLOT_COLOR[e.slot];
+    g.fillRect(x, Y(e.note) - 4, Math.max(2, Math.min(w, L.x1 - x)), 8);
+  });
+  /* 下半张：6 条动作轨 */
+  g.fillStyle = "#f7f9fb";
+  g.fillRect(L.x0, L.yBot, W, ROWH * 6);
+  ons.forEach(e => {
+    const x = X(e.t), w = Math.max(2, e.durMs / ROLL.span * W);
+    if(x + w < L.x0 || x > L.x1) return;
+    g.fillStyle = SLOT_COLOR[e.slot];
+    g.fillRect(x, L.yBot + e.slot * ROWH + 3, Math.max(2, Math.min(w, L.x1 - x)), ROWH - 6);
+  });
+  /* 轨名 + 分隔线 */
+  g.font = "10px sans-serif"; g.textBaseline = "middle";
+  for(let s = 0; s < 6; s++){
+    const y = L.yBot + s * ROWH;
+    g.strokeStyle = s ? "#e2e6eb" : "#cfd6df";
+    g.beginPath(); g.moveTo(L.x0, Math.round(y) + .5); g.lineTo(L.x1, Math.round(y) + .5); g.stroke();
+    g.fillStyle = "#6b7480";
+    g.fillText(SLOTS[s], 6, y + ROWH / 2);
+  }
+  /* 两块的交界 + 左侧时间轴 */
+  g.strokeStyle = "#cfd6df";
+  g.beginPath(); g.moveTo(L.x0, Math.round(L.yBot) + .5); g.lineTo(L.x1, Math.round(L.yBot) + .5); g.stroke();
+  g.beginPath(); g.moveTo(L.x0 + .5, L.yTop); g.lineTo(L.x0 + .5, L.yBot + ROWH * 6); g.stroke();
+
+  ROLL.sig = rollSig();
+}
+
+/* 每帧：贴静态层 + 压进度 + 画播放头 */
+function drawRoll(headMs){
+  const c = $("#roll"); if(!c || !S.plan) return;
+  if(rollNeedsRedraw(headMs)){ rollWindow(headMs); drawRollStatic(); }
+  ROLL.head = headMs || 0;
+
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, ROLL.w, ROLL.h);
+  if(ROLL.off) g.drawImage(ROLL.off, 0, 0);
+
+  const L = rollGeo(), W = L.x1 - L.x0;
+  const x = L.x0 + (ROLL.head - ROLL.t0) / ROLL.span * W;
+  if(x < L.x0 - 1 || x > L.x1 + 1) return;
+
+  g.fillStyle = "rgba(26,110,240,.07)";     // 已播过的部分压一层浅色
+  g.fillRect(L.x0, L.yTop, Math.max(0, x - L.x0), L.yBot + ROWH * 6 - L.yTop);
+  g.strokeStyle = "#e5484d"; g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(Math.round(x) + .5, L.yTop - 2);
+  g.lineTo(Math.round(x) + .5, L.yBot + ROWH * 6);
+  g.stroke();
+}
+
+/* 换曲 / 换窗口模式时重画整张 */
+function refreshRoll(headMs){
+  rollWindow(headMs || 0);
+  drawRollStatic();
+  drawRoll(headMs || 0);
+}
+$("#rollMode").onchange = () => refreshRoll(S.playing ? (performance.now() - S.t0) * curSpeed() : 0);
+
+/* 图例：颜色 ↔ 手指 */
+(function(){
+  const el = $("#rollLegend"); if(!el) return;
+  el.innerHTML = SLOTS.map((s, i) =>
+      '<span style="display:inline-flex;align-items:center;gap:4px">' +
+      '<i style="width:10px;height:10px;border-radius:3px;background:' + SLOT_COLOR[i] + ';display:inline-block"></i>' +
+      s + '</span>').join("") +
+    '<span style="display:inline-flex;align-items:center;gap:4px">' +
+    '<i style="width:10px;height:10px;border-radius:3px;background:#d7dde5;display:inline-block"></i>丢掉的音</span>';
+})();
 
 /* ======================= 6. 日志 / 终端 ======================= */
 $("#btnRaw").onclick = () => {

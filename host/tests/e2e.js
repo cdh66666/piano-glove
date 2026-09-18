@@ -400,6 +400,117 @@ function check(name, cond, extra){
   await page.waitForTimeout(500);
   check("停止后按钮复位", (await txt("#btnPlay")).includes("开始演奏"));
 
+  /* ============ 5b. 音乐 ↔ 演奏动作 同轴显示 ============
+     这块是「能听 + 能看 + 两边对齐」的合体，断言盯四件事：
+     ① 分析完不按播放就该有总览；
+     ② 声音和动作必须来自同一条事件流（起音数 == 已发出的「按下」数）；
+     ③ 播放头得跟着时间走；
+     ④ 停止要真的静音、关掉开关要一次都不响。 */
+  console.log("\n=== 5b. 音乐 ↔ 动作 同轴显示 ===");
+
+  const rollInfo = await page.evaluate(() => {
+    const c = document.querySelector("#roll");
+    return c ? {w: c.width, h: c.height} : null;
+  });
+  check("卷帘画布存在且尺寸够画", !!rollInfo && rollInfo.w >= 600 && rollInfo.h >= 300,
+    JSON.stringify(rollInfo));
+
+  /* ⚠️ 跟随模式只在「曲子比窗口长」时才验证得了：此刻 plan 还是 test.mid（6.5s，
+     短于 8 秒窗口），窗口本来就无处可移。先换回内置样本（≈15.8s）再测。 */
+  await click("#btnSample");
+  await page.waitForTimeout(700);
+  const planLen = await page.evaluate(() => S.plan.events[S.plan.events.length - 1].t);
+  check("样本比 8 秒窗口长（跟随模式才有的可动）", planLen > 8000, Math.round(planLen) + "ms");
+
+  /* ⚠️ 颜色统计**必须在不播放时采样**：播放时已播区域会压一层半透明蓝，
+     会把底下的纯色染偏，严格匹配全部落空。 */
+  const pxStat = () => page.evaluate(() => {
+    const c = document.querySelector("#roll");
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    const hex = ["#1a6ef0","#7c4dff","#12a150","#b5730a","#e5484d","#0e9aa7"];
+    const rgb = hex.map(h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]);
+    const near = (r,g,b,t) => Math.abs(r-t[0])<8 && Math.abs(g-t[1])<8 && Math.abs(b-t[2])<8;
+    const counts = [0,0,0,0,0,0];
+    let grey = 0, painted = 0;
+    for(let i = 0; i < d.length; i += 4){
+      if(d[i+3] === 0) continue;
+      painted++;
+      for(let k = 0; k < 6; k++) if(near(d[i], d[i+1], d[i+2], rgb[k])) counts[k]++;
+      if(near(d[i], d[i+1], d[i+2], [215,221,229])) grey++;
+    }
+    return {counts, grey, painted};
+  });
+
+  const st0 = await pxStat();
+  check("分析完就画出总览（不用等按播放）", st0.painted > 20000 && st0.counts.some(v => v > 0),
+    JSON.stringify(st0));
+
+  const legend = (await txt("#rollLegend")).replace(/\s+/g, " ");
+  check("图例列全 6 根手指 + 丢音",
+    ["拇指侧压","拇指下压","食指","中指","无名指","小指"].every(s => legend.includes(s)) &&
+    legend.includes("丢掉的音"), legend.slice(0, 80));
+
+  const usedSlots = await page.evaluate(() =>
+    (S.plan.used || []).map((v, i) => v > 0 ? i : -1).filter(i => i >= 0));
+  check("用到的每根手指都画出了块",
+    usedSlots.length >= 5 && usedSlots.every(i => st0.counts[i] > 0),
+    "槽位 " + JSON.stringify(usedSlots) + " 像素 " + JSON.stringify(st0.counts));
+
+  /* 跟随模式：窗口应随播放头移动（静态层按 2 秒网格吸附，避免每帧重画） */
+  const follow = await page.evaluate(() => {
+    const sel = document.querySelector("#rollMode");
+    sel.value = "follow"; sel.dispatchEvent(new Event("change"));
+    refreshRoll(3000);
+    const a = {t0: ROLL.t0, span: ROLL.span};
+    refreshRoll(12000);
+    const b = {t0: ROLL.t0, span: ROLL.span};
+    sel.value = "all"; sel.dispatchEvent(new Event("change"));
+    return {a, b};
+  });
+  check("跟随模式窗口会移动、且不超过 8 秒",
+    follow.b.t0 !== follow.a.t0 && follow.a.span <= 8000 && follow.b.span <= 8000,
+    JSON.stringify(follow));
+
+  /* 播放一轮：同时看播放头、起音数、已发出的「按下」数 */
+  await page.evaluate(() => { S.sndFired = 0; window.__head0 = ROLL.head; });
+  await click("#btnPlay");
+  await page.waitForTimeout(900);
+  const live = await page.evaluate(() => {
+    let onsSent = 0;
+    for(let i = 0; i < S.cursor; i++) if(S.plan.events[i].on) onsSent++;
+    return {head: ROLL.head, head0: window.__head0, snd: S.sndFired, onsSent,
+            playing: S.playing, ctx: SND.ctx ? SND.ctx.state : "none"};
+  });
+  /* 直接在「播放中」调用 stopPlay 并**立刻**读节点数 —— 只有这样才能测到 silence()。
+     晚读几百毫秒的话，短音符自己就 ended 出队了，把 silence() 删掉也测不出来（假绿）。 */
+  const afterStop = await page.evaluate(() => {
+    stopPlay(false);
+    return {n: SND.live.length, head: ROLL.head};
+  });
+  await page.waitForTimeout(250);
+
+  check("播放头随播放推进", live.head > live.head0 + 200,
+    "head0=" + live.head0 + " head=" + Math.round(live.head));
+  check("播放时确实起了音", live.snd > 0,
+    "起音 " + live.snd + " 次（AudioContext=" + live.ctx + "）");
+  check("起音数 == 已发出的「按下」数（同一条事件流）", live.snd === live.onsSent,
+    "起音 " + live.snd + " / 按下 " + live.onsSent);
+  check("停止后音频节点被清空", afterStop.n === 0, "剩余节点 " + afterStop.n);
+  check("停止后播放头回到起点", afterStop.head === 0, "head=" + afterStop.head);
+
+  /* 关掉声音开关后必须一次都不起音 —— 别让「静音」变成「没演奏」 */
+  await page.uncheck("#sndOn");
+  await page.evaluate(() => { S.sndFired = 0; S.fired = 0; });
+  await click("#btnPlay");
+  await page.waitForTimeout(700);
+  const muted = await page.evaluate(() => ({snd: S.sndFired, fired: S.fired}));
+  await click("#btnStop");
+  await page.check("#sndOn");
+  check("关掉「播放声音」后一次都不起音（但动作照发）",
+    muted.snd === 0 && muted.fired > 0,
+    "起音 " + muted.snd + " / 动作 " + muted.fired);
+  await shot("08b-roll");
+
   /* 回归：演奏引擎必须按**真实映射**取舵机 id，不能假设「槽位 i 的 id 就是 i+1」。
      原先写的是 `MOVE (slot+1)`：对出厂的 [1,2,3,4,5,6] 碰巧成立，
      一旦用户动过编号，就会把 A 槽位的校准位置发给 B 号舵机 ——
@@ -440,6 +551,38 @@ function check(name, cond, extra){
     bm.includes("已读取") || bm.includes("读取失败"), bm.slice(0, 70));
   await page.setInputFiles("#file", path.join(__dirname, "test.mid"));
   await page.waitForTimeout(700);
+
+  /* 丢音灰影。注意：**正常素材一根手指都不丢**（test.mid 是 85 音符 / 6 秒，
+     均摊到 6 根手指完全够用，dropped=0），所以这里分两步：
+     先人为注入一批丢音，验证「有丢音时会画灰影」；还原后再确认「没丢音时干净」。
+     注入前后都要 refreshRoll，验完立刻把原 plan 放回去。 */
+  const drop = await page.evaluate(() => {
+    const bak = S.plan;
+    const countGrey = () => {
+      const c = document.querySelector("#roll");
+      const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for(let i = 0; i < d.length; i += 4)
+        if(d[i+3] && Math.abs(d[i]-215)<8 && Math.abs(d[i+1]-221)<8 && Math.abs(d[i+2]-229)<8) n++;
+      return n;
+    };
+    const before = countGrey();
+    S.plan = Object.assign({}, bak, {
+      dropped: 3,
+      droppedNotes: [{t:300,d:200,note:64}, {t:900,d:200,note:67}, {t:1500,d:200,note:72}]
+    });
+    refreshRoll(0);
+    const injected = countGrey();
+    S.plan = bak;
+    refreshRoll(0);
+    return {before, injected, after: countGrey(), restored: S.plan === bak,
+            listed: (bak.droppedNotes || []).length, dropped: bak.dropped};
+  });
+  check("有丢音时图上画灰影（人为注入验证）",
+    drop.before === 0 && drop.injected > 10 && drop.restored,
+    JSON.stringify(drop));
+  check("没有丢音时图上不留灰影", drop.after === 0 && drop.dropped === 0 && drop.listed === 0,
+    "dropped=" + drop.dropped + " grey=" + drop.after);
 
   /* ---------- 6. 日志 ---------- */
   console.log("\n=== 6. 日志页 ===");
