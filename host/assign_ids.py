@@ -106,7 +106,8 @@ class Bus:
         global PORT
         if PORT in (None, "", "auto"):
             PORT = _autodetect()
-            log(f"    自动识别到手套主板: {PORT}")
+            # 只打印不写日志 —— assign_log.txt 是协议逆向的证据文件, 别让自动识别这种噪音污染它
+            print(f"    自动识别到手套主板: {PORT}", flush=True)
         # 打开串口时 DTR/RTS 跳变会给板子一个复位脉冲，紧接着发的第一条命令必丢。
         # 所以先发一条 INFO "叫醒" 它，收到回复才算真的通了。
         self.s = serial.Serial(PORT, BAUD, timeout=0.2)
