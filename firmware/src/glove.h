@@ -47,6 +47,9 @@ void    safe();
 
 uint16_t pressPos(int s, uint8_t depthPct);
 uint16_t releasePos(int s);
+uint16_t pressEnd(int s);     // 按到底的那一端（由 dir 决定）
+uint16_t releaseEnd(int s);   // 完全松开的那一端
+uint8_t  snapStandby();       // 把静止位对齐到松开端，返回被修正的槽位掩码
 
 bool    pressSlot(int s, uint16_t speed, uint8_t acc);
 bool    releaseSlot(int s, uint16_t speed, uint8_t acc);

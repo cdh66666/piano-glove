@@ -16,7 +16,10 @@
 #include "scs_bus.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.1.1"     // 2.1.1: 修「编号时 remapId 把已编好的槽位一起改掉」+ sendRecv 的 pkt[32] 栈溢出
+#define FW_VER "2.1.2"     // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
+                           //        + MOVE 越界安全闸（防"转到不该去的地方卡住"）
+                           //        + CAL ALIGN 修正存量校准
+                           // 2.1.1: 修「编号时 remapId 把已编好的槽位一起改掉」+ sendRecv 的 pkt[32] 栈溢出
 
 // 串口接收环形缓冲。Arduino 默认只有 256 B（115200 下 ≈ 22 ms 余量），
 // 扛不住上位机一次连发几十条命令，放大到 4 KB。详见 setup() 里的说明。
@@ -248,6 +251,14 @@ static void cmdCal(const int n, char **t) {
     }
     glove::calCapture(s, (uint16_t)atoi(t[3]), (uint16_t)atoi(t[4]), (uint16_t)atoi(t[5]));
     okf("CAL CAPTURE slot=%d", s);
+    return;
+  }
+  if (strcmp(sub, "ALIGN") == 0) {
+    // 把静止位对齐到「松开端」—— 修 2.1.1 及更早的自动校准留下的量程中点，
+    // 不用重做采样。上位机第 3 步也可以一键调用。
+    // snapStandby() 内部有改动时会自己持久化。
+    const uint8_t fixed = glove::snapStandby();
+    okf("CAL ALIGN fixed_mask=0x%02X standby_moved_to_release_end", (unsigned)fixed);
     return;
   }
   if (strcmp(sub, "SAVE") == 0) {
@@ -639,12 +650,42 @@ static void cmdLine(char *raw) {
   }
   if (strcmp(v, "MOVE") == 0) {
     if (!glove::armed()) { errf("MOVE motion_not_armed"); return; }
-    if (n < 3) { errf("MOVE usage_id_position_speed_acceleration_ARM"); return; }
+    if (n < 3) { errf("MOVE usage_id_position_speed_acceleration_[FORCE]"); return; }
     const int id  = atoi(t[1]);
     const int pos = atoi(t[2]);
     // speed / acc 可选（上位机的响应速度实测页只发 id + pos）
     const unsigned speed = (n >= 4) ? (unsigned)atol(t[3]) : (unsigned)glove::pressSpeed();
     const unsigned acc   = (n >= 5) ? (unsigned)atol(t[4]) : (unsigned)glove::pressAcc();
+
+    // ★ 安全闸：目标位置必须落在该槽位校准出的机械区间内。
+    //
+    // MOVE 是唯一能直接指定**原始位置**的命令，也最容易撞限位 ——
+    // 界面上「测动作往返」曾经硬编码 MOVE <id> 200，而那块舵机校准出来的
+    // 区间可能是 [2091, 2600]：200 远在界外，舵机就一路顶过去顶死在那儿。
+    // 用手册里的行话说这叫"转到不该转到的地方卡住"。
+    // 宁可拒绝并说清楚，也不要让用户不明不白地看着它卡着。
+    // FORCE 出现在**任何**位置都算。之所以不写死 t[5]：
+    // 演奏页发的是 MOVE <id> <pos> <speed> <acc> ARM —— t[5] 被 "ARM" 占了，
+    // 用户按 usage 写 MOVE 1 200 FORCE 更是压根没有 t[5]。
+    // 认不出来就等于闸门放行不了，用户会以为"加了 FORCE 也没用"。
+    bool force = false;
+    for (int i = 1; i < n; ++i)
+      if (strcasecmp(t[i], "FORCE") == 0) force = true;
+
+    if (!force) {
+      const int s = glove::slotOfId((uint8_t)id);
+      if (s >= 0 && glove::slot(s).valid) {
+        const int a0 = (int)glove::slot(s).lo, a1 = (int)glove::slot(s).hi;
+        const int lo = (a0 < a1) ? a0 : a1;
+        const int hi = (a0 < a1) ? a1 : a0;
+        if (pos < lo || pos > hi) {
+          errf("MOVE out_of_cal_range id=%d pos=%d allowed=%d..%d add_FORCE_to_override",
+               id, pos, lo, hi);
+          return;
+        }
+      }
+    }
+
     if (!glove::moveRaw((uint8_t)id, (uint16_t)pos, (uint16_t)speed, (uint8_t)acc)) {
       errf("MOVE servo_no_reply id=%d", id);
       return;

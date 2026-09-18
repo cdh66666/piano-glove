@@ -262,6 +262,14 @@ pre#log .sys{color:#c9a5ff}
         <button id="btnCalClear" class="danger">清空重来</button>
         <button id="btnCalCancel" class="ghost">中止采样</button>
       </div>
+      <div class="row">
+        <button id="btnCalAlign" class="ghost">修正静止位（旧版校准用）</button>
+      </div>
+      <p class="hint" style="margin-top:-2px">
+        这个按钮把每根手指的<b>静止位</b>拉回<b>松开端</b>。2.1.1 及更早的固件把静止位记成了
+        行程中点，按一下只走<b>半个行程</b>（这正是"幅度怎么这么小"的原因）。
+        烧上 2.1.2 后板子开机会自动修一次，这里也可以手动补一刀，<b>不用重做采样</b>。
+      </p>
       <div class="msg" id="calMsg">未开始。</div>
       <div class="bar" style="height:14px;margin-top:10px"><i id="calFill" style="left:0;width:0"></i></div>
       <div class="tw" style="margin-top:12px"><table>
@@ -289,7 +297,11 @@ pre#log .sys{color:#c9a5ff}
       <div class="tw" style="margin-top:12px"><table>
         <thead><tr><th>编号</th><th>手指</th><th>单独试</th><th>按下方向</th></tr></thead>
         <tbody id="testBody2"></tbody></table></div>
-      <p class="hint">按方向不对就用右侧下拉改，会立刻写到固件（<code>SETDIR</code>）。</p>
+      <p class="hint">
+        按方向不对就用右侧下拉改，会立刻写到固件（<code>SETDIR</code>）。
+        「按一下」= 从<b>松开位一路按到你校准的最深处</b>，看到的就是<b>完整行程</b>；
+        如果感觉只走了一小半，去第 3 步点一下「修正静止位」。
+      </p>
     </div>
   </div>
 
@@ -302,7 +314,7 @@ pre#log .sys{color:#c9a5ff}
         <button id="btnLatPing" class="primary" style="flex:1">① 测通信往返（不动手指，最安全）</button>
       </div>
       <div class="row">
-        <button id="btnLatMove" style="flex:1">② 测动作往返（会动手指）</button>
+        <button id="btnLatMove" style="flex:1">② 测动作往返（会动手指，只在校准行程内）</button>
       </div>
       <div class="row">
         <button id="btnLatBurst" style="flex:1">③ 压测：连发 60 条，看会不会把固件压死</button>
@@ -419,11 +431,21 @@ pre#log .sys{color:#c9a5ff}
           <input type="range" id="fSpeed" min="0" max="200" step="10" value="0" style="flex:1;min-width:120px">
           <span id="fSpeedLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">最快</span>
         </div>
+        <div class="row">
+          <label>按压幅度</label>
+          <input type="range" id="fDepth" min="50" max="100" step="5" value="100" style="flex:1;min-width:120px">
+          <span id="fDepthLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="followVel"> 跟随 MIDI 力度</label>
+        </div>
         <p class="hint" style="margin-top:-2px">
-          两个速度是不同的东西：<b>播放速度</b>改的是曲子本身的快慢（音符间隔）；
-          <b>手指动作速度</b>改的是舵机一根手指按下去用多久。
-          弹快的曲子时手指要跑得快，但按太猛听着/感觉着会"硬"，可以先调这个找手感。
-          「最快」= 用舵机的最大速度。
+          三个参数各管一件事：<b>播放速度</b>改的是曲子本身的快慢（音符间隔）；
+          <b>手指动作速度</b>改的是舵机一根手指按下去用多久（「最快」= 舵机最大速度）；
+          <b>按压幅度</b>改的是手指按到多深。
+          <b>按压幅度 100% = 用你校准出来的整个行程</b>（松开位 → 按到底），这也是默认值。
+          勾上「跟随 MIDI 力度」后强音按得深、弱音按得浅；不勾则每个音都按满行程 ——
+          手感更实，也更容易看清哪根手指对应哪个音。
         </p>
         <div class="row">
           <button id="btnPlay" class="primary" style="flex:1">▶ 开始演奏</button>
@@ -697,7 +719,18 @@ class MockFirmware{
         }
         if(mode === "FINISH"){
           this.autoActive = 0;
-          for(let s=0;s<6;s++){ const c = this.cal[s]; if(c.samples > 3 && c.max > c.min) c.valid = 1; }
+          for(let s=0;s<6;s++){
+            const c = this.cal[s];
+            if(c.samples > 3 && c.max > c.min){
+              c.valid = 1;
+              // ⚠️ 静止位 = **松开端**，不是量程中点。
+              // 真固件 glove.cpp 的 autoFinish() 就是这条语义。
+              // 取中点的话 pressPos 只从"中点"走到"按下端"，幅度只剩半个行程 ——
+              // 模拟就会显示得比实机好看，成了"模拟一套、实机另一套"
+              // （这个项目为它栽过两次，见 7c）。
+              c.standby = (c.press === "min") ? c.max : c.min;
+            }
+          }
           return ["OK CAL AUTO FINISH torque=off"];
         }
         if(mode === "CANCEL"){ this.autoActive = 0; return ["OK CAL AUTO CANCEL torque=off"]; }
@@ -706,6 +739,20 @@ class MockFirmware{
           out.push("CAL_AUTO slot=" + s + " samples=" + c.samples + " min=" + c.min + " max=" + c.max + " last=" + c.last); }
         out.push("OK CAL AUTO STATUS active=" + this.autoActive);
         return out;
+      }
+      if(sub === "ALIGN"){
+        // 把静止位对齐到「松开端」—— 与真固件 glove::snapStandby() 同语义。
+        // 只修"明显跑偏"的（离松开端超过量程的 1/4），避免动到有意留的偏移。
+        let mask = 0;
+        for(let s=0;s<6;s++){
+          const c = this.cal[s];
+          if(!c.valid) continue;
+          const want = (c.press === "min") ? c.max : c.min;
+          const span = Math.abs(c.max - c.min);
+          if(Math.abs(c.standby - want) > span / 4){ c.standby = want; mask |= (1 << s); }
+        }
+        return ["OK CAL ALIGN fixed_mask=0x" + mask.toString(16).toUpperCase().padStart(2, "0") +
+                " standby_moved_to_release_end"];
       }
       if(sub === "SAVE"){
         const bad = [0,1,2,3,4,5].find(s => !this.cal[s].valid);
@@ -733,6 +780,21 @@ class MockFirmware{
     if(v === "MOVE"){
       if(!this.armed) return ["ERR MOVE motion_not_armed"];
       const id = +a[0], pos = +a[1];
+      // 和真固件同一条安全闸：目标位置必须落在该槽位校准出的区间内。
+      // MOVE 是唯一能直接指定**原始位置**的命令，最容易撞限位 ——
+      // 界面曾经硬编码 MOVE 1 200，而那块舵机的区间是 [2091,2600]：
+      // 200 在界外，舵机一路顶过去顶死，用户原话"转到不该转到的地方卡住"。
+      const force = a.slice(2).some(x => String(x).toUpperCase() === "FORCE");
+      if(!force){
+        const s = this.slotId.indexOf(id);
+        const c = (s >= 0) ? this.cal[s] : null;
+        if(c && c.valid){
+          const lo = Math.min(c.min, c.max), hi = Math.max(c.min, c.max);
+          if(pos < lo || pos > hi)
+            return ["ERR MOVE out_of_cal_range id=" + id + " pos=" + pos +
+                    " allowed=" + lo + ".." + hi + " add_FORCE_to_override"];
+        }
+      }
       if(this.present(id)) this.moveTo(id, pos);
       return ["OK MOVE id=" + (a[0]||0) + " pos=" + (a[1]||0)];
     }
@@ -811,8 +873,15 @@ class MockFirmware{
       const c = s >= 0 ? this.cal[s] : null;
       if(!c) return;
       const stroke = Math.round((300 + 55 * s) * this.rng() / 4095);
-      const dir    = c.press === "min" ? -1 : 1;
-      const p      = c.standby + dir * Math.round(Math.random() * stroke);
+      // ⚠️ 采样是**双向**摆开的。
+      // 真机上用户按校准提示做的是「手指伸直 ↔ 用力握拳」，起点（静止位）
+      // 落在中间，min 和 max 分别朝两侧走，总跨度 ≈ stroke（与实机 298~573 计数对齐）。
+      //
+      // 这里曾经写成「从 standby 单向朝 press 方向走」：那样 min 恰好 = 起点，
+      // 于是真固件"把静止位写成 (min+max)/2 中点"这个 bug 在模拟里**完全看不出来** ——
+      // 模拟显示满幅、实机只剩半程。又一次"模拟一套、实机另一套"。
+      const half = Math.round(Math.random() * stroke / 2);
+      const p    = c.standby + (Math.random() < 0.5 ? -half : half);
       c.last = p; c.samples++;
       if(p < c.min) c.min = p;
       if(p > c.max) c.max = p;
@@ -1319,6 +1388,18 @@ $("#btnCalCancel").onclick = async () => {
   $("#calMsg").className = "msg warn";
   $("#calMsg").textContent = "已中止采样。";
 };
+$("#btnCalAlign").onclick = async () => {
+  const r = await T.send("CAL ALIGN", 6000);
+  const line = r.find(l => l.startsWith("OK CAL ALIGN")) || "";
+  const maskHex = line ? (kv(line)["fixed_mask"] || "0x0") : "";
+  const mask = parseInt(maskHex, 16) || 0;
+  const names = [0,1,2,3,4,5].filter(s => mask & (1 << s)).map(s => (s + 1) + " 号").join("、");
+  $("#calMsg").className = "msg " + (line ? "ok" : "err");
+  $("#calMsg").textContent = line
+    ? ("静止位已对齐到「松开端」（" + maskHex + "）。本次修正：" + (names || "无，本来就对"))
+    : ("固件不认识这条命令（回了：" + (r[0] || "无回复") + "）—— 需要 2.1.2 及以上固件。");
+  await refreshCal(); await refreshSlots(true);
+};
 $("#btnCalClear").onclick = async () => {
   clearInterval(calTimer);
   await T.send("CAL CLEAR", 5000);
@@ -1413,16 +1494,35 @@ function _median(a){
 }
 function latSay(kind, html){ const m = $("#latMsg"); m.className = "msg " + (kind || ""); m.innerHTML = html; }
 
-async function measureRoundTrip(cmd, n){
+async function measureRoundTrip(cmd, n, altCmd){
   const rs = [];
   let lost = 0;
   for(let i=0;i<n;i++){
-    latSay("warn", "正在测 " + (i+1) + " / " + n + " …（<code>" + esc(cmd) + "</code>）");
-    const lines = await T.send(cmd, 4000);
+    const c = (altCmd && (i % 2)) ? altCmd : cmd;
+    latSay("warn", "正在测 " + (i+1) + " / " + n + " …（<code>" + esc(c) + "</code>）");
+    const lines = await T.send(c, 4000);
     if(!lines.length){ lost++; continue; }
     if(T.last && T.last.first != null) rs.push(T.last.first);
   }
   return {rs, lost};
+}
+
+/* 挑一根「最可信」的手指来测动作往返。
+   ⚠️ 这里**绝不要**再发 `MOVE <id> <pos>`。
+   曾经硬编码 MOVE 1 200，而那块舵机校准出来的区间可能是 [2091, 2600] ——
+   200 完全在界外，舵机就一路顶过去顶死，用户的原话是"转到不该转到的地方卡住"。
+   PRESS / RELEASE 走的是固件按校准表算出来的两个端点，天然不会越界；
+   而「位置离静止位最近」的那根，说明它这份校准多半就是它自己的。 */
+function latPickSlot(){
+  let best = -1, bestDev = Infinity;
+  for(let s=0;s<6;s++){
+    const d = S.slots[s] || {};
+    if(d.online !== "1" || d.valid !== "1") continue;
+    const dev = (d.pos !== undefined && d.standby !== undefined)
+      ? Math.abs(+d.pos - +d.standby) : 0;
+    if(dev < bestDev){ bestDev = dev; best = s; }
+  }
+  return best;
 }
 
 function perSecOf(rs){
@@ -1487,12 +1587,20 @@ $("#btnLatPing").onclick = async () => {
 
 $("#btnLatMove").onclick = async () => {
   if(S.info.armed !== "1"){ latSay("err", "还没使能。先点上面第 4 步的「使能（ARM）」。"); return; }
+  await refreshSlots(true);                       // 拿到最新的位置，才好挑安全的那根
+  const s = latPickSlot();
+  if(s < 0){
+    latSay("err", "没有可用的手指（6 个槽位都不在线、或还没校准）。先回第 3 步检查。");
+    return;
+  }
   const b = $("#btnLatMove"); b.disabled = true;
-  latSay("warn", "开始测动作往返（<code>MOVE</code> × 20）—— 手指会动，先把手套摘下来放桌上更安全。");
+  latSay("warn", "开始测动作往返：<code>PRESS " + s + "</code> / <code>RELEASE " + s +
+    "</code> 交替 × 20（用 " + (s + 1) + " 号 " + SLOTS[s] +
+    "）—— 手指会动，先把手套摘下来放桌上更安全。");
   try{
-    const {rs, lost} = await measureRoundTrip("MOVE 1 200", 20);
-    if(!rs.length){ latSay("err", "MOVE 一条都没回复。去第 6 步看看固件到底回了什么。"); return; }
-    latPush(latRow("MOVE（含动作）", rs, lost, 20));
+    const {rs, lost} = await measureRoundTrip("PRESS " + s, 20, "RELEASE " + s);
+    if(!rs.length){ latSay("err", "PRESS/RELEASE 一条都没回复。去第 6 步看看固件到底回了什么。"); return; }
+    latPush(latRow("PRESS/RELEASE（含动作）", rs, lost, 20));
     latVerdict(perSecOf(rs), "单条动作");
   }catch(e){ latSay("err", "测到一半出错：" + esc(e.message)); }
   finally{ b.disabled = false; }
@@ -1985,6 +2093,11 @@ $("#fSpeed").oninput = () => {
   $("#fSpeedLabel").textContent = v === 0 ? "最快" : String(v);
 };
 
+/* 按压幅度：1.0 = 用「松开位 → 按到底」的**整个校准行程**。
+   这就是用户要的那句"要用我校准的最大幅度来啊"。 */
+function fingerDepth(){ return (parseInt($("#fDepth").value, 10) || 100) / 100; }
+$("#fDepth").oninput = () => { $("#fDepthLabel").textContent = Math.round(fingerDepth() * 100) + "%"; };
+
 /* ---------- 5.4 播放引擎 ---------- */
 const SLOT_SVG = ["f-thumb","f-thumb","f-index","f-middle","f-ring","f-pinky"];
 function slotPos(slot, depth){
@@ -2056,7 +2169,13 @@ $("#btnPlay").onclick = async () => {
     let sent = 0;
     while(S.cursor < ev.length && ev[S.cursor].t <= t && sent < 40){
       const e = ev[S.cursor++];
-      const d = e.on ? Math.max(0.35, e.vel) : 0;
+      // 深度 = 按压幅度 × (跟随力度 ? MIDI 力度 : 1)。
+      // 默认**不**跟随力度 —— 每个音都走完**校准出来的整个行程**，
+      // 也就是用户要的"用我校准的最大幅度"。
+      // 曾经这里只有 Math.max(0.35, e.vel)：力度 0.7 的音就只按到 70%，
+      // 听/感觉起来就是"幅度怎么这么小"。
+      const amp = fingerDepth(), useVel = $("#followVel").checked;
+      const d = e.on ? (useVel ? Math.max(0.35, e.vel) : 1) * amp : 0;
       depth[e.slot] = d;
       T.fire("MOVE " + (e.slot + 1) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
       S.fired++; sent++;

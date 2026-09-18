@@ -209,9 +209,57 @@ void demoTick(uint32_t now) {
 }  // namespace
 
 // ------------------------------------------------------------------
+//
+// ⚠️ 下面这三个函数定义在**命名空间级**、而不是上面的匿名 namespace 里。
+// 原因是 glove.h 里也声明了它们（main.cpp 的 CAL ALIGN 要用 snapStandby）。
+// 匿名 namespace 的成员在父命名空间里也是可见的 —— 两边都定义就成了
+// 两个候选，gcc 直接报 "call of overloaded ... is ambiguous"。
+
+void load();
+void save();
+
+// ---- 行程的两个端点 ----
+//
+// dir 描述的是**按下去往哪边走**，不是"哪边数值大"：
+//   DIR_PRESS_MAX -> 按下端 = hi，松开端 = lo
+//   DIR_PRESS_MIN -> 按下端 = lo，松开端 = hi
+//
+// 之所以把"松开端"单独拎出来：**静止位必须落在松开端**，
+// 按压才是从"手指完全松开"一路走到"完全按下"，也就是校准出的整个量程。
+uint16_t pressEnd(int s) {
+  const Slot &sl = g_slot[s];
+  return (sl.dir == DIR_PRESS_MAX) ? sl.hi : sl.lo;
+}
+
+uint16_t releaseEnd(int s) {
+  const Slot &sl = g_slot[s];
+  return (sl.dir == DIR_PRESS_MAX) ? sl.lo : sl.hi;
+}
+
+// 把静止位对齐到松开端，返回被修正的槽位掩码。
+// 供 begin() 修正历史数据、以及 CAL ALIGN 手动触发。
+// 只修"明显跑偏"的（离松开端超过量程的 1/4），免得把手工校准里有意留的偏移也改掉。
+uint8_t snapStandby() {
+  uint8_t changed = 0;
+  for (int s = 0; s < SLOT_COUNT; ++s) {
+    if (!g_slot[s].valid) continue;
+    const int want = (int)releaseEnd(s);
+    const int span = abs((int)g_slot[s].hi - (int)g_slot[s].lo);
+    if (abs((int)g_slot[s].standby - want) > span / 4) {
+      g_slot[s].standby = (uint16_t)want;
+      changed |= (uint8_t)(1 << s);
+    }
+  }
+  if (changed) save();
+  return changed;
+}
 
 void begin() {
   load();
+  // 修一次存量校准：2.1.1 及更早的自动校准把静止位写成了量程中点，
+  // 导致按压幅度只有校准行程的一半。这里对齐到松开端，用户不必重做校准。
+  const uint8_t fixed = snapStandby();          // 内部会持久化
+  if (fixed) Serial.printf("CAL SNAPBASE fixed=0x%02X standby_moved_to_release_end\n", fixed);
   g_lastPollMs = millis();
 }
 
@@ -322,11 +370,18 @@ void safe() {
 uint16_t pressPos(int s, uint8_t depthPct) {
   const Slot &sl = g_slot[s];
   if (depthPct > 100) depthPct = 100;
-  const int from = (int)sl.standby;
-  const int to   = (int)((sl.dir == DIR_PRESS_MAX) ? sl.hi : sl.lo);
+  // ⚠️ 起点是**静止位**，终点是**按下端** —— 所以静止位必须待在松开端附近。
+  // 先把它夹进校准区间：历史数据里它可能落在区间外（旧固件的自动校准
+  // 把它写成了量程中点，见 autoFinish 的注释；更老的还可能是别的舵机采的）。
+  // 不夹的话插值会算出区间外的目标位，机械上就是"顶死"。
+  const int lo   = (sl.lo < sl.hi) ? (int)sl.lo : (int)sl.hi;
+  const int hi   = (sl.lo < sl.hi) ? (int)sl.hi : (int)sl.lo;
+  const int from = constrain((int)sl.standby, lo, hi);
+  const int to   = (int)pressEnd(s);
   return clampPos(from + (to - from) * (int)depthPct / 100);
 }
 
+// 松开 = 回到静止位。静止位就是「松开端」（见 autoFinish / snapStandby）。
 uint16_t releasePos(int s) { return g_slot[s].standby; }
 
 bool pressSlot(int s, uint16_t speed, uint8_t acc) {
@@ -356,6 +411,9 @@ bool setMap(int s, uint8_t id) {
 void setDir(int s, Dir d) {
   if (s < 0 || s >= SLOT_COUNT) return;
   g_slot[s].dir = d;
+  // 方向一改，"松开端"就换到另一半了 —— 静止位必须跟过去，
+  // 否则按下行程会从错的端点起算（表现为幅度减半，甚至整个反向）。
+  if (g_slot[s].valid) g_slot[s].standby = releaseEnd(s);
   save();
 }
 
@@ -433,9 +491,21 @@ void autoFinish() {
   g_auto = false;
   for (int s = 0; s < SLOT_COUNT; ++s) {
     if (g_autoN[s] == 0) continue;
-    g_slot[s].lo      = g_autoMin[s];
-    g_slot[s].hi      = g_autoMax[s];
-    g_slot[s].standby = (uint16_t)(((uint32_t)g_autoMin[s] + g_autoMax[s]) / 2);
+    g_slot[s].lo = g_autoMin[s];
+    g_slot[s].hi = g_autoMax[s];
+    // ★ 静止位 = **松开端**，不是量程中点。
+    //
+    // 这里原来是 (min+max)/2。同一份校准下：
+    //   standby=中点  -> pressPos(100) = 中点..按下端 —— 只有半个量程
+    //   standby=松开端 -> pressPos(100) = 松开端..按下端 —— 整个量程
+    // 用户做完第 3 步（手指伸直<->握拳来回活动），看到的是**整个量程**，
+    // 一试动作却发现幅度只有一半，原话就是"怎么幅度这么小，
+    // 要用我校准的最大幅度来啊"。
+    //
+    // 注意 releaseEnd() 依赖 dir，而自动校准时 dir 还是默认的 DIR_PRESS_MAX，
+    // 所以这里取到的就是 lo；用户之后在试动作页改 SETDIR 时，
+    // setDir() 会把静止位跟着挪到新的松开端。
+    g_slot[s].standby = releaseEnd(s);
     g_slot[s].valid   = true;
   }
   torqueAll(false);

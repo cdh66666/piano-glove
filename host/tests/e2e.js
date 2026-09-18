@@ -177,6 +177,37 @@ function check(name, cond, extra){
   check("顶栏显示已校准", (await txt("#cCal")).includes("已校准"), await txt("#cCal"));
   await shot("05-cal-done");
 
+  /* 回归：静止位必须落在「松开端」。
+     曾经 autoFinish() 把 standby 写成 (min+max)/2 量程中点 ——
+     于是 pressPos 只从"中点"走到"按下端"，按下幅度正好只有校准行程的一半，
+     用户看到的就是"怎么幅度这么小，要用我校准的最大幅度来啊"。
+     这里同样不看界面文案，直接读固件的校准表来判。 */
+  const calTbl = await page.evaluate(async () => {
+    const lines = await T.send("CAL STATUS", 5000);
+    return lines.filter(l => l.startsWith("CAL slot")).map(l => {
+      const m = {}; l.replace(/(\w+)=(\S+)/g, (_, k, v) => (m[k] = v));
+      return {slot: +m.slot, min: +m.min, standby: +m.standby, max: +m.max, press: m.press};
+    });
+  });
+  const relEnd = c => (c.press === "min") ? c.max : c.min;    // 松开端
+  const hitEnd = c => (c.press === "min") ? c.min : c.max;    // 按下端
+  check("静止位落在松开端（不是量程中点）",
+    calTbl.length === 6 && calTbl.every(c => Math.abs(c.standby - relEnd(c)) <= Math.abs(c.max - c.min) / 4),
+    calTbl.map(c => c.slot + ":" + c.standby + "→" + relEnd(c)).join(" "));
+  check("按压行程 ≈ 整个校准量程",
+    calTbl.length === 6 && calTbl.every(c => {
+      const span = Math.abs(c.max - c.min);
+      return span === 0 || Math.abs(hitEnd(c) - c.standby) >= span * 0.75;
+    }),
+    calTbl.map(c => c.slot + ":" + Math.abs(hitEnd(c) - c.standby) + "/" + Math.abs(c.max - c.min)).join(" "));
+
+  // CAL ALIGN：校准本来就对的时候，应当一个槽位都不改（fixed_mask=0x00）
+  const alignLine = await page.evaluate(async () => {
+    const r = await T.send("CAL ALIGN", 5000);
+    return (r || []).find(l => l.startsWith("OK CAL ALIGN")) || "";
+  });
+  check("CAL ALIGN 可用且无需改动", /fixed_mask=0x0+\b/.test(alignLine), alignLine || "(无回复)");
+
   /* ---------- 4. 试动作 ---------- */
   console.log("\n=== 4. 试动作 ===");
   await click('#tabbar button[data-p="test"]');
@@ -190,6 +221,27 @@ function check(name, cond, extra){
   check("单指测试按钮恢复可用", await page.isEnabled('#testBody2 button[data-press="0"]'));
   await shot("06-test");
 
+  /* 回归：MOVE 越界必须被拒。
+     界面上的「测动作往返」曾经硬编码 `MOVE 1 200`，而那块舵机校准出来的区间
+     可能是 [2091, 2600] —— 200 远在界外，舵机一路顶过去顶死在那儿，
+     用户的原话是"转到不该转到的地方卡住"。
+     现在 MOVE 会先查该槽位的校准区间。 */
+  const guard = await page.evaluate(async () => {
+    const st = await T.send("STATUS_ALL", 5000);
+    const m = {};
+    (st.find(l => l.startsWith("SLOT slot=0")) || "").replace(/(\w+)=(\S+)/g, (_, k, v) => (m[k] = v));
+    const id = +m.id;
+    const lo = Math.min(+m.min, +m.max), hi = Math.max(+m.min, +m.max);
+    // 挑一个一定落在区间外的位置
+    const outPos = (lo >= 500) ? (lo - 500) : Math.min(4095, hi + 500);
+    const bad  = await T.send("MOVE " + id + " " + outPos, 4000);
+    const good = await T.send("MOVE " + id + " " + Math.round((lo + hi) / 2), 4000);
+    return {id, lo, hi, outPos, bad: bad.join(" | "), good: good.join(" | ")};
+  });
+  check("MOVE 越界被拒绝（目标在区间外）", /out_of_cal_range/.test(guard.bad),
+    "id=" + guard.id + " pos=" + guard.outPos + " 区间=" + guard.lo + ".." + guard.hi + " → " + guard.bad.slice(0, 70));
+  check("MOVE 区间内放行", /OK MOVE/.test(guard.good), guard.good.slice(0, 70));
+
   /* ---------- 4B. 响应延迟实测 ---------- */
   console.log("\n=== 4B. 响应延迟实测 ===");
   check("延迟卡闸门已开", await page.isVisible("#latBody"));
@@ -202,7 +254,12 @@ function check(name, cond, extra){
 
   await click("#btnLatMove");
   await page.waitForTimeout(3500);
-  check("MOVE 测试追加一块", (await page.$$("#latList .latitem")).length === 2, (await page.$$("#latList .latitem")).length);
+  check("动作往返测试追加一块", (await page.$$("#latList .latitem")).length === 2, (await page.$$("#latList .latitem")).length);
+  // 回归：② 绝不能再发 MOVE。它必须走 PRESS/RELEASE ——
+  // 固件按校准表算出两个端点，天然不会越界；而硬编码 MOVE 1 200 会让舵机顶死。
+  const latTxt = await txt("#latList");
+  check("动作往返走的是 PRESS/RELEASE（不是 MOVE）",
+    /PRESS\/RELEASE/.test(latTxt) && !/MOVE/.test(latTxt), latTxt.replace(/\s+/g, " ").slice(0, 70));
 
   await click("#btnLatBurst");
   await page.waitForTimeout(4500);
@@ -328,6 +385,13 @@ function check(name, cond, extra){
     await page.waitForTimeout(80);
   }
   check("手指深度条有变化", barPeak.some(v => v > 0), barPeak.map(v => v + "%").join(" "));
+  // 回归：默认「按压幅度 100% + 不跟随力度」时，每个音都要跑满校准行程。
+  // 曾经这里只有 Math.max(0.35, e.vel)：力度 0.7 的音就只按到 70%，
+  // 用户的感觉同样是"幅度怎么这么小，要用我校准的最大幅度来啊"。
+  check("演奏默认用满行程（深度 100%）", barPeak.every(v => v >= 99), barPeak.map(v => v + "%").join(" "));
+  check("演奏页默认：幅度 100% + 不跟随力度",
+    (await page.inputValue("#fDepth")) === "100" && !(await page.isChecked("#followVel")),
+    "depth=" + (await page.inputValue("#fDepth")) + " followVel=" + (await page.isChecked("#followVel")));
   await shot("08-playing");
 
   await click("#btnStop");
