@@ -182,7 +182,7 @@ pre#log .sys{color:#c9a5ff}
 
   <div class="card">
     <h2>板子信息</h2>
-    <p class="desc">确认板子里跑的是 <code>PIANO_GLOVE_1</code> 固件，且舵机档位是 <code>STS3032</code>。</p>
+    <p class="desc">确认板子里跑的是 <code>PIANO_GLOVE_2</code>（自研）或 <code>PIANO_GLOVE_1</code>（原厂）固件，且舵机档位是 <code>STS3032</code>。</p>
     <div class="row">
       <button id="btnInfo" class="primary">读取信息</button>
       <button id="btnProfile">设为 STS3032 档</button>
@@ -508,7 +508,7 @@ class MockFirmware{
     const v = (parts[0]||"").toUpperCase();
     const a = parts.slice(1);
     if(v === "HELP") return ["OK HELP INFO PROFILE AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO"];
-    if(v === "INFO") return ["OK INFO fw=PIANO_GLOVE_1 profile=" + this.profile + " range=" + this.rng() +
+    if(v === "INFO") return ["OK INFO fw=PIANO_GLOVE_2 profile=" + this.profile + " range=" + this.rng() +
       " ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated + " armed=" + this.armed +
       " auto_active=" + this.autoActive + " enroll_active=0 enroll_next=1 enroll_temp=10 enroll_phase=OFF"];
     if(v === "PROFILE"){
@@ -869,7 +869,9 @@ async function refreshInfo(){
   if(!line) return;
   S.info = kv(line);
   $("#infoKv").innerHTML =
-    "<dt>固件</dt><dd><b>" + esc(S.info.fw) + "</b></dd>" +
+    "<dt>固件</dt><dd><b>" + esc(S.info.fw) + "</b>" +
+      (S.info.fw === "PIANO_GLOVE_2" ? ' <span class="chip ok">自研</span>'
+       : S.info.fw === "PIANO_GLOVE_1" ? ' <span class="chip">原厂</span>' : "") + "</dd>" +
     "<dt>舵机档位</dt><dd>" + esc(S.info.profile) +
       (S.info.profile === "STS3032" ? ' <span class="chip ok">正确</span>' : ' <span class="chip bad">应为 STS3032</span>') + "</dd>" +
     "<dt>量程</dt><dd>" + esc(S.info.range) + "</dd>" +
