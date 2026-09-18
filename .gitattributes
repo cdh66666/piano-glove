@@ -1,0 +1,24 @@
+# Windows 批处理必须是 CRLF。
+# LF-only 的 .bat 在 cmd.exe 里跑 goto/:label 会出古怪问题（标签匹配不上、
+# 整段被当成一行），而且是"在这台机器好好的、换台机器就坏"的那种。
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# 文本文件统一按 LF 入库，避免 Windows 上编辑一次就整文件 diff。
+*.c    text eol=lf
+*.cpp  text eol=lf
+*.h    text eol=lf
+*.ino  text eol=lf
+*.js   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.html text eol=lf
+*.ini  text eol=lf
+
+# 二进制，别做任何换行转换
+*.mid  binary
+*.midi binary
+*.bin  binary
+*.png  binary
+*.jpg  binary
+*.gif  binary
