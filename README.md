@@ -67,6 +67,7 @@ piano-glove/
 │   ├── handoff-2026-09-17.md   ★ 交接文档（协议逆向、踩坑、进度、路线的唯一事实来源）
 │   └── design-notes.md         决策记录 · 待定问题 · 里程碑
 ├── host/                       PC 侧上位机与调试工具
+│   ├── start-debug.bat         ★ 一键启动：起服务 + 用 Chrome/Edge 打开调试台
 │   ├── web_piano_glove.html    ★ 分页式调试台（底部导航 6 页，内置模拟固件，含 MIDI 演奏）
 │   ├── glove_fw.py             PIANO_GLOVE 协议 Python 封装 + CLI
 │   ├── assign_ids.py           舵机 ID 编号向导（命令行，支持断电续跑）
@@ -92,6 +93,11 @@ piano-glove/
 
 ### 网页调试台（推荐，无硬件也能玩）
 
+**Windows 一键启动**：双击 `host/start-debug.bat`
+—— 它会（必要时）起好 127.0.0.1:8123 的静态服务，再用 Chrome/Edge 打开调试台。
+
+手动方式：
+
 ```bash
 cd host
 python -m http.server 8123 --bind 127.0.0.1
@@ -99,7 +105,13 @@ python -m http.server 8123 --bind 127.0.0.1
 ```
 
 选「模拟模式」点连接，就能把 **编号 → 校准 → 试动作 → MIDI 演奏** 整条链路走完，不接硬件即可验证。
-连实机需 Chrome 或 Edge（Web Serial），波特率 **115200**。
+
+> ⚠️ **连实机必须用 Chrome 或 Edge，且必须走 `http://localhost`，不要双击 html 走 `file://`。**
+> 串口能力来自 Web Serial（`navigator.serial`）：
+> - `file://` 下拿不到串口权限；
+> - 部分国产浏览器的内置内核不暴露 `navigator.serial`（界面上「连接」永远扫不到板子）。
+>
+> 波特率固定 **115200**。
 
 ### 无硬件自测
 
