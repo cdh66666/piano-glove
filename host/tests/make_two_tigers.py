@@ -93,7 +93,10 @@ def build_file() -> bytes:
 
 
 def main():
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("host/samples/two-tigers.mid")
+    # 默认输出到 <仓库根>/host/samples/，相对**本脚本**解析而不是 CWD ——
+    # 否则在 host/tests 里直接跑会在 tests/ 下另起一份 samples/，白生成。
+    default = Path(__file__).resolve().parents[1] / "samples" / "two-tigers.mid"
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else default
     out.parent.mkdir(parents=True, exist_ok=True)
     data = build_file()
     out.write_bytes(data)

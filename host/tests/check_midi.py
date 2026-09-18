@@ -83,7 +83,11 @@ def parse(path):
 
 
 def main():
-    f = sys.argv[1] if len(sys.argv) > 1 else "host/samples/two-tigers.mid"
+    # ⚠️ 默认路径必须相对**本脚本**解析，不能相对 CWD ——
+    # 否则 `cd host/tests && python check_midi.py` 会报 FileNotFoundError，
+    # 看着像样本文件坏了，其实是路径找错了。
+    default = Path(__file__).resolve().parents[1] / "samples" / "two-tigers.mid"
+    f = sys.argv[1] if len(sys.argv) > 1 else str(default)
     fmt, ntrk, ppq, notes, metas = parse(f)
     print(f"{f}")
     print(f"  格式 {fmt} / {ntrk} 轨 / {ppq} ticks per 四分音符")
