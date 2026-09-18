@@ -91,7 +91,7 @@ function check(name, cond, extra){
   check("闸门打开（编号页可见）", await page.isVisible("#assignBody") && !(await page.isVisible("#assignGate")));
   await click('#tabbar button[data-p="connect"]');
   await page.waitForTimeout(150);
-  check("INFO 已读取", (await txt("#infoKv")).includes("PIANO_GLOVE_1"));
+  check("INFO 已读取", (await txt("#infoKv")).includes("PIANO_GLOVE_2"), (await txt("#infoKv")).slice(0, 60));
   check("初始档位是 SC09（与真板一致）", (await txt("#infoKv")).includes("SC09"));
   await click("#btnProfile");
   await page.waitForTimeout(500);
@@ -126,6 +126,21 @@ function check(name, cond, extra){
   check("6 个进度点全部 done", dots.filter(c => c.includes("done")).length === 6, dots.join("|"));
   check("编号完成后按钮禁用", await page.isDisabled("#btnDetect"));
   check("顶栏显示 1/6 徽标已清空", (await txt("#bAssign")) === "", "badge=" + (await txt("#bAssign")));
+
+  /* ★ 关键回归：编号跑完之后，槽位 -> 舵机 ID 的映射必须是 1..6。
+     这一条曾经是假的：
+       - cur===target 时上位机一个字节都不发（映射没写）；
+       - 改号时固件走 remapId(old,new)，把**已编好的槽位**一起改了。
+     因为每轮插上的出厂舵机号都是 1，第 2 轮就把槽位 0 一起改成 2，
+     6 轮跑完得到 [2,2,3,4,5,6] —— 界面照样显示"编号全部完成"，
+     但实机上 1 号舵机永远不动、槽位 0/1 抢同一块。
+     所以这里不看界面文案，直接查固件里的真实映射。 */
+  const slotIds = await page.evaluate(async () => {
+    const lines = await T.send("STATUS_ALL", 5000);
+    return lines.filter(l => l.startsWith("SLOT "))
+                .map(l => +(l.match(/ id=(\d+)/) || [0, 0])[1]);
+  });
+  check("编号后槽位映射 = 1..6", slotIds.join(",") === "1,2,3,4,5,6", "[" + slotIds.join(",") + "]");
   await shot("03-assign-done");
 
   // 回归：死循环修复 —— 编完号不拔，再检测应给出明确「请拔下来」而不是反复刷
@@ -199,11 +214,77 @@ function check(name, cond, extra){
   check("延迟结果不撑破页面（无横向溢出）", latW[0] <= latW[1] + 1, latW.join(" / "));
   await shot("06b-latency");
 
+  /* ---------- 4C. 速度实测 ---------- */
+  console.log("\n=== 4C. 速度实测 ===");
+  check("测速卡闸门已开", await page.isVisible("#rtBody"));
+  check("6 个槽位按钮默认全选",
+    (await page.$$eval("#rtDots .dot", e => e.filter(x => x.className.includes("cur")).length)) === 6);
+  check("默认提示已选 6 根", (await txt("#rtPick")).includes("已选 6"), await txt("#rtPick"));
+
+  // 取消一根 -> 计数要跟着变
+  await click("#rtDots .dot:nth-child(3)");
+  await page.waitForTimeout(120);
+  check("取消一根后变 5 根", (await txt("#rtPick")).includes("5 根"), await txt("#rtPick"));
+  // 全不选 -> 按钮禁用（防止发出空掩码）
+  await click("#rtNone");
+  await page.waitForTimeout(120);
+  check("全不选时开始按钮禁用", await page.isDisabled("#btnRate"));
+  await click("#rtAll");
+  await page.waitForTimeout(120);
+  check("全选后可再次开始", await page.isEnabled("#btnRate"));
+
+  // 掩码必须以 0x 十六进制发出：十进制 63 会被固件当成非法槽位
+  const rateCmd = await page.evaluate(() => {
+    const s = [];
+    const old = T.send.bind(T);
+    T.send = (cmd, t) => { s.push(cmd); return old(cmd, t); };
+    return new Promise(res => {
+      $("#btnRate").click();
+      setTimeout(() => { T.send = old; res(s.find(c => c.startsWith("RATE ")) || ""); }, 200);
+    });
+  });
+  check("RATE 掩码发成 0x 十六进制", /^RATE 0x3F /.test(rateCmd), rateCmd || "(没发出去)");
+
+  await page.waitForTimeout(3500);
+  check("速度实测出了结果块", await page.isVisible("#rtResult"));
+  const rtTxt = await txt("#rtResult");
+  check("结果含完整行程耗时", /ms/.test(rtTxt) && rtTxt.includes("一趟完整行程"), rtTxt.replace(/\s+/g, " ").slice(0, 70));
+  check("结果含实测 Hz", /Hz/.test(rtTxt), rtTxt.replace(/\s+/g, " ").slice(0, 70));
+  check("给了能不能达到目标的结论",
+    /达到 6 Hz|过了 4 Hz|连 4 Hz 都不到|等满 800 ms/.test(rtTxt), rtTxt.replace(/\s+/g, " ").slice(-90));
+
+  // 行程调小 -> 测出来应该更快（模拟固件的物理模型）
+  const hzOf = t => parseFloat((t.match(/([\d.]+) Hz/) || [0, 0])[1]);
+  const hz100 = hzOf(rtTxt);
+  await page.$eval("#rtDepth", e => { e.value = "40"; e.dispatchEvent(new Event("input")); });
+  await page.waitForTimeout(150);
+  check("行程标签跟着变", (await txt("#rtDepthL")) === "40%", await txt("#rtDepthL"));
+  await click("#btnRate");
+  await page.waitForTimeout(3500);
+  const hz40 = hzOf(await txt("#rtResult"));
+  check("行程减半后实测频率变高", hz40 > hz100, hz100 + " Hz -> " + hz40 + " Hz");
+
+  check("测完按钮恢复可用", await page.isEnabled("#btnRate") && await page.isDisabled("#btnRateStop"));
+  await shot("06c-rate");
+
   /* ---------- 5. 演奏 ---------- */
   console.log("\n=== 5. MIDI 演奏 ===");
   await click('#tabbar button[data-p="play"]');
   await page.waitForTimeout(300);
   check("校准后演奏页开放", await page.isVisible("#playBody"));
+
+  // 内置示例：《两只老虎》—— 不选文件也应该能一键加载
+  await click("#btnSample");
+  await page.waitForTimeout(700);
+  check("内置示例可以一键加载", (await txt("#midiMsg")).includes("两只老虎"), (await txt("#midiMsg")).slice(0, 80));
+  const sampleStat = await txt("#midiStat");
+  /* 用 includes("32") 太松：时长 16.0s / 峰值 32/s 都可能凑出 "32"。
+     必须咬住"音符 32"这个统计卡本身。 */
+  check("示例解析出 32 个音符", /音符\s*32|32\s*个音符/.test(await txt("#midiMsg") + " " + sampleStat),
+    sampleStat.replace(/\s+/g, " ").slice(0, 90));
+  check("示例不再报「文件有损坏」", !(await txt("#midiMsg")).includes("损坏"),
+    (await txt("#midiMsg")).replace(/\s+/g, " ").slice(0, 90));
+  await shot("07a-sample");
 
   await page.setInputFiles("#file", path.join(__dirname, "test.mid"));
   await page.waitForTimeout(800);
@@ -236,8 +317,17 @@ function check(name, cond, extra){
   check("进度在推进", !t.startsWith("0.0s"), t);
   const rate = await txt("#playRate");
   check("显示实际命令速率", rate.includes("实际") || rate === "—", rate);
-  const barW = await page.$eval("#p-play .dep .bar i", e => e.style.width);
-  check("手指深度条有变化", barW !== "" && barW !== "0%", barW);
+  /* 深度条不能只瞬时读一次：无头浏览器里 rAF 只有 ~8fps，
+     一个「按下 + 抬起」的对子有可能落在同一帧的追赶循环里，
+     帧末渲染出来的就是全 0（实测撞到过：6 条全 0%）。
+     所以在一段时间里连续采样，取每条的峰值。 */
+  let barPeak = [0, 0, 0, 0, 0, 0];
+  for(let i = 0; i < 14; i++){
+    const cur = await page.$$eval("#p-play .dep .bar i", els => els.map(e => parseFloat(e.style.width) || 0));
+    barPeak = barPeak.map((v, k) => Math.max(v, cur[k] || 0));
+    await page.waitForTimeout(80);
+  }
+  check("手指深度条有变化", barPeak.some(v => v > 0), barPeak.map(v => v + "%").join(" "));
   await shot("08-playing");
 
   await click("#btnStop");

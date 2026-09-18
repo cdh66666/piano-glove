@@ -16,7 +16,7 @@
 #include "scs_bus.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.0.1"
+#define FW_VER "2.1.1"     // 2.1.1: 修「编号时 remapId 把已编好的槽位一起改掉」+ sendRecv 的 pkt[32] 栈溢出
 
 // 串口接收环形缓冲。Arduino 默认只有 256 B（115200 下 ≈ 22 ms 余量），
 // 扛不住上位机一次连发几十条命令，放大到 4 KB。详见 setup() 里的说明。
@@ -98,15 +98,28 @@ static void enrollTick(uint32_t now) {
     return;
   }
 
-  const uint8_t cur = found[0];
-  if (cur == g_enrollNext) {                     // 正好是目标号，无需改
+  const uint8_t cur  = found[0];
+  const int     slot = (int)g_enrollNext - 1;      // 第 N 轮 -> 槽位 N-1
+
+  // ⚠️ 这里**必须**用 setMap(slot, id) 明确"这一轮填哪个槽位"，
+  //    不能用 glove::remapId() —— 那个是给 SETID 命令用的
+  //    （"某块舵机的号变了，把指向它的槽位跟着改"）。
+  //
+  //    编号流程里每轮插上的都是**新的出厂舵机，出厂号全是 1**，
+  //    于是第 2 轮就会调 remapId(1, 2)，把**第 1 轮已经填好的槽位 0**
+  //    （它也存着 1）一起改成 2 —— 结果 6 轮跑完得到 [2,2,3,4,5,6]，
+  //    槽位 0 和槽位 1 指向同一块舵机，id=1 那块永远不动。
+  //    界面还会显示"编号完成"，一点错都看不出来。（这个坑踩过）
+  if (cur == g_enrollNext) {                       // 正好是目标号，不用改号
+    glove::setMap(slot, g_enrollNext);             // 但映射无论如何都要写
     g_enrollPhase = "ASSIGNED";
+    sayf("ENROLL ASSIGNED id=%u slot=%d (号已正确)", (unsigned)g_enrollNext, slot);
     return;
   }
   if (scs::setId(cur, g_enrollNext)) {
-    glove::remapId(cur, g_enrollNext);
+    glove::setMap(slot, g_enrollNext);
     g_enrollPhase = "ASSIGNED";
-    sayf("ENROLL ASSIGNED id=%u slot=%d", (unsigned)g_enrollNext, (int)g_enrollNext - 1);
+    sayf("ENROLL ASSIGNED id=%u slot=%d was=%u", (unsigned)g_enrollNext, slot, (unsigned)cur);
   } else {
     g_enrollPhase = "FAILED";
   }
@@ -296,6 +309,22 @@ static void cmdCal(const int n, char **t) {
   errf("CAL subcommand_unknown");
 }
 
+// 槽位选择参数：0 / all = 全部 6 个；0x3F = 位掩码；1..6 = 单个槽位（1 起）。
+// 返回 0 表示参数非法或没选中任何槽位 —— 调用方据此报错。
+static uint8_t parseMask(const char *a) {
+  uint8_t mask = 0;
+  if (strcasecmp(a, "all") == 0 || strcmp(a, "0") == 0) {
+    mask = 0x3F;
+  } else if (a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) {
+    mask = (uint8_t)strtol(a + 2, nullptr, 16);
+  } else {
+    const int s = atoi(a);
+    if (s < 1 || s > (int)glove::SLOT_COUNT) return 0;
+    mask = (uint8_t)(1 << (s - 1));
+  }
+  return (uint8_t)(mask & 0x3F);
+}
+
 static void cmdSweep(const int n, char **t) {
   if (n >= 2 && strcasecmp(t[1], "STOP") == 0) {
     glove::sweepStop();
@@ -314,20 +343,7 @@ static void cmdSweep(const int n, char **t) {
   }
 
   // 1) 参与的槽位：0/all = 全部；1..6 = 单槽（1 起）；0x3F = 位掩码
-  uint8_t mask = 0;
-  if (strcasecmp(t[1], "all") == 0 || strcmp(t[1], "0") == 0) {
-    mask = 0x3F;
-  } else if (t[1][0] == '0' && (t[1][1] == 'x' || t[1][1] == 'X')) {
-    mask = (uint8_t)strtol(t[1] + 2, nullptr, 16);
-  } else {
-    const int s = atoi(t[1]);
-    if (s < 1 || s > glove::SLOT_COUNT) {
-      errf("SWEEP bad_slot");
-      return;
-    }
-    mask = (uint8_t)(1 << (s - 1));
-  }
-  mask &= 0x3F;
+  const uint8_t mask = parseMask(t[1]);
   if (!mask) {
     errf("SWEEP bad_slot");
     return;
@@ -356,14 +372,32 @@ static void cmdSweep(const int n, char **t) {
       speed, acc);
 }
 
+// SETID <old> <new> CONFIRM [slot]
+//
+// 两种语义，靠最后那个可选 slot 区分：
+//   不给 slot —— 「修号」：某块舵机的号变了，把**指向它的槽位**跟着改（remapId）。
+//   给   slot —— 「编号向导」：这块刚插上来的舵机就归槽位 slot 了，
+//               其它槽位一律不许动（setMap）。
+//
+// ⚠️ 为什么必须分两种：编号向导每轮插上来的都是**出厂新舵机，出厂号全是 1**。
+//    第 2 轮发 SETID 1 2 时，如果按"修号"语义走 remapId(1,2)，
+//    就会把第 1 轮已经填好的槽位 0（它也存着 1）一起改成 2 ——
+//    6 轮跑完得到 [2,2,3,4,5,6]，槽位 0 和 1 指向同一块舵机，
+//    1 号那块永远不动，而界面显示"编号全部完成"。（这个坑踩过）
 static void cmdSetId(const int n, char **t) {
   if (n < 4 || strcasecmp(t[3], "CONFIRM") != 0) {
-    errf("SETID usage_old_new_CONFIRM");
+    errf("SETID usage_old_new_CONFIRM_[slot]");
     return;
   }
   const int oldId = atoi(t[1]), newId = atoi(t[2]);
   if (oldId < 0 || oldId > 253 || newId < 1 || newId > 253) {
-    errf("SETID usage_old_new_CONFIRM");
+    errf("SETID usage_old_new_CONFIRM_[slot]");
+    return;
+  }
+  const bool hasSlot = (n >= 5);
+  const int  slot    = hasSlot ? atoi(t[4]) : -1;
+  if (hasSlot && (slot < 0 || slot >= glove::SLOT_COUNT)) {
+    errf("SETID bad_slot=%d", slot);
     return;
   }
   if (!scs::ping((uint8_t)oldId)) {
@@ -378,8 +412,13 @@ static void cmdSetId(const int n, char **t) {
     errf("SETID write_or_verify_failed");
     return;
   }
-  glove::remapId((uint8_t)oldId, (uint8_t)newId);
-  okf("SETID old_id=%d new_id=%d", oldId, newId);
+  if (hasSlot) {
+    glove::setMap(slot, (uint8_t)newId);       // 只认这一块，别碰别的槽位
+    okf("SETID old_id=%d new_id=%d slot=%d mode=guide", oldId, newId, slot);
+  } else {
+    glove::remapId((uint8_t)oldId, (uint8_t)newId);
+    okf("SETID old_id=%d new_id=%d mode=repair", oldId, newId);
+  }
 }
 
 static void cmdLine(char *raw) {
@@ -411,15 +450,16 @@ static void cmdLine(char *raw) {
   if (strcmp(v, "HELP") == 0) {
     okf("HELP commands=%s",
         "INFO PROFILE PING SCAN STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE "
-        "STANDBY PRESS RELEASE MOVE DEMO SWEEP PRESET AUTO ENROLL ECHO BUSINFO HELP");
+        "STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET AUTO ENROLL ECHO BUSINFO HELP");
     return;
   }
   if (strcmp(v, "BUSINFO") == 0) {
     const scs::Stats &st = scs::stats();
-    okf("BUSINFO rx_pin=%d tx_pin=%d baud=%u echo=%d echo_bytes=%u timeout_ms=%u tx=%u rx=%u timeout=%u badsum=%u rx_drop=%u",
+    okf("BUSINFO rx_pin=%d tx_pin=%d baud=%u echo=%d echo_bytes=%u timeout_ms=%u tx=%u rx=%u timeout=%u badsum=%u servo_err=%u rx_drop=%u",
         scs::RX_PIN, scs::TX_PIN, (unsigned)scs::BUS_BAUD, st.echo ? 1 : 0,
         (unsigned)st.echoBytes, (unsigned)scs::RESP_TIMEOUT_MS, (unsigned)st.tx,
-        (unsigned)st.rx, (unsigned)st.timeout, (unsigned)st.badsum, (unsigned)g_rxDrop);
+        (unsigned)st.rx, (unsigned)st.timeout, (unsigned)st.badsum,
+        (unsigned)st.servoErr, (unsigned)g_rxDrop);
     return;
   }
   if (strcmp(v, "ECHO") == 0) {
@@ -512,6 +552,42 @@ static void cmdLine(char *raw) {
   // ---- 动作级 ----
   if (strcmp(v, "CAL") == 0) { cmdCal(n, t); return; }
   if (strcmp(v, "SWEEP") == 0) { cmdSweep(n, t); return; }
+  if (strcmp(v, "RATE") == 0) {
+    // RATE <slots> <speed> <acc> <depth%> [cycles]
+    //   一次完整行程 = 最小 → 最大 → 最小。跑完自动打 RATE_DONE。
+    if (n < 2) {
+      // 不带参数 = 查状态
+      okf("RATE active=%d done=%u/%u half_ms=%.1f slow_ms=%.1f lost=%u",
+          glove::rateActive() ? 1 : 0, (unsigned)glove::rateDone(),
+          (unsigned)glove::rateCycles(), glove::rateHalfUs() / 1000.0f,
+          glove::rateSlowUs() / 1000.0f, (unsigned)glove::rateLost());
+      return;
+    }
+    if (strcasecmp(t[1], "STOP") == 0) {
+      glove::rateStop();
+      okf("RATE stopped");
+      return;
+    }
+    const uint8_t  mask  = parseMask(t[1]);
+    if (mask == 0) { errf("RATE no_slot_selected_or_offline"); return; }
+    const uint16_t speed = (n >= 3) ? (uint16_t)atol(t[2]) : 0;
+    const uint8_t  acc   = (n >= 4) ? (uint8_t)atol(t[3]) : 0;
+    const uint8_t  depth = (n >= 5) ? (uint8_t)atoi(t[4]) : 100;
+    const uint16_t cyc   = (n >= 6) ? (uint16_t)atoi(t[5]) : 3;
+
+    const int bad = glove::rateBadSlot(mask, depth);
+    if (bad >= 0) {
+      errf("RATE stroke_too_small slot=%d (先做第 3 步校准，或把 depth 调大)", bad);
+      return;
+    }
+    if (!glove::rateStart(mask, speed, acc, depth, cyc)) {
+      errf("RATE start_failed slots=0x%02X (检查槽位是否在线)", (unsigned)mask);
+      return;
+    }
+    okf("RATE_START slots=0x%02X speed=%u acc=%u depth=%u cycles=%u", (unsigned)mask,
+        (unsigned)speed, (unsigned)acc, (unsigned)depth, (unsigned)cyc);
+    return;
+  }
   if (strcmp(v, "ARM") == 0) {
     if (!glove::calibrated()) { errf("ARM calibration_incomplete"); return; }
     glove::setArmed(true);
@@ -552,7 +628,13 @@ static void cmdLine(char *raw) {
     }
     if (isPress) glove::pressSlot(s, glove::pressSpeed(), glove::pressAcc());
     else         glove::releaseSlot(s, glove::pressSpeed(), glove::pressAcc());
-    okf("%s slot=%d depth_percent=%d", v, s, isPress ? 100 : 0);
+    const uint8_t e = scs::lastError();
+    if (e) {
+      errf("%s servo_rejected slot=%d err=%u (err 非 0 = 舵机拒收，指令没生效)", v, s,
+           (unsigned)e);
+      return;
+    }
+    okf("%s slot=%d depth_percent=%d err=0", v, s, isPress ? 100 : 0);
     return;
   }
   if (strcmp(v, "MOVE") == 0) {
@@ -564,10 +646,17 @@ static void cmdLine(char *raw) {
     const unsigned speed = (n >= 4) ? (unsigned)atol(t[3]) : (unsigned)glove::pressSpeed();
     const unsigned acc   = (n >= 5) ? (unsigned)atol(t[4]) : (unsigned)glove::pressAcc();
     if (!glove::moveRaw((uint8_t)id, (uint16_t)pos, (uint16_t)speed, (uint8_t)acc)) {
-      errf("MOVE servo_read_failed id=%d", id);
+      errf("MOVE servo_no_reply id=%d", id);
       return;
     }
-    okf("MOVE id=%d pos=%d speed=%u acc=%u", id, pos, speed, acc);
+    const uint8_t e = scs::lastError();
+    if (e) {
+      // 曾经这里无条件报 OK，把「舵机拒收指令」伪装成成功，
+      // 直接导致试动作时"只有 ARM 锁了电机、按下去不动"却看不出任何错。
+      errf("MOVE servo_rejected id=%d pos=%d err=%u", id, pos, (unsigned)e);
+      return;
+    }
+    okf("MOVE id=%d pos=%d speed=%u acc=%u err=0", id, pos, speed, acc);
     return;
   }
   if (strcmp(v, "DEMO") == 0) {

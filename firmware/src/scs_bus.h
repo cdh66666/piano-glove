@@ -32,6 +32,7 @@ enum : uint8_t {
   INST_ACTION     = 0x05,
   INST_RESET      = 0x0A,
   INST_SYNC_WRITE = 0x83,
+  INST_SYNC_READ  = 0x82,
 };
 constexpr uint8_t BROADCAST_ID = 0xFE;
 
@@ -79,6 +80,7 @@ struct Stats {
   uint32_t rx       = 0;   // 收到的字节数
   uint32_t timeout  = 0;   // 等回复超时次数
   uint32_t badsum   = 0;   // 校验和/长度错次数
+  uint32_t servoErr = 0;   // 舵机在状态包里报了错误位的次数
   uint16_t echoBytes = 0;  // 开机探测时收到的自身回显字节数
   bool     echo     = false;
 };
@@ -87,11 +89,26 @@ void    begin();
 Stats  &stats();
 void    setEcho(bool on);          // 手动覆盖回显判定（诊断用）
 
+// 最近一条回复里舵机上报的错误位（状态包第 5 字节）。0 = 正常。
+//
+// 为什么需要它：`sendRecv` 只判断"有没有收到一条校验正确的回包"，
+// 而舵机拒绝一条指令时**照样会回包**（只是错误位非 0）。曾经因为漏看这一位，
+// moveTo() 少写了起始寄存器地址、舵机收下垃圾地址后回了个错误包，
+// 固件却报 OK —— 现象是「使能以后舵机锁死但一点也不动」，查了很久。
+uint8_t lastError();
+
 bool    ping(uint8_t id);
 bool    readRegs(uint8_t id, uint8_t addr, uint8_t len, uint8_t *out,
                  uint16_t timeoutMs = RESP_TIMEOUT_MS);
 bool    writeRegs(uint8_t id, uint8_t addr, const uint8_t *data, uint8_t len);
 bool    readFeedback(uint8_t id, Feedback &fb, uint16_t timeoutMs = RESP_TIMEOUT_MS);
+
+// 位置到位判定容差（舵机计数，4096 计数 = 360°，所以 25 计数 ≈ 2.2°）
+constexpr int POS_TOL = 25;
+
+// 下发目标位置：写 ACC(41) 起 7 字节（ACC + 位置 + 运行时间 + 速度）。
+// speed = 0 表示用舵机自身的最大速度。
+// 返回 false = 没收到回包；返回 true 但 lastError()!=0 = 舵机拒绝了这条指令。
 bool    moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc);
 bool    setTorque(uint8_t id, bool on);
 bool    setId(uint8_t oldId, uint8_t newId);
@@ -99,6 +116,16 @@ int     scan(uint8_t maxId, uint8_t *found, int cap);
 
 struct SyncItem { uint8_t id; uint16_t pos; uint16_t speed; uint8_t acc; };
 void    syncMove(const SyncItem *items, int n);   // 一帧同时更新多个舵机
+
+// 一次 SYNC_READ 读回 n 个舵机的当前位置。
+// ids[] 必须互不相同；pos[] 与 ids[] 一一对应，读不到的置 0xFFFF。
+// 返回值 = 真正读到的个数。
+//
+// 为什么不用 for 循环逐个 readRegs：读 6 个舵机要 6 次往返（≈10 ms），
+// 做速度实测时这个开销会直接吃掉测量精度。SYNC_READ 一帧问、6 条回包，
+// 1 Mbps 下总共不到 1 ms。
+int     syncReadPos(const uint8_t *ids, int n, uint16_t *pos,
+                    uint16_t timeoutMs = RESP_TIMEOUT_MS);
 
 void    drain(uint16_t ms);                       // 丢弃总线上的残包
 

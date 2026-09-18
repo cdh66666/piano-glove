@@ -59,6 +59,9 @@ data/captures/
 *.mid
 *.midi
 !docs/**/*.mid
+# ⚠️ 演奏样本必须入库：《两只老虎》是需求方用来试指法的交付物，不是测试产物。
+#    少了这一条，`host/samples/two-tigers.mid` 会被上面两行静默吃掉，仓库里就是空的。
+!host/samples/*.mid
 
 # ---------- 测试产物（make_midi.py / ref_parse.py / e2e.js 生成）----------
 host/tests/shots/

@@ -83,6 +83,28 @@ uint32_t sweepElapsedMs();
 bool    demoActive();
 void    demoStart();
 
+// ---- 速度实测（RATE）----
+//
+// 定义：一次完整行程 = 最小 → 最大 → 最小（往返各一次）。
+// 板子驱动选中的舵机跑 cycles 次完整行程，**每次都等舵机真正到位再走下一半程**，
+// 所以量出来的是「这套机械 + 这个速度设定」实际能跑到的频率，不是命令频率。
+//
+// 输出（跑完自动打印）：
+//   RATE_DONE cycles=3 half_ms=78.3 full_ms=156.6 hz=6.39 slow_ms=84.1 lost=0
+//
+// hz = 1000 / full_ms。演奏要 6 Hz 就得 hz >= 6。
+bool     rateStart(uint8_t mask, uint16_t speed, uint8_t acc, uint8_t depthPct, uint16_t cycles);
+void     rateStop();
+bool     rateActive();
+uint16_t rateDone();          // 已完成几次完整行程
+uint16_t rateCycles();
+uint32_t rateHalfUs();        // 最近一个半程耗时（微秒）
+uint32_t rateSlowUs();        // 最慢的一个半程（超时说明跟不上）
+uint16_t rateLost();          // 有多少个半程是超时放弃的
+
+// 前置检查：返回第一个"行程过小"的槽位号（校准不到位/范围太窄），没有则 -1。
+int      rateBadSlot(uint8_t mask, uint8_t depthPct);
+
 uint16_t pressSpeed();
 uint8_t  pressAcc();
 void     setPressProfile(uint16_t speed, uint8_t acc);

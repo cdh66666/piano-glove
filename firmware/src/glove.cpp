@@ -39,6 +39,26 @@ uint32_t g_swTickMs     = 0;
 uint16_t g_swSpeed      = 0;          // 0 = 舵机最大速度
 uint8_t  g_swAcc        = 0;
 
+// ---- 速度实测（RATE）----
+bool     g_rate         = false;
+uint8_t  g_rateMask     = 0;
+uint16_t g_rateSpeed    = 0;
+uint8_t  g_rateAcc      = 0;
+uint8_t  g_rateDepth    = 100;
+uint16_t g_rateCycles   = 3;
+uint16_t g_rateDone     = 0;    // 已完成的完整行程数
+uint8_t  g_ratePhase    = 0;    // 0 = 去「按下」位，1 = 回「静止」位
+uint32_t g_ratePhaseT0  = 0;    // 本半程起点（微秒）
+bool     g_rateSent     = false;
+uint32_t g_rateHalfUs   = 0;    // 最近一个半程耗时
+uint32_t g_rateSlowUs   = 0;    // 最慢的一个半程
+uint32_t g_rateSumUs    = 0;
+uint16_t g_rateHalfN    = 0;
+uint16_t g_rateLost     = 0;    // 超时没到位的半程数
+
+// 单个半程最多等多久。等满 = 舵机/机构跟不上，记为 lost。
+constexpr uint32_t RATE_HALF_TIMEOUT_MS = 800;
+
 // ---- DEMO ----
 bool     g_demo         = false;
 uint32_t g_demoT0       = 0;
@@ -102,6 +122,75 @@ void sweepTick(uint32_t now) {
   }
 }
 
+// 速度实测的一个 tick。
+//
+// 关键点：**每个半程都等舵机真正到位才发下一个**，量的才是真实可达频率。
+// 如果只是按固定周期猛发目标位置，量到的是"命令频率"，
+// 舵机跟不跟得上完全看不出来 —— 那就失去了做这个测试的意义。
+void rateTick() {
+  if (!g_rate) return;
+
+  uint8_t  ids[SLOT_COUNT];
+  uint16_t tgt[SLOT_COUNT];
+  int      n = 0;
+  for (int s = 0; s < SLOT_COUNT; ++s) {
+    if (!(g_rateMask & (1 << s))) continue;
+    ids[n] = g_slot[s].id;
+    tgt[n] = (g_ratePhase == 0) ? pressPos(s, g_rateDepth) : g_slot[s].standby;
+    ++n;
+  }
+  if (n == 0) { g_rate = false; return; }
+
+  if (!g_rateSent) {
+    scs::SyncItem items[SLOT_COUNT];
+    for (int i = 0; i < n; ++i) {
+      items[i].id    = ids[i];
+      items[i].pos   = tgt[i];
+      items[i].speed = g_rateSpeed;
+      items[i].acc   = g_rateAcc;
+    }
+    scs::syncMove(items, n);
+    scs::drain(1);
+    g_rateSent    = true;
+    g_ratePhaseT0 = micros();
+    return;
+  }
+
+  uint16_t pos[SLOT_COUNT];
+  scs::syncReadPos(ids, n, pos, 8);
+
+  bool all = true;
+  for (int i = 0; i < n; ++i) {
+    if (pos[i] == 0xFFFF) { all = false; continue; }   // 这一轮没读到，当作未到位
+    const int d = (int)pos[i] - (int)tgt[i];
+    if (d > scs::POS_TOL || d < -scs::POS_TOL) all = false;
+  }
+
+  const uint32_t el = micros() - g_ratePhaseT0;
+  if (!all && el < RATE_HALF_TIMEOUT_MS * 1000UL) return;   // 还没到，继续等
+
+  if (!all) ++g_rateLost;                 // 等满超时都没到位 = 这套机构跟不上
+  g_rateHalfUs = el;
+  if (el > g_rateSlowUs) g_rateSlowUs = el;
+  g_rateSumUs += el;
+  ++g_rateHalfN;
+
+  g_rateSent = false;
+  if (g_ratePhase == 1) ++g_rateDone;     // 回程结束 = 走完一次"最小→最大→最小"
+
+  if (g_rateDone >= g_rateCycles) {
+    const float half = (g_rateHalfN ? (float)g_rateSumUs / g_rateHalfN : 0.0f) / 1000.0f;
+    const float full = half * 2.0f;
+    const float hz   = (full > 0.01f) ? (1000.0f / full) : 0.0f;
+    Serial.printf("RATE_DONE cycles=%u half_ms=%.1f full_ms=%.1f hz=%.2f slow_ms=%.1f lost=%u\n",
+                  (unsigned)g_rateDone, half, full, hz, g_rateSlowUs / 1000.0f,
+                  (unsigned)g_rateLost);
+    g_rate = false;
+    return;
+  }
+  g_ratePhase = (uint8_t)(1 - g_ratePhase);
+}
+
 void demoTick(uint32_t now) {
   const uint32_t el = now - g_demoT0;
   const uint8_t  k  = (uint8_t)(el / 250);              // 每 250 ms 一拍
@@ -131,6 +220,10 @@ void tick() {
 
   if (g_sweep) {                                        // 扫频独占总线
     sweepTick(now);
+    return;
+  }
+  if (g_rate) {                                         // 速度实测也独占总线
+    rateTick();
     return;
   }
   if (g_demo) demoTick(now);
@@ -388,6 +481,64 @@ bool     sweepActive()        { return g_sweep; }
 uint16_t sweepFreqMilliHz()   { return g_swFreq; }
 uint8_t  sweepDepth()         { return g_swDepth; }
 uint32_t sweepElapsedMs()     { return g_sweep ? (millis() - g_swT0) : 0; }
+
+// ---------------------------------------------------------- 速度实测（RATE）
+
+bool rateStart(uint8_t mask, uint16_t speed, uint8_t acc, uint8_t depthPct, uint16_t cycles) {
+  if (mask == 0 || cycles == 0) return false;
+  if (depthPct == 0 || depthPct > 100) return false;
+  if (g_sweep || g_rate) return false;
+
+  for (int s = 0; s < SLOT_COUNT; ++s) {
+    if (!(mask & (1 << s))) continue;
+    Slot &sl = g_slot[s];
+    if (!refresh(s)) return false;                     // 参与的槽位必须在线
+    const int span = (int)pressPos(s, depthPct) - (int)sl.standby;
+    // 行程太小的话"一次完整行程"几乎没有位移，测出来的频率是假的。
+    if (span > -100 && span < 100) return false;       // 调用方看 rateStart 返回 false 后自查
+    scs::setTorque(sl.id, true);
+  }
+
+  g_rateMask   = mask;
+  g_rateSpeed  = speed;
+  g_rateAcc    = acc;
+  g_rateDepth  = depthPct;
+  g_rateCycles = cycles;
+  g_rateDone   = 0;
+  g_ratePhase  = 0;
+  g_rateSent   = false;
+  g_rateHalfUs = 0;
+  g_rateSlowUs = 0;
+  g_rateSumUs  = 0;
+  g_rateHalfN  = 0;
+  g_rateLost   = 0;
+  g_rate       = true;
+  g_armed      = true;
+  return true;
+}
+
+void rateStop() {
+  if (!g_rate) return;
+  g_rate = false;
+  releaseMask(g_rateMask);
+}
+
+bool     rateActive()   { return g_rate; }
+uint16_t rateDone()     { return g_rateDone; }
+uint16_t rateCycles()   { return g_rateCycles; }
+uint32_t rateHalfUs()   { return g_rateHalfUs; }
+uint32_t rateSlowUs()   { return g_rateSlowUs; }
+uint16_t rateLost()     { return g_rateLost; }
+
+// 给调用方做前置检查：返回第一个"行程过小"的槽位号，没有则 -1。
+int rateBadSlot(uint8_t mask, uint8_t depthPct) {
+  for (int s = 0; s < SLOT_COUNT; ++s) {
+    if (!(mask & (1 << s))) continue;
+    const int span = (int)pressPos(s, depthPct) - (int)g_slot[s].standby;
+    if (span > -100 && span < 100) return s;
+  }
+  return -1;
+}
 
 bool demoActive() { return g_demo; }
 

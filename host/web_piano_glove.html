@@ -319,6 +319,55 @@ pre#log .sys{color:#c9a5ff}
       </p>
     </div>
   </div>
+
+  <div class="card">
+    <h2><span class="stepno">4C</span>测速度：手指到底能跑多快</h2>
+    <p class="desc">
+      让舵机跑完整的 <b>最小 → 最大 → 最小</b>，每跑完一个半程都<b>等它真正到位</b>再跑下一个，
+      所以量出来的是这套手套<b>实际能跑到的频率</b>，不是"命令发得多快"。
+      这是判断「能不能弹快曲子」的唯一硬指标。
+    </p>
+    <div class="gate" id="rtGate"><b>先完成第 3 步</b>校准完成后才能测速。</div>
+    <div id="rtBody" style="display:none">
+      <div class="row" style="margin-bottom:2px">
+        <label>测哪几根</label>
+        <button id="rtAll" class="ghost">全选</button>
+        <button id="rtNone" class="ghost">全不选</button>
+      </div>
+      <div class="dots" id="rtDots"></div>
+      <div class="hint" style="margin-top:6px" id="rtPick">已选 6 根</div>
+
+      <div class="row">
+        <label>行程大小</label>
+        <input type="range" id="rtDepth" min="20" max="100" step="5" value="100" style="flex:1;min-width:110px">
+        <span id="rtDepthL" style="width:52px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
+      </div>
+      <div class="row">
+        <label>舵机速度</label>
+        <input type="range" id="rtSpeed" min="0" max="200" step="5" value="0" style="flex:1;min-width:110px">
+        <span id="rtSpeedL" style="width:52px;text-align:right;font-variant-numeric:tabular-nums">最快</span>
+      </div>
+      <div class="row">
+        <label>来回次数</label>
+        <input type="number" id="rtCycles" value="3" min="1" max="20" style="width:70px">
+        <span style="font-size:12.5px;color:var(--sub)">次（1 次 = 一趟完整行程）</span>
+      </div>
+
+      <div class="row">
+        <button id="btnRate" class="primary" style="flex:1">开始测速</button>
+        <button id="btnRateStop" class="danger">停止</button>
+      </div>
+      <div class="msg" id="rtMsg">先选好手指再点开始。测的时候舵机会来回跑，手离远一点。</div>
+
+      <div id="rtResult" style="display:none;margin-top:12px"></div>
+      <p class="hint">
+        <b>怎么看结果</b>：一次完整行程耗时 <code>full_ms</code>，频率 = 1000 ÷ full_ms。
+        想弹 6 Hz（每趟 167 ms 以内）或 4 Hz（250 ms 以内），看结论行就行。<br>
+        跑不到目标时先调 <b>行程大小</b> —— 手指不用压到底，行程越小越快，
+        这也是真弹琴的做法。
+      </p>
+    </div>
+  </div>
 </section>
 
 <!-- ============ 5 演奏 ============ -->
@@ -331,6 +380,9 @@ pre#log .sys{color:#c9a5ff}
     <div id="playBody" style="display:none">
       <div class="drop" id="drop">把 <b>.mid</b> 文件拖到这里，或点一下选择文件</div>
       <input type="file" id="file" accept=".mid,.midi,audio/midi" style="display:none">
+      <div class="row" style="margin-top:10px">
+        <button id="btnSample" style="flex:1">🎵 先拿内置的《两只老虎》试试</button>
+      </div>
       <div class="msg" id="midiMsg" style="display:none"></div>
 
       <div id="midiPanel" style="display:none">
@@ -362,6 +414,17 @@ pre#log .sys{color:#c9a5ff}
           <input type="range" id="speed" min="10" max="150" value="100" style="flex:1;min-width:120px">
           <span id="speedLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
         </div>
+        <div class="row">
+          <label>手指动作速度</label>
+          <input type="range" id="fSpeed" min="0" max="200" step="10" value="0" style="flex:1;min-width:120px">
+          <span id="fSpeedLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">最快</span>
+        </div>
+        <p class="hint" style="margin-top:-2px">
+          两个速度是不同的东西：<b>播放速度</b>改的是曲子本身的快慢（音符间隔）；
+          <b>手指动作速度</b>改的是舵机一根手指按下去用多久。
+          弹快的曲子时手指要跑得快，但按太猛听着/感觉着会"硬"，可以先调这个找手感。
+          「最快」= 用舵机的最大速度。
+        </p>
         <div class="row">
           <button id="btnPlay" class="primary" style="flex:1">▶ 开始演奏</button>
           <button id="btnStop" class="danger">■ 停止</button>
@@ -479,8 +542,10 @@ const logRecv = text => String(text).split(/\r?\n/).forEach(l=>{
 
 /* ======================= 模拟固件 ======================= */
 class MockFirmware{
-  constructor(){ this.reset(true); }
+  /* onAsync 只在这里初始化为 null。**绝对不要**在 reset() 里清它 —— 见下面注释。 */
+  constructor(){ this.onAsync = null; this.reset(true); }
   reset(full){
+    if(this.rateTimer){ clearTimeout(this.rateTimer); this.rateTimer = null; }
     this.profile  = full ? "SC09" : this.profile;   // 故意从错档位开始, 逼用户走一遍切档
     this.calibrated = 0; this.armed = 0; this.autoActive = 0;
     this.cal = {};
@@ -489,9 +554,22 @@ class MockFirmware{
     /* 总线模型: bus 上现在挂着的舵机 ID 列表; spares = 还没编号的新舵机数量(出厂都是 1 号) */
     this.bus = [1];
     this.spares = 5;
+    /* 槽位 -> 舵机 ID 的映射，默认就是 1..6。
+       必须**当成状态存起来**：编号流程的 bug 全表现为"这张表最后是错的"。
+       如果每次都硬编码成 id = s+1，这类 bug 在模拟模式下永远测不出来。
+       （这个坑踩过：[2,2,3,4,5,6] 那次，模拟全绿、实机坏掉） */
+    this.slotId = [1, 2, 3, 4, 5, 6];
+    this.rateTimer = null;      // RATE_DONE 的异步定时器
+    /* ⚠️ 这里**绝不能**把 this.onAsync 置成 null。
+       onAsync 是 Transport 在构造时接上的「异步出口」，全应用只有这一根线，
+       接一次就一直有效；而 wizardReset() 会调 T.mock.reset(true)。
+       一旦在这里清掉，RATE_DONE 就再也不会被吐出来，
+       现象是测速页一直转圈、最后超时报错。（这个坑踩过：4C 六项全挂） */
   }
   rng(){ return this.profile === "SC09" ? 1023 : 4095; }
   present(id){ return this.bus.includes(id); }
+  /* 这个舵机 ID 挂在哪个槽位上（-1 = 没有任何槽位认领它） */
+  slotOf(id){ return this.slotId.indexOf(+id); }
   /* ---- 模拟: 拔下当前舵机 / 插入一个新舵机 ---- */
   simUnplug(){ this.bus = []; }
   simPlug(){
@@ -507,13 +585,24 @@ class MockFirmware{
     const parts = String(cmd).trim().split(/\s+/);
     const v = (parts[0]||"").toUpperCase();
     const a = parts.slice(1);
-    if(v === "HELP") return ["OK HELP INFO PROFILE AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO"];
+    if(v === "HELP") return ["OK HELP INFO PROFILE AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET ECHO BUSINFO"];
     if(v === "INFO") return ["OK INFO fw=PIANO_GLOVE_2 profile=" + this.profile + " range=" + this.rng() +
       " ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated + " armed=" + this.armed +
       " auto_active=" + this.autoActive + " enroll_active=0 enroll_next=1 enroll_temp=10 enroll_phase=OFF"];
     if(v === "PROFILE"){
       const n = (a[0]||"").toUpperCase();
-      if(n === "SC09" || n === "STS3032"){ this.profile = n; return ["OK PROFILE name=" + n + " range=" + this.rng()]; }
+      if(n === "SC09" || n === "STS3032"){
+        const changed = this.profile !== n;
+        this.profile = n;
+        /* 换档位要按新量程重铺一遍校准数据 —— 否则量程从 1023 变 4095 之后，
+           还留着 511 这种"SC09 时代"的中间值，行程会算出离谱的数字。 */
+        if(changed){
+          const mid = Math.floor(this.rng() / 2);
+          for(let s=0;s<6;s++)
+            Object.assign(this.cal[s], {min:mid, standby:mid, max:mid, valid:0, samples:0, last:mid});
+        }
+        return ["OK PROFILE name=" + n + " range=" + this.rng()];
+      }
       return ["ERR PROFILE must_be_SC09_or_STS3032"];
     }
     if(v === "PING"){ const id = parseInt(a[0]||"0",10);
@@ -527,13 +616,14 @@ class MockFirmware{
     if(v === "STATUS"){
       const id = parseInt(a[0]||"0",10);
       if(!this.present(id)) return ["ERR STATUS id=" + id + " offline=1"];
-      return ["OK STATUS id=" + id + " profile=" + this.profile + " pos=" + (this.cal[id-1]?.last ?? 512) +
+      const s = this.slotOf(id);
+      return ["OK STATUS id=" + id + " profile=" + this.profile + " pos=" + (s >= 0 ? (this.cal[s].last ?? 512) : 512) +
         " speed=0 load=0 voltage_raw=57 temperature=32 current=0 moving=0 mode=0"];
     }
     if(v === "STATUS_ALL"){
       const out = [];
       for(let s=0;s<6;s++){
-        const id = s+1, c = this.cal[s], on = this.present(id);
+        const id = this.slotId[s], c = this.cal[s], on = this.present(id);
         out.push("SLOT slot=" + s + " name=" + SLOTS[s] + " id=" + id + " online=" + (on?1:0) +
           (on ? " pos=" + (c.last??512) + " speed=0 load=0 voltage_raw=57 temperature=32 current=0" : "") +
           " min=" + c.min + " standby=" + c.standby + " max=" + c.max + " valid=" + c.valid + " press=" + c.press);
@@ -541,7 +631,12 @@ class MockFirmware{
       out.push("OK STATUS_ALL profile=" + this.profile + " armed=" + this.armed);
       return out;
     }
-    if(v === "MAP"){ return ["OK MAP slot=" + (a[0]||0) + " id=" + (a[1]||0)]; }
+    if(v === "MAP"){
+      const s = +a[0], id = +a[1];
+      if(!this.cal[s] || id < 1 || id > 253) return ["ERR MAP usage_slot_id"];
+      this.slotId[s] = id;
+      return ["OK MAP slot=" + s + " id=" + id];
+    }
     if(v === "SETDIR"){
       const s = +a[0], d = (a[1]||"").toLowerCase();
       if(!this.cal[s] || (d !== "max" && d !== "min")) return ["ERR SETDIR usage_slot_max_or_min"];
@@ -549,18 +644,28 @@ class MockFirmware{
     }
     if(v === "SETID"){
       const o = +a[0], n = +a[1];
-      if((a[2]||"").toUpperCase() !== "CONFIRM") return ["ERR SETID usage_old_new_CONFIRM"];
+      if((a[2]||"").toUpperCase() !== "CONFIRM") return ["ERR SETID usage_old_new_CONFIRM_[slot]"];
       if(!this.present(o)) return ["ERR SETID old_not_found"];
       if(this.present(n))  return ["ERR SETID new_id_occupied"];
       this.bus = this.bus.map(i => i === o ? n : i);
-      return ["OK SETID old_id=" + o + " new_id=" + n];
+      /* slot 给了 = "编号向导"语义：只认这一块，别的槽位不许动（见固件 cmdSetId 的注释）。
+         不给 = "修号"语义：把指向 old 的槽位都跟着改。
+         ⚠️ 模拟固件也必须忠实实现这两条分支 —— 否则"编号跑完映射是错的"
+         这个 bug 在模拟模式下根本测不出来。（这个坑踩过） */
+      const slot = a.length >= 4 ? +a[3] : -1;
+      if(slot >= 0 && this.cal[slot] !== undefined){
+        this.slotId[slot] = n;
+        return ["OK SETID old_id=" + o + " new_id=" + n + " slot=" + slot + " mode=guide"];
+      }
+      this.slotId = this.slotId.map(i => i === o ? n : i);
+      return ["OK SETID old_id=" + o + " new_id=" + n + " mode=repair"];
     }
     if(v === "CAL"){
       const sub = (a[0]||"").toUpperCase();
       if(sub === "STATUS"){
         const out = []; let done = 0;
         for(let s=0;s<6;s++){ const c = this.cal[s];
-          out.push("CAL slot=" + s + " name=" + SLOTS[s] + " id=" + (s+1) + " min=" + c.min + " standby=" + c.standby +
+          out.push("CAL slot=" + s + " name=" + SLOTS[s] + " id=" + this.slotId[s] + " min=" + c.min + " standby=" + c.standby +
             " max=" + c.max + " valid=" + c.valid + " press=" + c.press);
           if(c.valid) done++;
         }
@@ -575,18 +680,19 @@ class MockFirmware{
       if(sub === "CAPTURE"){
         const s = +a[1];
         if(!this.cal[s]) return ["ERR CAL CAPTURE usage_slot_MIN_STANDBY_MAX"];
-        if(!this.present(s+1)) return ["ERR CAL CAPTURE servo_read_failed"];
+        if(!this.present(this.slotId[s])) return ["ERR CAL CAPTURE servo_read_failed"];
         Object.assign(this.cal[s], {min:+a[2], standby:+a[3], max:+a[4], valid:1});
         return ["OK CAL CAPTURE slot=" + s];
       }
       if(sub === "AUTO"){
         const mode = (a[1]||"STATUS").toUpperCase();
         if(mode === "START"){
-          const miss = [0,1,2,3,4,5].find(s => !this.present(s+1));
+          const miss = [0,1,2,3,4,5].find(s => !this.present(this.slotId[s]));
           if(miss !== undefined)
-            return ["ERR CAL AUTO feedback_missing_slot=" + miss + "_id=" + (miss+1) + " fix_ids_or_wiring_first"];
+            return ["ERR CAL AUTO feedback_missing_slot=" + miss + "_id=" + this.slotId[miss] + " fix_ids_or_wiring_first"];
           this.autoActive = 1;
-          for(let s=0;s<6;s++){ Object.assign(this.cal[s], {samples:0, min:this.rng(), max:0}); }
+          const mid = Math.floor(this.rng() / 2);
+          for(let s=0;s<6;s++){ Object.assign(this.cal[s], {samples:0, min:mid, max:mid, standby:mid}); }
           return ["OK CAL AUTO START"];
         }
         if(mode === "FINISH"){
@@ -631,6 +737,55 @@ class MockFirmware{
       return ["OK MOVE id=" + (a[0]||0) + " pos=" + (a[1]||0)];
     }
     if(v === "DEMO"){ if(!this.armed || !this.calibrated) return ["ERR DEMO arm_and_calibrate_first"]; return ["OK DEMO start"]; }
+    if(v === "RATE"){
+      /* 速度实测：模拟固件的"异步"行为 —— 先回 START，过一会儿再吐 DONE。
+         这样上位机那段"挂后台监听等 DONE"的逻辑在没有硬件时也能被真正测到。 */
+      if((a[0]||"").toUpperCase() === "STOP"){ this.rateTimer && clearTimeout(this.rateTimer); this.rateTimer = null; return ["OK RATE stopped"]; }
+      if(!this.armed) return ["ERR RATE motion_not_armed"];
+      if(a.length === 0) return ["OK RATE active=0 done=0/0 half_ms=0.0 slow_ms=0.0 lost=0"];
+
+      const raw0  = (a[0]||"").toUpperCase();
+      const mask  = raw0 === "ALL" || raw0 === "0" ? 0x3F
+                  : raw0.startsWith("0X") ? (parseInt(raw0.slice(2), 16) || 0)
+                  : (parseInt(raw0, 10) && parseInt(raw0, 10) >= 1 && parseInt(raw0, 10) <= 6 ? (1 << (parseInt(raw0, 10) - 1)) : 0);
+      const speed = parseInt(a[1] || "0", 10) || 0;
+      const depth = parseInt(a[3] || "100", 10) || 100;
+      const cyc   = parseInt(a[4] || "3", 10) || 3;
+      if(!mask) return ["ERR RATE no_slot_selected_or_offline"];
+
+      /* 物理模型，参数按实机标定过（STS3032 + 这套连杆）：
+           单程耗时 ≈ 22 ms 固定开销（通信往返 + 起停加减速）
+                    + 行程 / 6.6   （6.6 计数/ms ≈ 空载 0.10s/60° 换算）
+         行程取**选中槽位里最大的那根**：多根同步跑的时候，最慢的那根决定整体。
+         实测对照（5 根一起，满行程）：100% -> 100.5ms(4.97Hz)，
+         60% -> 69.6ms(7.18Hz)，和这个模型差在 1~2 ms 以内。 */
+      let spanMax = 0;
+      for(let s = 0; s < 6; s++){
+        if(!((mask >> s) & 1)) continue;
+        const c = this.cal[s];
+        if(!c || !c.valid) continue;
+        const press = c.press === "min" ? c.min : c.max;
+        spanMax = Math.max(spanMax, Math.abs(press - c.standby));
+      }
+      if(!spanMax) spanMax = 400;                     // 没校准就当一根典型手指
+      const span  = spanMax * depth / 100;
+      const cpm   = speed > 0 ? Math.min(6.6, speed * 0.058) : 6.6;
+      const half  = Math.max(10, Math.round(22 + span / cpm));
+      const full  = half * 2;
+      const hz    = (1000 / full).toFixed(2);
+      const slow  = Math.round(half * 1.02);
+
+      this.rateTimer && clearTimeout(this.rateTimer);
+      this.rateTimer = setTimeout(() => {
+        this.rateTimer = null;
+        if(this.onAsync) this.onAsync(
+          "RATE_DONE cycles=" + cyc + " half_ms=" + half.toFixed(1) + " full_ms=" + full.toFixed(1) +
+          " hz=" + hz + " slow_ms=" + slow.toFixed(1) + " lost=0");
+      }, cyc * 2 * half + 150);
+
+      return ["OK RATE_START slots=0x" + mask.toString(16).toUpperCase().padStart(2, "0") +
+              " speed=" + speed + " acc=0 depth=" + depth + " cycles=" + cyc];
+    }
     if(v === "ENROLL"){
       const sub = (a[0]||"STATUS").toUpperCase();
       if(sub === "START") return ["OK ENROLL START active=1 next=1 temp=10 phase=WAIT_EMPTY requirement=first_1_to_10_then_add_id1_as_2_to_6_then_10_to_1"];
@@ -643,13 +798,21 @@ class MockFirmware{
       "OK AUTO profile=" + this.profile + " ready=1 range=" + this.rng()];
     return ["ERR UNKNOWN_COMMAND verb=" + v];
   }
-  /* 采样期间让位置在量程内游走, 模拟人活动手指 */
+  /* 采样期间让位置在量程内游走, 模拟人活动手指。
+     注意方向：真实手套的手指是**从静止位单向压到按下位**，静止位在一端，
+     不是中间。所以这里从 standby 朝 press 方向走 0~stroke。
+     行程按实机标定：STS3032 上手指从静止到压到底约 300~550 计数
+     （12bit / 360°，500 计数 ≈ 44°，和实测的 302~514 一致）。
+     不同槽位给不同行程，好让"有的手指幅度小"在模拟里也看得到。 */
   tick(){
     if(!this.autoActive) return;
     this.bus.forEach(id=>{
-      const c = this.cal[id-1];
+      const s = this.slotOf(id);
+      const c = s >= 0 ? this.cal[s] : null;
       if(!c) return;
-      const p = 260 + Math.floor(Math.random() * (this.rng() - 520));
+      const stroke = Math.round((300 + 55 * s) * this.rng() / 4095);
+      const dir    = c.press === "min" ? -1 : 1;
+      const p      = c.standby + dir * Math.round(Math.random() * stroke);
       c.last = p; c.samples++;
       if(p < c.min) c.min = p;
       if(p > c.max) c.max = p;
@@ -663,6 +826,8 @@ class Transport{
     this.mode = "sim"; this.port = null; this.reader = null; this.buf = "";
     this.connected = false; this.listeners = []; this.mock = new MockFirmware();
     this.inflight = 0;
+    /* 模拟固件的异步输出（RATE_DONE 这种"跑完才吐"的行）直接转成普通收入行 */
+    this.mock.onAsync = l => this.emit(l);
     setInterval(()=>this.mock.tick(), 100);
   }
   onLine(fn){ this.listeners.push(fn); }
@@ -816,6 +981,7 @@ function updateGates(){
   const calOk = S.info.calibrated === "1";
   need(conn && calOk, "#testGate", "#testBody");
   need(conn && calOk, "#latGate",  "#latBody");
+  need(conn && calOk, "#rtGate",   "#rtBody");
   need(conn && calOk, "#playGate", "#playBody");
 }
 
@@ -905,7 +1071,12 @@ $("#autoPoll").onchange = startPolling;
    必须等总线**真的空了**才允许插下一个, 否则会把已编过号的舵机又改一遍。 */
 function wizardReset(){
   S.wizard = { assigned:[], phase:"need-plug", detected:null };
-  if(isSim()) T.mock.reset(true);
+  /* ⚠️ 这里**不要**调 T.mock.reset(true)。
+     那是「恢复出厂」—— 档位会掉回 SC09，已校准的数据也会被抹掉。
+     而真机上按这个按钮，板子那边一个字节都不发：它只清上位机自己的进度。
+     模拟模式要是顺手把档位和校准也清了，就成了"模拟一套、实机另一套"：
+     实测偏差高达 4 倍（模拟显示 11.6 Hz，实机只有 5.0 Hz，
+     因为 SC09 量程 1023 把行程算成了真实的 1/4）。（这个坑踩过） */
   renderWizard();
   wizSay("", "点下面的「检测当前舵机」开始。");
 }
@@ -991,9 +1162,22 @@ $("#btnAssignNext").onclick = async () => {
   const w = S.wizard;
   if(w.phase !== "ready" || w.detected === null) return;
   const target = w.assigned.length + 1;
-  const cur = w.detected;
+  const slot   = target - 1;                // 第 N 轮 -> 槽位 N-1
+  const cur    = w.detected;
 
-  if(cur === target){                       // 已经是目标号, 直接确认
+  /* 无论要不要改号，都必须把「这块舵机归哪个槽位」**显式**写给固件。
+     这两个坑都踩过：
+       1. cur === target 时这里曾经一个字节都不发，直接往下走 ——
+          槽位就保留 NVS 里的旧值（可能是上一次编号留下的脏数据）；
+       2. 改号走的是 SETID，固件早先按"修号"语义做 remapId(old,new)，
+          会把指向 old 的**已编好槽位**一起改掉。因为每轮插上的出厂舵机
+          号都是 1，第 2 轮就会把第 1 轮的槽位 0 一起改成 2 ——
+          6 轮跑完得到 [2,2,3,4,5,6]，界面还显示"编号全部完成"，
+          表现为「有一根手指怎么都不动、另两根一起动」。
+     现在：cur===target 用 MAP 补写映射；要改号则给 SETID 带上 slot，
+     走"编号向导"语义，固件只动这一个槽位。 */
+  if(cur === target){                       // 已经是目标号, 直接确认（但映射要补写）
+    await T.send("MAP " + slot + " " + target, 3000);
     w.assigned.push(target);
     w.detected = null;
     w.phase = target === 6 ? "done" : "need-unplug";
@@ -1003,7 +1187,7 @@ $("#btnAssignNext").onclick = async () => {
 
   $("#btnAssignNext").disabled = true;
   wizSay("warn", "正在改号 " + cur + " → " + target + " …（舵机可能要重启一下，请稍等）");
-  await T.send("SETID " + cur + " " + target + " CONFIRM", 8000);
+  await T.send("SETID " + cur + " " + target + " CONFIRM " + slot, 8000);
   await sleep(1200);                        // 舵机应用新 ID 需要时间
   const chk = await T.send("PING " + target, 2000);
 
@@ -1361,6 +1545,182 @@ $("#btnLatBurst").onclick = async () => {
   finally{ b.disabled = false; }
 };
 
+/* ======================= 4C. 速度实测 ======================= */
+/* 和 4B 的区别：
+   4B 量的是「命令走一个来回要多久」（链路口径），
+   4C 量的是「舵机真的从最小跑到最大再跑回来要多久」（机械口径）。
+   演奏能不能跟上，取决于后者。 */
+const RT = { mask: 0x3F, running: false };
+
+/* 目标频率门槛：演奏页默认按 6 Hz 期望，4 Hz 算及格线 */
+const RT_TARGET_HZ = 6;
+const RT_FLOOR_HZ  = 4;
+
+function rtSay(kind, html){
+  const m = $("#rtMsg"); if(!m) return;
+  m.className = "msg " + kind; m.innerHTML = html;
+}
+
+function renderRt(){
+  const box = $("#rtDots"); if(!box) return;
+  box.innerHTML = "";
+  for(let s = 0; s < 6; s++){
+    const on = (RT.mask >> s) & 1;
+    const b = document.createElement("button");
+    b.className = "dot" + (on ? " cur" : "");
+    b.textContent = String(s + 1);
+    b.title = SLOTS[s];
+    b.onclick = () => { if(RT.running) return; RT.mask ^= (1 << s); renderRt(); };
+    box.appendChild(b);
+  }
+  const names = SLOTS.filter((_, s) => (RT.mask >> s) & 1);
+  $("#rtPick").innerHTML = names.length
+    ? "已选 <b>" + names.length + "</b> 根：" + names.map(esc).join("、")
+    : "<b style=\"color:#a52227\">一根都没选 —— 至少选一根</b>";
+  $("#btnRate").disabled = RT.running || !RT.mask;
+  $("#btnRateStop").disabled = !RT.running;
+}
+
+function rtParse(line){
+  const o = {};
+  line.trim().split(/\s+/).slice(1).forEach(kv => {
+    const i = kv.indexOf("=");
+    if(i > 0) o[kv.slice(0, i)] = kv.slice(i + 1);
+  });
+  return o;
+}
+
+function showRateResult(line, depth, speed, cyc){
+  const d    = rtParse(line);
+  const half = parseFloat(d.half_ms), full = parseFloat(d.full_ms);
+  const hz   = parseFloat(d.hz),      slow = parseFloat(d.slow_ms);
+  const lost = parseInt(d.lost || "0", 10);
+  const sel  = SLOTS.filter((_, s) => (RT.mask >> s) & 1).length;
+
+  const stat =
+    '<div class="stat">' +
+      '<div><b>' + full.toFixed(0) + ' ms</b><span>一趟完整行程</span></div>' +
+      '<div><b>' + hz.toFixed(2) + ' Hz</b><span>实际能跑</span></div>' +
+      '<div><b>' + half.toFixed(0) + ' ms</b><span>单程平均</span></div>' +
+      '<div><b>' + slow.toFixed(0) + ' ms</b><span>最慢单程</span></div>' +
+    '</div>';
+
+  /* 达到目标频率需要的单程上限 */
+  const needHalf = 1000 / RT_TARGET_HZ / 2;
+
+  /* 反推"行程要减到多少"，不能按纯比例算。
+     行程和单程耗时**不是过原点的直线**：有一块固定开销（通信往返 + 起停加减速），
+     行程再小也省不掉。只按比例反推会算出偏乐观的值 ——
+     实测 5 根一起跑：100% -> 100.5ms，实际拟合是 half ≈ 22.7 + 0.778*depth，
+     所以 100% 时那个公式给 82%，而 82% 实测只有 ~5.9 Hz，差一点点到 6。
+     这里用一个更保守的固定开销去反推，并且文案里说明是估算值。 */
+  const RATE_FIXED_MS = 30;
+  const slope   = Math.max(0.02, (half - RATE_FIXED_MS) / Math.max(depth, 1));
+  const sugDepth = Math.floor((needHalf - RATE_FIXED_MS) / slope);
+
+  let cls, verdict;
+  if(lost > 0){
+    cls = "err";
+    verdict = "✘ 有 <b>" + lost + "</b> 个半程等满 800 ms 都没到位 —— 卡住了。先查机械有没有阻力、" +
+              "那个接触不良的舵机，再谈速度。";
+  }else if(hz >= RT_TARGET_HZ){
+    cls = "ok";
+    verdict = "✔ 实测 <b>" + hz.toFixed(2) + " Hz</b>，达到 6 Hz 目标。这套配置可以直接弹快曲子。";
+  }else if(hz >= RT_FLOOR_HZ){
+    cls = "warn";
+    verdict = "⚠ 实测 <b>" + hz.toFixed(2) + " Hz</b>，过了 4 Hz 及格线，但没到 6 Hz。" +
+      (sugDepth >= 20
+        ? "把<b>行程大小</b>从 " + depth + "% 调到约 <b>" + sugDepth + "%</b> 应该能上去" +
+          "（估算值，改完再点一次「开始测速」确认）。手指不用压到底，真弹琴本来也是这样。"
+        : "行程已经很小了，说明瓶颈在舵机速度或机械阻力上。");
+  }else{
+    cls = "err";
+    verdict = "✘ 实测只有 <b>" + hz.toFixed(2) + " Hz</b>，连 4 Hz 都不到。" +
+      (sugDepth >= 20
+        ? "先试把<b>行程大小</b>调到约 <b>" + Math.max(20, Math.min(sugDepth, 60)) + "%</b> 再测一次。"
+        : "行程已经很小，得从机械阻力 / 供电 / 舵机型号上找原因。") +
+      "　另外确认用的是<b>最快</b>速度档。";
+  }
+
+  const head = '<div style="font-size:12.5px;color:var(--sub);margin-bottom:8px">' +
+    '测了 ' + sel + ' 根 · 行程 ' + depth + '% · 速度 ' + (speed === 0 ? "最快" : speed) +
+    ' · ' + cyc + ' 趟' + (isSim() ? ' · <span class="chip">模拟</span>' : '') + '</div>';
+
+  const box = $("#rtResult");
+  box.innerHTML = head + stat + '<div class="msg ' + cls + '" style="margin-top:10px">' + verdict + '</div>';
+  box.style.display = "block";
+  rtSay(cls, cls === "ok" ? "测完了，结果在下面。" : "测完了，结果在下面 —— 看一下结论行的建议。");
+}
+
+/* 槽位掩码必须发成 0x 十六进制形式：
+   固件那边 1..6 是"单个槽位"的意思，直接发十进制 63 会被判成非法参数。
+   （这个坑踩过——发 63 时固件回 ERR RATE no_slot_selected_or_offline） */
+function rtMaskHex(){ return "0x" + RT.mask.toString(16).toUpperCase().padStart(2, "0"); }
+
+async function runRate(){
+  if(!RT.mask){ rtSay("err", "先选至少一根手指。"); return; }
+  if(S.info.armed !== "1"){
+    const r = await T.send("ARM", 4000);
+    if(!r.some(l => l.startsWith("OK ARM"))){
+      rtSay("err", "使能失败：<code>" + esc(r.join(" / ") || "无回复") + "</code>　先回第 4 步点「使能」。");
+      return;
+    }
+    await refreshInfo(); refreshChips();
+  }
+  const depth = +$("#rtDepth").value;
+  const speed = +$("#rtSpeed").value;
+  const cyc   = Math.max(1, Math.min(20, +$("#rtCycles").value || 3));
+
+  RT.running = true; renderRt();
+  $("#rtResult").style.display = "none";
+
+  /* RATE 是"先立刻回 OK RATE_START，跑完再吐 RATE_DONE"，
+     所以必须挂一个后台监听去接后面那行，不能只等 T.send 的返回值。 */
+  let doneLine = null;
+  const onLine = l => { if(l.startsWith("RATE_DONE")) doneLine = l; };
+  T.listeners.push(onLine);
+
+  try{
+    const r = await T.send("RATE " + rtMaskHex() + " " + speed + " 0 " + depth + " " + cyc, 6000);
+    const bad = r.find(l => l.startsWith("ERR"));
+    if(bad){
+      rtSay("err", "没能开始测：<code>" + esc(bad) + "</code>" +
+        (/stroke_too_small/.test(bad) ? "　→ 这个槽位的行程太小，回第 3 步重新校准。" :
+         /no_slot_selected/.test(bad) ? "　→ 选中的槽位里有不在线的。" : ""));
+      return;
+    }
+    if(!r.some(l => l.startsWith("OK RATE_START"))){
+      rtSay("err", "固件没认这条命令：<code>" + esc(r.join(" / ") || "无回复") + "</code>　" +
+        "板子上的固件可能还是旧版（需要 PIANO_GLOVE_2 v2.1.0 以上）。");
+      return;
+    }
+
+    rtSay("warn", "正在跑 " + cyc + " 趟完整行程… 舵机会来回动，手离远一点。");
+    const t0 = performance.now();
+    const budget = cyc * 2 * 900 + 4000;     // 每个半程最坏 800 ms + 余量
+    while(!doneLine && performance.now() - t0 < budget) await sleep(80);
+
+    if(!doneLine){
+      rtSay("err", "等超时了也没收到 <code>RATE_DONE</code>。去「日志」页看固件最后回的是什么。");
+      return;
+    }
+    showRateResult(doneLine, depth, speed, cyc);
+  }catch(e){
+    rtSay("err", "测速出错：" + esc(e.message));
+  }finally{
+    T.listeners = T.listeners.filter(f => f !== onLine);
+    RT.running = false; renderRt();
+  }
+}
+
+$("#btnRate").onclick     = () => runRate();
+$("#btnRateStop").onclick = async () => { await T.send("RATE STOP", 3000); RT.running = false; renderRt(); };
+$("#rtAll").onclick       = () => { if(!RT.running){ RT.mask = 0x3F; renderRt(); } };
+$("#rtNone").onclick      = () => { if(!RT.running){ RT.mask = 0;    renderRt(); } };
+$("#rtDepth").oninput = e => { $("#rtDepthL").textContent = e.target.value + "%"; };
+$("#rtSpeed").oninput = e => { $("#rtSpeedL").textContent = +e.target.value === 0 ? "最快" : e.target.value; };
+renderRt();
+
 /* ======================= 5. 演奏 ======================= */
 /* ---------- 5.1 MIDI 解析 (零依赖) ----------
    读越界一律返回 0 并置 truncated 标记, 不抛异常 —— 真实世界的 MIDI 文件时长字段
@@ -1517,6 +1877,23 @@ drop.onclick = () => fileInput.click();
 drop.addEventListener("drop", ev => { const f = ev.dataTransfer.files[0]; if(f) loadMidiFile(f); });
 fileInput.onchange = () => { if(fileInput.files[0]) loadMidiFile(fileInput.files[0]); };
 
+// 内置示例：《两只老虎》。手写生成，见 host/tests/make_two_tigers.py，
+// 源文件在 host/samples/two-tigers.mid。这里内嵌一份，好处是完全离线可用、
+// 新手点一下就能听到/感受到效果，不用先去找一个 MIDI 文件。
+//
+// 选它的原因：旋律只用到 C D E F G A 六个音，正好等于手套的 6 根手指 ——
+// 用「音高对应」分配时，一个音固定一根手指，按下哪个音是哪根手指一眼看清。
+const SAMPLE_MIDI_B64 =
+  "TVRoZAAAAAYAAAABAeBNVHJrAAABVAD/UQMHoSAA/wMZ5Lik5Y+q6ICB6JmOIChUd28gVGlnZXJzKQD/WAQEAhgIAJA8ZIMAgDwAYJA+ZIMAgD4AYJBAZIMAgEAAYJA8ZIMAgDwAYJA8ZIMAgDwAYJA+ZIMAgD4AYJBAZIMAgEAAYJA8ZIMAgDwAYJBAZIMAgEAAYJBBZIMAgEEAYJBDZIYAgEMAgUCQQGSDAIBAAGCQQWSDAIBBAGCQQ2SGAIBDAIFAkENkgUCAQwAwkEVkgUCARQAwkENkgUCAQwAwkEFkgUCAQQAwkEBkgwCAQABgkDxkgwCAPABgkENkgUCAQwAwkEVkgUCARQAwkENkgUCAQwAwkEFkgUCAQQAwkEBkgwCAQABgkDxkgwCAPABgkD5kgwCAPgBgkENkgwCAQwBgkDxkhgCAPACBQJA+ZIMAgD4AYJBDZIMAgEMAYJA8ZIYAgDwAgUD/LwA=";
+
+function b64ToFile(b64, name){
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new File([u8], name, {type: "audio/midi"});
+}
+$("#btnSample").onclick = () => loadMidiFile(b64ToFile(SAMPLE_MIDI_B64, "两只老虎.mid"));
+
 async function loadMidiFile(f){
   $("#midiMsg").style.display = "block";
   try{
@@ -1600,6 +1977,14 @@ $("#nLow").oninput = $("#nHigh").oninput = () => {};
 $("#btnReanalyze").onclick = analyze;
 $("#speed").oninput = () => { $("#speedLabel").textContent = $("#speed").value + "%"; };
 
+/* 手指动作速度：0 = 让舵机用最快速度（写 0 是飞特协议里"不用速度限制"的约定）。
+   其它值越大越慢，单位约 0.0146 转/秒，所以 0~120 之外基本没区别。 */
+function fingerSpeed(){ return parseInt($("#fSpeed").value, 10) || 0; }
+$("#fSpeed").oninput = () => {
+  const v = fingerSpeed();
+  $("#fSpeedLabel").textContent = v === 0 ? "最快" : String(v);
+};
+
 /* ---------- 5.4 播放引擎 ---------- */
 const SLOT_SVG = ["f-thumb","f-thumb","f-index","f-middle","f-ring","f-pinky"];
 function slotPos(slot, depth){
@@ -1673,7 +2058,7 @@ $("#btnPlay").onclick = async () => {
       const e = ev[S.cursor++];
       const d = e.on ? Math.max(0.35, e.vel) : 0;
       depth[e.slot] = d;
-      T.fire("MOVE " + (e.slot + 1) + " " + slotPos(e.slot, d) + " 800 0 ARM");
+      T.fire("MOVE " + (e.slot + 1) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */
