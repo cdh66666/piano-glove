@@ -1612,12 +1612,22 @@ $("#btnLatBurst").onclick = async () => {
   const b = $("#btnLatBurst"); b.disabled = true;
   const N = 60, sim = isSim();
   latSay("warn", "连喷 " + N + " 条 MOVE，期间不等回复（模拟真实演奏）…");
+  /* 挑一个已校准的槽位，在它的**区间内**来回摆。
+     ⚠️ 这里曾经硬编码 `MOVE 1 240 + i%6*24` —— 240~360 对真机的区间
+     （比如 [2006,2708]）是**越界**的，会被固件的新闸全部拒掉，
+     量到的就只是"拒绝路径"的速度，不是真实演奏路径。 */
+  let bs = 0;
+  for(let k = 0; k < 6; k++){ if(S.slots[k] && String(S.slots[k].valid) === "1"){ bs = k; break; } }
+  const bc  = S.slots[bs] || {};
+  const bLo = Math.min(+bc.min || 0, +bc.max || 0), bHi = Math.max(+bc.min || 0, +bc.max || 0);
+  const bMid = Math.round((bLo + bHi) / 2);
+  const bAmp = Math.max(1, Math.round((bHi - bLo) / 2 * 0.8));   // 摆到 80% 处，留余量
   let replies = 0;
   const counter = () => { replies++; };
   T.listeners.push(counter);
   const t0 = performance.now();
   try{
-    for(let i=0;i<N;i++) T.fire("MOVE 1 " + (240 + (i % 6) * 24));
+    for(let i=0;i<N;i++) T.fire("MOVE " + slotIdOf(bs) + " " + (bMid + ((i % 2) ? bAmp : -bAmp)));
     const sendMs = performance.now() - t0;
     await sleep(1200);                                // 等固件把积压的回复吐完
     T.listeners = T.listeners.filter(f => f !== counter);
@@ -2100,6 +2110,19 @@ $("#fDepth").oninput = () => { $("#fDepthLabel").textContent = Math.round(finger
 
 /* ---------- 5.4 播放引擎 ---------- */
 const SLOT_SVG = ["f-thumb","f-thumb","f-index","f-middle","f-ring","f-pinky"];
+
+/* 槽位 → 真实舵机 id。
+   ⚠️ 不要写 `slot + 1`。演奏引擎曾经用 `MOVE (slot+1)` 当 id，
+   等于假设"槽位 i 的 id 恰好是 i+1" —— 对出厂的 [1,2,3,4,5,6] 碰巧成立，
+   但只要用户动过编号，就会把 A 槽位的校准位置发给 B 号舵机。
+   现在固件对 MOVE 有越界闸，那种情况会变成"静默不演奏"（比顶限位安全，但更难查）。
+   id 从 STATUS_ALL 的 `SLOT slot=N id=M` 里取，那才是事实。 */
+function slotIdOf(slot){
+  const c = S.slots[slot] || {};
+  const id = parseInt(c.id, 10);
+  return (id >= 1 && id <= 253) ? id : slot + 1;   // 拿不到就退回老假设
+}
+
 function slotPos(slot, depth){
   const c = (S.slots[slot] || {});
   const standby = +c.standby || 0;
@@ -2177,7 +2200,7 @@ $("#btnPlay").onclick = async () => {
       const amp = fingerDepth(), useVel = $("#followVel").checked;
       const d = e.on ? (useVel ? Math.max(0.35, e.vel) : 1) * amp : 0;
       depth[e.slot] = d;
-      T.fire("MOVE " + (e.slot + 1) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
+      T.fire("MOVE " + slotIdOf(e.slot) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */

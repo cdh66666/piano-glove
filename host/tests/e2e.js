@@ -398,6 +398,23 @@ function check(name, cond, extra){
   await page.waitForTimeout(500);
   check("停止后按钮复位", (await txt("#btnPlay")).includes("开始演奏"));
 
+  /* 回归：演奏引擎必须按**真实映射**取舵机 id，不能假设「槽位 i 的 id 就是 i+1」。
+     原先写的是 `MOVE (slot+1)`：对出厂的 [1,2,3,4,5,6] 碰巧成立，
+     一旦用户动过编号，就会把 A 槽位的校准位置发给 B 号舵机 ——
+     现在固件对 MOVE 有越界闸，那种情况会变成「静默不演奏」（比顶限位安全，但更难查）。
+     故意把槽位 0 改成 id=7，看 slotIdOf 是不是跟着走。
+     ⚠️ 不真改一下 id 就测不出东西：默认映射下 slotIdOf 与 slot+1 结果相同。 */
+  const idRemap = await page.evaluate(async () => {
+    await T.send("MAP 0 7", 3000);
+    await refreshSlots(true);
+    const got = slotIdOf(0);
+    await T.send("MAP 0 1", 3000);        // 还原
+    await refreshSlots(true);
+    return {got, back: slotIdOf(0)};
+  });
+  check("演奏按真实映射取舵机 id（不假设 slot+1）",
+    idRemap.got === 7 && idRemap.back === 1, JSON.stringify(idRemap));
+
   // 格式 0 文件也要能读
   await page.setInputFiles("#file", path.join(__dirname, "test_f0.mid"));
   await page.waitForTimeout(700);
