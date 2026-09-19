@@ -29,7 +29,7 @@ python ref_parse.py       # 参考实现解析 -> ref.json
 node compare.js           # 两边结果比对
 
 # 2) 端到端流程自测（模拟固件，无需硬件）
-node e2e.js               # 输出 121 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
+node e2e.js               # 输出 131 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
 
 # 3) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
 node shots.js
@@ -126,9 +126,24 @@ node   fingering_report.js      # 导出 host/samples/FINGERING.md 自动指法�
    C D E F G A 只占满 **4 根**手指（E/F 挤在食指、小指全程闲着）—— 而这首曲子当初被选进
    样本库的理由恰恰是「6 个音 = 6 根手指」。**做过变异测试**：退掉修复，断言返回
    `[6,6,16,10,4,0]` 立刻变红。另外还配了一条「音越高、手指越靠小指侧」保证单调性。
+9. **音频断言不能只读 `AudioContext.state` —— 那是假绿。** headless Chromium 里
+   `AudioContext` 一建出来就是 `running`，所以「断言 state === running」永远成立，
+   把演奏入口那行 `unlockAudio()` 整行删掉也测不出来。现在改成**包一层数调用次数**，
+   删掉调用立刻变红。**做过变异测试**：4 处退化一起注入 → 5 条断言变红，
+   其中这条报 `n:0` 而 `state` 仍是 `running`，正好印证了"读 state 什么都测不到"。
+10. **「越高级越快」要断言真实的频率数字，不能只断言速度标签。** 断言读的是页面提示里的
+    「约 X 次按压/秒」（由 `peakRate × 当前速度` 算出来），并要求 L5 > L1。
+   **做过变异测试**：把分级退化成「不管哪级都 100%」，
+   「选 L1 自动套用 90%」「选 L5 自动套用 200%」两条立刻变红。
 
 ## 已知的坑（写脚本时踩过）
 
+- **顶层初始化不要调用依赖后面 `const` 的函数**（TDZ）。`LEVEL_SPEED` 曾经声明在文件后半段，
+  而顶层那句 `applyLevelSpeed(SONG_LIB[0])` 在它之前执行 → 抛
+  `Cannot access 'LEVEL_SPEED' before initialization`，**整个顶层脚本从那行断掉**，
+  后面的事件绑定（含 `#songLib.onchange`）全部作废。症状是「曲库下拉换了没反应」，
+  而 e2e 报出来的是「两条曲库断言 FAIL + 一条页面导航错误」，很难一眼看出是 TDZ。
+  **规则：常量一律声明在所有使用它们的代码之前。**
 - **测试 MIDI 的手写生成器极易造出非法文件**：一个事件必须是「delta-time + 事件」的完整单元。
   曾经把 `vlq(480)` 和后面第一组 `vlq(0)` 分开写，导致事件里出现两个 delta-time，
   解析器按 running status 一路错位。表现形式是「音符数量对但时间全歪」。

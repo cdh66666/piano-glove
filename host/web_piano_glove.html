@@ -429,9 +429,11 @@ pre#log .sys{color:#c9a5ff}
 
         <div class="row" style="margin-top:14px">
           <label>播放速度</label>
-          <input type="range" id="speed" min="10" max="150" value="100" style="flex:1;min-width:120px">
+          <input type="range" id="speed" min="10" max="250" value="100" style="flex:1;min-width:120px">
           <span id="speedLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
+          <button id="btnMaxSpeed" class="ghost" style="padding:4px 9px" title="把手套压到极限">⚡ 拉满</button>
         </div>
+        <div id="speedHint" style="font-size:12px;color:var(--sub);margin:-2px 0 2px"></div>
         <div class="row">
           <label>手指动作速度</label>
           <input type="range" id="fSpeed" min="0" max="200" step="10" value="0" style="flex:1;min-width:120px">
@@ -488,6 +490,15 @@ pre#log .sys{color:#c9a5ff}
           <input type="range" id="sndVol" min="0" max="100" value="70" style="flex:1;min-width:80px">
           <span id="sndVolLabel" style="width:44px;text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)">70%</span>
         </div>
+        <div class="row">
+          <button id="btnSndTest" class="ghost">🔔 试听一下</button>
+          <span id="sndState" style="font-size:12px;color:var(--sub);flex:1">音频未启动</span>
+        </div>
+        <p class="hint" style="margin-top:-2px">
+          如果试听有声音、演奏却没有，那是<b>播放速度</b>或<b>「播放声音」没勾</b>；
+          如果试听也没声音，点上面的按钮 —— 浏览器要求音频必须由一次点击启动，
+          按钮旁边的文字会告诉你现在是什么状态。
+        </p>
         <div class="row">
           <label><input type="checkbox" id="sndAll"> 连被丢掉的音也一起响（听完整曲子，用于对比）</label>
         </div>
@@ -2071,6 +2082,21 @@ $("#btnSample").onclick = () => loadMidiFile(b64ToFile(SAMPLE_MIDI_B64, "两只�
    每个文件只含「曲名/速度/拍号/音符」，手指分配是载入后由 buildPlan() 现算的，
    所以同一首曲子切换「轮流分配 / 音高对应」会得到两套完全不同的指法。
    指法表（跑真实分配算法导出的那份）见 host/samples/FINGERING.md。 */
+/* ---------- 演奏速度分级（常量） ----------
+   ★ 必须声明在 SONG_LIB **之前**：渲染曲目描述、选曲套用速度都要用它。
+   曾经把它放在文件后半段，结果顶层初始化一调用就撞上 TDZ（暂时性死区），
+   整个脚本从这里断掉 —— 连 #songLib 的事件绑定都没执行到，
+   症状是「曲库下拉换了没反应」。常量放前面，这类坑就不会再有。 */
+
+/* 每一级的建议速度（%）。级别越高跑得越快。
+   L5 特意压过手套的物理上限：那是**故意的压力测试**，
+   用来榨出「板子接不住时怎么办」—— 正确表现是主动丢音、保住节奏，不是卡住不动。 */
+const LEVEL_SPEED = { 1: 90, 2: 110, 3: 140, 4: 170, 5: 200 };
+
+/* 手套的硬上限，来自实机实测（见 docs/design-notes.md 的速度基准）：
+   满行程一次完整按压 4.97 Hz。而一次按压 = 按下 + 松开 = 两条 MOVE 命令。 */
+const GLOVE_MAX_PRESS_HZ = 4.97;
+
 /* === SONG LIB BEGIN === */
 const SONG_LIB = [
   {slug:"twinkle", title:"小星星", level:1, levelName:"入门", bpm:100, timesig:[4,4],
@@ -2129,14 +2155,18 @@ function fillSongLib(){
     }
     const o = document.createElement("option");
     o.value = String(i);
-    o.textContent = s.title + "　" + s.bpm + " BPM　" + s.notes + " 音";
+    /* 下拉里直接把「本级建议速度」写出来 —— 一眼看到 90→110→140→170→200 的递进 */
+    o.textContent = s.title + "　" + s.bpm + " BPM　" + s.notes + " 音　"
+                  + (LEVEL_SPEED[s.level] || 100) + "%";
     grp.appendChild(o);
   });
 }
 function songDescHtml(s){
+  const lv = LEVEL_SPEED[s.level] || 100;
   return "<b>L" + s.level + " " + s.levelName + " · " + s.title + "</b>"
        + "　" + s.bpm + " BPM " + s.timesig[0] + "/" + s.timesig[1]
        + "　" + s.notes + " 个音　" + s.seconds + " 秒"
+       + "　<span style='color:var(--sub)'>本级建议速度 <b>" + lv + "%</b></span>"
        + "<br><span style='color:var(--sub)'>测试点：" + s.tests + "</span>"
        + "<br>" + s.desc;
 }
@@ -2144,12 +2174,14 @@ fillSongLib();
 if(SONG_LIB.length){
   $("#songLib").value = "0";
   $("#songDesc").innerHTML = songDescHtml(SONG_LIB[0]);
+  applyLevelSpeed(SONG_LIB[0]);      // 默认停在最低一级的速度上
 }
 $("#songLib").onchange = () => {
   const s = SONG_LIB[+$("#songLib").value];
   if(!s) return;
   $("#songDesc").innerHTML = songDescHtml(s);
   S.songSlug = s.slug;
+  applyLevelSpeed(s);            // ← 级别越高，演奏速度越快（L5 直冲手套极限）
   loadMidiFile(b64ToFile(s.b64, s.slug + ".mid"));
 };
 
@@ -2220,13 +2252,14 @@ function analyze(){
   $("#planMsg").className = "msg " + (risky ? "warn" : "ok");
   $("#planMsg").innerHTML = "每根手指分配到的音符数：" + pct +
     (plan.dropped ? "　·　因手指不够用丢掉了 <b>" + plan.dropped + "</b> 个音" : "") +
-    "<br>峰值需要 <b>" + plan.peakRate + " 条命令/秒</b>，平均 " + avg.toFixed(0) + " 条/秒。" +
-    (risky ? "　<b>注意</b>：模拟模式不受限，但实机上板子每条命令有固定处理时间，这个速率可能发不完 —— 演奏时我会自动丢音保节奏。"
+    "<br><b>100% 速度下</b>：峰值 " + plan.peakRate + " 条命令/秒，平均 " + avg.toFixed(0) + " 条/秒。" +
+    (risky ? "　<b>注意</b>：实机上板子每条命令有固定处理时间，这个速率发不完 —— 演奏时会自动丢音保节奏。"
            : "　这个速率板子应该能跟上。");
   $("#btnPlay").disabled = false;
   /* 分析完立刻画一张总览 —— 不用等到按播放，
      用户就能先看清「这首曲子手套要做什么、哪些音它按不了」。 */
   refreshRoll(0);
+  updateLoadHint();      // 换曲子/换筛选后，负载提示要跟着重算
 }
 const st = (k,v) => "<div><span>" + k + "</span><b>" + v + "</b></div>";
 const fmtTime = ms => {
@@ -2237,7 +2270,7 @@ $("#selTrack").onchange = analyze;
 $("#selMap").onchange   = analyze;
 $("#nLow").oninput = $("#nHigh").oninput = () => {};
 $("#btnReanalyze").onclick = analyze;
-$("#speed").oninput = () => { $("#speedLabel").textContent = $("#speed").value + "%"; };
+/* 播放速度的 oninput 绑在「演奏速度分级」那一节（除了改标签还要刷新负载提示） */
 
 /* 手指动作速度：0 = 让舵机用最快速度（写 0 是飞特协议里"不用速度限制"的约定）。
    其它值越大越慢，单位约 0.0146 转/秒，所以 0~120 之外基本没区别。 */
@@ -2308,6 +2341,12 @@ $("#btnStop").onclick = () => { stopPlay(true); $("#playTime").textContent = "0.
 $("#btnPlay").onclick = async () => {
   if(S.playing){ stopPlay(false); return; }
   if(!S.plan || !S.plan.events.length) return;
+
+  /* ★ 必须在第一个 await **之前**解锁音频。
+     下面那句 `await T.send("ARM", …)` 一旦执行，用户手势就过期了，
+     之后再 resume() 会被自动播放策略拒绝 —— 症状正是「手指在动、没有声音」。
+     演奏是唯一会发声的入口，所以解锁放在这里。 */
+  unlockAudio();
 
   if(S.info.armed !== "1"){
     const r = await T.send("ARM", 3000);
@@ -2401,6 +2440,24 @@ const SND = { ctx:null, master:null, live:[] };
 function volLevel(){ return (parseInt($("#sndVol").value, 10) || 0) / 100; }
 function noteHz(note){ return 440 * Math.pow(2, (note - 69) / 12); }
 
+/* 音频状态直接写在界面上，别让用户猜。
+   为什么要有这个：AudioContext 的自动播放策略**只认用户手势**。
+   一旦第一次发声发生在 requestAnimationFrame 里（演奏恰是这样），
+   resume() 会被拒 —— 现象是「手套在动、一点声音都没有」，而且**不报任何错**。
+   把它做成可见状态，用户一眼就知道声音卡在哪一步。 */
+function setAudioBadge(kind, extra){
+  const el = $("#sndState"); if(!el) return;
+  const map = {
+    ok:      ["#1a7f37", "🔊 音频已就绪"],
+    running: ["#1a7f37", "🔊 正在发声"],
+    blocked: ["#b5730a", "🔇 被浏览器拦住 —— 再点一下「试听一下」"],
+    none:    ["#e5484d", "🔇 这个浏览器不支持 Web Audio"]
+  };
+  const m = map[kind] || map.ok;
+  el.style.color = m[0];
+  el.textContent = m[1] + (extra ? "（" + extra + "）" : "");
+}
+
 function audioCtx(){
   if(!SND.ctx){
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -2410,17 +2467,46 @@ function audioCtx(){
     SND.master.gain.value = volLevel();
     SND.master.connect(SND.ctx.destination);
   }
-  /* 自动播放策略会把 AudioContext 挂起，必须在用户手势里 resume。
-     resume() 返回 Promise，被策略挡住时会 reject —— 吞掉，别让它变成未捕获拒绝。 */
+  /* resume() 返回 Promise，被策略挡住时会 reject —— 吞掉，别让它变成未捕获拒绝。 */
   if(SND.ctx.state === "suspended") SND.ctx.resume().catch(() => {});
   return SND.ctx;
+}
+
+/* 必须在**用户手势的同步调用栈**里跑一次（按钮 onclick 的第一行）。
+   演奏入口正是这么用的：那里紧接着就有 await，而 await 一过手势即失效，
+   之后再 resume 就会被拒。 */
+function unlockAudio(){
+  const ctx = audioCtx();
+  if(!ctx){ setAudioBadge("none"); return null; }
+  if(ctx.state === "suspended"){
+    ctx.resume().then(() => setAudioBadge("ok"))
+                .catch(() => setAudioBadge("blocked"));
+  }else{
+    setAudioBadge("ok", ctx.state);
+  }
+  return ctx;
+}
+
+/* 试听：响一小段上行音阶。既验证音频通道，也给用户一个确定的答案 ——
+   "到底是我没听见，还是它真没响"。
+   这个函数**无视「播放声音」勾选**：试听的目的就是要出声。 */
+function sndTest(){
+  const ctx = audioCtx();
+  if(!ctx){ setAudioBadge("none"); return; }
+  const go = () => {
+    setAudioBadge("ok");
+    [60, 64, 67, 72].forEach((n, i) => setTimeout(() => tone(n, 260, 1, true), i * 150));
+    setTimeout(() => { if(SND.ctx && SND.ctx.state === "running") setAudioBadge("running"); }, 950);
+  };
+  if(ctx.state === "suspended") ctx.resume().then(go).catch(() => setAudioBadge("blocked"));
+  else go();
 }
 
 /* 一个音 = 三角波基频 + 一点二次谐波，走「快起 + 指数衰减」包络。
    不追求仿真钢琴，要的是每个音的**起音时刻**干脆清楚 ——
    这样「听到的节拍」和「看到的动作」才对得上。 */
-function tone(note, durMs, vel){
-  if(!$("#sndOn").checked) return;
+function tone(note, durMs, vel, force){
+  if(!force && !$("#sndOn").checked) return;
   S.sndFired = (S.sndFired || 0) + 1;      // 给自测断言用：声音确实被调度了
   const ctx = audioCtx(); if(!ctx) return;
   const t0  = ctx.currentTime + 0.01;
@@ -2429,7 +2515,8 @@ function tone(note, durMs, vel){
 
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(0.30 * amp, t0 + 0.006);
+  /* 峰值 0.42：0.30 那版在笔记本内置小喇叭上偏轻，密集段落几乎听不见 */
+  g.gain.exponentialRampToValueAtTime(0.42 * amp, t0 + 0.006);
   g.gain.exponentialRampToValueAtTime(0.0001, end);
 
   const o1 = ctx.createOscillator(); o1.type = "triangle"; o1.frequency.value = noteHz(note);
@@ -2454,6 +2541,16 @@ $("#sndVol").oninput = () => {
   if(SND.master) SND.master.gain.value = volLevel();
 };
 $("#sndOn").onchange = () => { if(!$("#sndOn").checked) silence(); };
+$("#btnSndTest").onclick = sndTest;
+
+/* 兜底：用户在页面上**任何地方**第一次按下，就顺手把音频解锁一次。
+   自动播放策略只认用户手势，而用户在演奏之前一定会先点连接、点校准 ——
+   那些点击同样是"手势"，用它们把 AudioContext 提前建好并 resume，
+   等到演奏页就不会因为手势被别处用掉而哑掉。 */
+document.addEventListener("pointerdown", function once(){
+  document.removeEventListener("pointerdown", once);
+  unlockAudio();
+}, { once: true });
 
 /* ---------- 5.6 音乐 ↔ 动作 同轴卷帘 ---------- */
 const SLOT_COLOR = ["#1a6ef0", "#7c4dff", "#12a150", "#b5730a", "#e5484d", "#0e9aa7"];
@@ -2461,6 +2558,55 @@ const ROWH = 20;
 const ROLL = { w:760, h:380, off:null, sig:"", t0:0, span:1, head:0 };
 
 function curSpeed(){ return (parseInt($("#speed").value, 10) || 100) / 100; }
+
+/* 演奏速度分级的常量（LEVEL_SPEED / GLOVE_MAX_PRESS_HZ）声明在 SONG_LIB 之前，
+   见那边的注释 —— 这里只放用到它们的函数。 */
+
+/* 当前速度下「实际要发多少命令」，以及它对手套物理上限的倍数。
+   只在拖滑块 / 换曲子时算一次，不进每帧循环。 */
+function updateLoadHint(){
+  const el = $("#speedHint"); if(!el) return;
+  if(!S.plan){ el.innerHTML = ""; return; }
+  const k   = curSpeed();
+  const ev  = S.plan.events;
+  const dur = ev.length ? Math.max(0.5, ev[ev.length - 1].t / 1000) : 1;
+  /* 两个数都要给：
+     - **平均**速率是浮点的，对速度很敏感 —— 用户拖滑块能立刻看出它在起作用；
+       只给峰值的话，4 条/秒 × 90% 四舍五入还是 4，看着像滑块坏了。
+     - **峰值**才是判断"跟不跟得上"的依据，瞬时压力才是会卡住设备的东西。 */
+  const avg   = (ev.length / dur) * k;
+  const peak  = Math.round(S.plan.peakRate * k);
+  const press = peak / 2;
+  const over  = press / GLOVE_MAX_PRESS_HZ;
+
+  if(over <= 1){
+    el.innerHTML = "平均 " + avg.toFixed(1) + " 条/秒（约 " + (avg / 2).toFixed(1) + " 次按压/秒），"
+                 + "峰值 " + peak + " 条/秒 —— 手套满行程上限 " + GLOVE_MAX_PRESS_HZ
+                 + " 次按压/秒，<b style='color:#1a7f37'>跟得上</b>";
+  }else{
+    el.innerHTML = "平均 " + avg.toFixed(1) + " 条/秒（约 " + (avg / 2).toFixed(1) + " 次按压/秒），"
+                 + "峰值 " + peak + " 条/秒 = 上限的 <b>" + over.toFixed(1) + " 倍</b> —— "
+                 + "<b style='color:#b5730a'>只有约 " + Math.max(1, Math.round(100 / over))
+                 + "% 的动作来得及发出，其余会被主动丢掉以保住节奏</b>";
+  }
+}
+
+/* 选曲时把该级别的建议速度设上去 —— 这就是「分级」的落点。 */
+function applyLevelSpeed(s){
+  const v = (s && LEVEL_SPEED[s.level]) || 100;
+  $("#speed").value = String(v);
+  $("#speedLabel").textContent = v + "%";
+  updateLoadHint();
+}
+$("#speed").oninput = () => {
+  $("#speedLabel").textContent = $("#speed").value + "%";
+  updateLoadHint();
+};
+$("#btnMaxSpeed").onclick = () => {
+  $("#speed").value = $("#speed").max;
+  $("#speedLabel").textContent = $("#speed").max + "%";
+  updateLoadHint();
+};
 
 function rollGeo(){
   /* 上半张 = 卷帘，下半张 = 6 条动作轨；左边留一条给槽位名和刻度 */

@@ -669,6 +669,79 @@ function metaKinds(buf){
   await page.setInputFiles("#file", path.join(__dirname, "test.mid"));
   await page.waitForTimeout(700);
 
+  /* ---------- 5c. 演奏速度分级 & 音频自检 ---------- */
+  /* 「越高级越快」不能只是文案，得是**可断言的数字**：
+     曲库每首自带建议速度（L1 90% → L5 200%），选曲即套用。
+     L5 特意超过手套的物理上限，用来看它怎么主动丢音、保住节奏。 */
+  const pickSong = async (k) => {
+    await page.$eval("#songLib", (el, v) => {
+      el.value = String(v); el.dispatchEvent(new Event("change"));
+    }, k);
+    await page.waitForTimeout(800);
+    return { speed: await page.inputValue("#speed"), hint: await txt("#speedHint") };
+  };
+  const nSongs = await page.$$eval("#songLib option", o => o.length);
+
+  const s1 = await pickSong(0);                    // L1 小星星
+  check("选 L1 自动套用该级速度 90%", s1.speed === "90", s1.speed);
+  check("速度提示给出了按压频率", s1.hint.includes("次按压"), s1.hint);
+
+  const s5 = await pickSong(nSongs - 1);           // L5 革命练习曲
+  check("选 L5 自动套用该级速度 200%（越高级越快）", s5.speed === "200", s5.speed);
+  check("L5 的速度下明确提示超出手套上限、会丢音",
+    s5.hint.includes("倍") && s5.hint.includes("丢"), s5.hint);
+
+  /* 滑块上限必须够高，否则"达到极限"这个诉求根本表达不出来（150% 那版压不到顶） */
+  const maxAttr = await page.getAttribute("#speed", "max");
+  check("速度滑块上限 ≥ 200%（能压到极限）", parseInt(maxAttr, 10) >= 200, maxAttr);
+  await click("#btnMaxSpeed");
+  check("「拉满」把速度顶到滑块上限", (await page.inputValue("#speed")) === maxAttr,
+    await page.inputValue("#speed"));
+
+  /* L1 与 L5 在各自建议速度下的**实际按压频率**必须真的递增 ——
+     这是"越高级越快"的硬证据，看标签是看不出来的。 */
+  /* 注：别叫 hzOf —— 上面 4B 测速那段已经用掉这个名字了（同一作用域） */
+  const pressHzOf = h => { const m = /约\s*([\d.]+)\s*次按压/.exec(h); return m ? parseFloat(m[1]) : -1; };
+  const l1hz = pressHzOf(s1.hint), l5hz = pressHzOf(s5.hint);
+  check("L5 的实际按压频率高于 L1（越高级越快）", l5hz > l1hz && l1hz > 0,
+    "L1=" + l1hz + " Hz  L5=" + l5hz + " Hz");
+
+  /* 音频：试听按钮必须真的把音起出来。
+     这条是**用户报「演奏没声音」之后加的回归** —— 页面得能自证在发声，
+     下次再遇到"没声音"，一眼就能区分是页面问题还是输出环境问题。 */
+  await page.evaluate(() => { S.sndFired = 0; });
+  await click("#btnSndTest");
+  await page.waitForTimeout(700);
+  const snd = await page.evaluate(() => ({
+    fired: S.sndFired || 0,
+    state: SND.ctx ? SND.ctx.state : "no-ctx",
+    badge: (document.querySelector("#sndState") || {}).textContent || ""
+  }));
+  check("「试听」真的起音且 AudioContext 在跑",
+    snd.fired > 0 && snd.state === "running", JSON.stringify(snd));
+  check("音频状态在界面上可见（不让用户猜）", snd.badge.length > 0, snd.badge);
+
+  /* 演奏入口必须在**第一个 await 之前**解锁音频 ——
+     否则 await 一过用户手势就失效，resume() 被拒，表现就是"手指在动、没有声音"。
+     ⚠️ 这里有个假绿陷阱：headless Chromium 里 AudioContext 一建出来就是 running，
+     所以「读 state 看是不是 running」永远成立、什么都测不到。必须**数调用次数**。 */
+  const unlocked = await page.evaluate(() => {
+    S.playing = false;
+    let n = 0;
+    const real = unlockAudio;
+    window.unlockAudio = function(){ n++; return real.apply(null, arguments); };
+    document.querySelector("#btnPlay").click();       // 走真实入口
+    window.unlockAudio = real;
+    return { n, state: SND.ctx ? SND.ctx.state : "no-ctx" };
+  });
+  await page.waitForTimeout(400);
+  check("点「开始演奏」确实解锁了音频（不是拖到 rAF 里才建）",
+    unlocked.n === 1 && unlocked.state === "running", JSON.stringify(unlocked));
+  await click("#btnStop");
+
+  await pickSong(0);                               // 还原到最低级，别把后面的用例带偏
+  await shot("11-speed-levels");
+
   /* 丢音灰影。注意：**正常素材一根手指都不丢**（test.mid 是 85 音符 / 6 秒，
      均摊到 6 根手指完全够用，dropped=0），所以这里分两步：
      先人为注入一批丢音，验证「有丢音时会画灰影」；还原后再确认「没丢音时干净」。

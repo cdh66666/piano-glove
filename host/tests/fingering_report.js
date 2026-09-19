@@ -72,6 +72,8 @@ function verdict(rate){
     tests: s.tests, desc: s.desc,
   })));
   const slots = await page.evaluate(() => SLOTS);
+  const gloveHz = await page.evaluate(() => GLOVE_MAX_PRESS_HZ);
+  const speedMax = await page.evaluate(() => parseInt($("#speed").max, 10));
   console.log("曲库 " + lib.length + " 首：" + lib.map(s => s.slug).join(", "));
 
   const rows = [];
@@ -108,12 +110,28 @@ function verdict(rate){
         };
       }, mode);
     }
-    rows.push({ song, modes });
+    /* 该曲在「本级建议速度」下实际要发多少命令。
+       "越高级越快"必须是数字，不能只是文案 —— 所以这里读的是页面自己
+       算出来的那一行提示（同一份 peakRate、同一个速度值），不是另算一套。 */
+    const speedInfo = await page.evaluate(() => {
+      $("#selMap").value = "rr";
+      analyze();
+      return {
+        pct:  parseInt($("#speed").value, 10),
+        max:  parseInt($("#speed").max, 10),
+        hint: ($("#speedHint").textContent || "").replace(/\s+/g, " ").trim(),
+      };
+    });
+    const mHz = /约\s*([\d.]+)\s*次按压/.exec(speedInfo.hint);
+    speedInfo.pressHz = mHz ? parseFloat(mHz[1]) : 0;
+
+    rows.push({ song, modes, speedInfo });
     console.log("  " + song.slug.padEnd(14) +
       " 音 " + String(song.notes).padStart(3) +
       " | 轮流丢 " + String(modes.rr.dropped).padStart(3) +
       " | 音高丢 " + String(modes.pitch.dropped).padStart(3) +
-      " | 峰值 " + String(Math.max(modes.rr.peak, modes.pitch.peak)).padStart(3) + " 条/秒");
+      " | 峰值 " + String(Math.max(modes.rr.peak, modes.pitch.peak)).padStart(3) + " 条/秒" +
+      " | L" + song.level + " " + speedInfo.pct + "% → " + speedInfo.pressHz + " 次按压/秒");
   }
 
   /* ───────── 生成 Markdown ───────── */
@@ -166,6 +184,47 @@ function verdict(rate){
   L.push("**怎么读这张表**：算法只给了手套 6 个自由度，音比手多时它会**主动丢音保节奏**，");
   L.push("绝不会卡住不动。所以「丢音」不是故障，是设计好的降级 —— L1~L3 应当零丢音，");
   L.push("L4 应当极少丢音，L5 就是故意让它丢，用来看固件在超载下会不会被压死。");
+  L.push("");
+
+  /* ── 演奏速度分级 ──
+     用户要的是「越高级越快、最高级压到极限」。这里就是那张要对账的表：
+     级别 → 建议速度 → **实际按压频率**（而不是曲子的原始 BPM）。
+     为什么强调"实际按压频率"：不同曲子本身的音符密度差十几倍，
+     同一个速度百分比对它们完全不是一回事，只有按压频率能横向比。 */
+  L.push("## 演奏速度分级");
+  L.push("");
+  L.push("曲库每首自带**本级建议速度**，选中即自动套用 —— 级别越高跑得越快。");
+  L.push("下表读的是**当前速度下实际要发的动作数**，而不是曲子的原始 BPM：");
+  L.push("");
+  L.push("| 级别 | 曲名 | 建议速度 | 峰值命令 | 实际按压频率 | 手套上限 " + gloveHz + " 次/秒 |");
+  L.push("| --- | --- | ---: | ---: | ---: | --- |");
+  for(const { song, modes, speedInfo } of rows){
+    const peak = Math.round(Math.max(modes.rr.peak, modes.pitch.peak) * speedInfo.pct / 100);
+    const hz   = speedInfo.pressHz;
+    const over = hz / gloveHz;
+    const rel  = over <= 1
+      ? "跟得上"
+      : over.toFixed(1) + " 倍（约 " + Math.max(1, Math.round(100 / over)) + "% 的动作发得出）";
+    L.push("| L" + song.level + " " + song.levelName + " | " + song.title +
+      " | " + speedInfo.pct + "%" +
+      " | " + peak + " 条/秒" +
+      " | " + hz.toFixed(1) + " 次/秒" +
+      " | " + rel + " |");
+  }
+  L.push("");
+  L.push("**怎么读**：一次「按压」= 按下 + 松开 = **两条** `MOVE` 命令；");
+  L.push("手套满行程的物理上限是实测的 " + gloveHz + " 次按压/秒（见 docs/design-notes.md 的速度基准）。");
+  L.push("L5 的建议速度（200%）是**故意**越过这条线的 —— 它的意义不是「弹得好听」，");
+  L.push("而是压力测试：看固件接不住时会不会卡死。正确表现是**主动丢音、保住节奏**。");
+  L.push("");
+  L.push("⚠️ **「越高级越快」是按倍率说的，不是按绝对频率。** 上面那一列实际频率还受");
+  L.push("曲子本身密度影响：卡农每音两拍、24 个音铺满 35 秒，即使给它 L4 的 170%，");
+  L.push("绝对频率也只有 1.5 次/秒，比《小星星》的 2 次/秒还低 —— 那是谱子决定的，不是分级没生效。");
+  L.push("要比不同级别谁快，看**建议速度**那一列；想看手套被榨到多狠，看**实际按压频率**那一列。");
+  L.push("");
+  L.push("速度滑块可以手动拖，上限 " + speedMax + "%；旁边的「⚡ 拉满」一键压到顶。");
+  L.push("滑块下面那行提示会实时算出「当前速度相当于手套上限的几倍」，");
+  L.push("所以「极限在哪」是个看得见的数字，不用凭感觉。");
   L.push("");
 
   for(const { song, modes } of rows){
