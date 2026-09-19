@@ -52,6 +52,45 @@ function check(name, cond, extra){
   console.log(tag + "  " + name + (extra !== undefined ? "   [" + extra + "]" : ""));
 }
 
+/* 扫出 MIDI 文件里所有 meta 事件类型。用来**机器验证**「样本不含指法信息」——
+   这件事不能靠人眼看：指法在 MIDI 里最常见的藏身处是 Text（0x01）和歌词（0x05），
+   人打开播放器根本看不出来，但解析器读得到。
+   只允许：0x03 曲名 / 0x51 速度 / 0x58 拍号 / 0x2F 结束。 */
+const META_ALLOWED = [0x03, 0x51, 0x58, 0x2f];
+function metaKinds(buf){
+  const kinds = new Set();
+  let p = 14;                                   // 跳过 MThd
+  while(p + 8 <= buf.length && buf.toString("latin1", p, p + 4) === "MTrk"){
+    const size = buf.readUInt32BE(p + 4);
+    const end = Math.min(p + 8 + size, buf.length);
+    p += 8;
+    let running = null;
+    const readVlq = () => { let v = 0, b; do { b = buf[p++]; v = (v << 7) | (b & 0x7f); } while(b & 0x80); return v; };
+    while(p < end){
+      readVlq();                                // delta
+      let st = buf[p];
+      if(st & 0x80){ p++; running = st; } else st = running;
+      if(st === 0xff){
+        kinds.add(buf[p++]);
+        /* ⚠️ 这里必须拆成两步，不能写 `p += readVlq()`。
+           JS 的 `+=` 会先取 p 的旧值，再求右边：readVlq 内部已经把 p 推进了
+           「长度字段自身占的字节数」，但返回值只是长度值，于是 p 少前进 1~2 字节。
+           每读一个 meta 就错位一点，最后把 EndOfTrack 的 0x2F 读成了数据字节
+           （现象：扫出 meta 0x00、却扫不到 0x2F）。短文件错位后可能碰巧再对上，
+           长的就露馅 —— 这类 bug 靠肉眼是看不出来的。 */
+        const len = readVlq();
+        p += len;
+      }else if(st === 0xf0 || st === 0xf7){
+        const len = readVlq();
+        p += len;
+      }else if(st === 0xc0 || st === 0xd0) p += 1;
+      else p += 2;
+    }
+    p = end;
+  }
+  return [...kinds];
+}
+
 (async () => {
   await new Promise(r => server.listen(PORT, "127.0.0.1", r));
   const browser = await chromium.launch({ executablePath: EXE, headless: true });
@@ -331,6 +370,84 @@ function check(name, cond, extra){
   await click('#tabbar button[data-p="play"]');
   await page.waitForTimeout(300);
   check("校准后演奏页开放", await page.isVisible("#playBody"));
+
+  /* ---------- 5a. 曲库：10 首分级样本 ----------
+     三个承诺必须机器验证，不能靠"生成的时候看过一眼"：
+       ① 样本里**没有指法信息**（指法由 buildPlan 现算）；
+       ② 网页内嵌的曲库与磁盘上的 .mid 是同一份字节；
+       ③ 曲库清单和 samples/ 目录不会各说各话。 */
+  console.log("\n=== 5a. 曲库（10 首分级样本）===");
+
+  const lib = await page.evaluate(() => SONG_LIB.map(s =>
+    ({ slug: s.slug, level: s.level, notes: s.notes, b64: s.b64 })));
+  check("曲库 10 首", lib.length === 10, lib.length + " 首");
+
+  const sampleDir = path.join(ROOT, "samples");
+  const cat = JSON.parse(fs.readFileSync(path.join(sampleDir, "catalog.json"), "utf8"));
+  const onDisk = fs.readdirSync(sampleDir)
+    .filter(f => f.endsWith(".mid") && f !== "two-tigers.mid")
+    .map(f => f.replace(/\.mid$/, "")).sort();
+  check("曲库清单与 samples/ 目录一一对应",
+    JSON.stringify(lib.map(s => s.slug).sort()) === JSON.stringify(onDisk),
+    "网页 " + lib.length + " 首 / 磁盘 " + onDisk.length + " 首");
+
+  const lvCount = {};
+  lib.forEach(s => { lvCount[s.level] = (lvCount[s.level] || 0) + 1; });
+  check("L1~L5 每级正好两首",
+    [1, 2, 3, 4, 5].every(l => lvCount[l] === 2), JSON.stringify(lvCount));
+
+  let sameBytes = 0;
+  const metaBad = [];
+  for(const s of lib){
+    const disk = fs.readFileSync(path.join(sampleDir, s.slug + ".mid"));
+    if(Buffer.from(s.b64, "base64").equals(disk)) sameBytes++;
+    const bad = metaKinds(disk).filter(k => !META_ALLOWED.includes(k));
+    if(bad.length) metaBad.push(s.slug + ":0x" + bad.map(x => x.toString(16)).join(","));
+  }
+  check("内嵌曲库与磁盘 .mid 逐字节一致", sameBytes === lib.length,
+    sameBytes + "/" + lib.length);
+  check("样本不含任何指法 meta（只允许 曲名/速度/拍号/结束）",
+    metaBad.length === 0, metaBad.length ? metaBad.join(" ") : "10/10 干净");
+
+  // 逐首从下拉加载，确认解析出的音符数和 catalog 对得上
+  const loaded = [];
+  for(let i = 0; i < lib.length; i++){
+    await page.$eval("#songLib", (el, k) => {
+      el.value = String(k); el.dispatchEvent(new Event("change"));
+    }, i);
+    await page.waitForTimeout(180);
+    loaded.push(await page.evaluate(() => ({
+      name: (S.midi && S.midi.name) || "", got: S.midi ? S.midi.notes.length : -1 })));
+  }
+  const miss = loaded.filter((r, i) => r.name !== lib[i].slug + ".mid").map(r => r.name || "(空)");
+  check("10 首都能从曲库下拉加载", miss.length === 0, miss.length ? miss.join(",") : "全部命中");
+  const mismatch = loaded.filter((r, i) => r.got !== cat.songs[i].notes);
+  check("解析出的音符数与 catalog.json 一致", mismatch.length === 0,
+    mismatch.length ? mismatch.map((r, i) => r.got).join(",") : "10/10 一致");
+
+  /* 音高对应模式：音域窄的曲子也要把 6 个槽位用满。
+     这条是**回归测试** —— 曾经 hi 兜底到 72、want 用 floor(ratio*6)，
+     《小星星》的 C D E F G A 只占满 4 根手指（E/F 挤在食指、小指全程闲着），
+     而这首曲子当初被选进来的理由恰恰是「6 个音 = 6 根手指」。 */
+  const star = await page.evaluate(() => {
+    const sel = document.querySelector("#songLib");
+    sel.value = "0";
+    sel.dispatchEvent(new Event("change"));
+    return new Promise(res => setTimeout(() => {
+      document.querySelector("#selMap").value = "pitch";
+      analyze();
+      const map = {};
+      S.plan.events.filter(e => e.on).forEach(e => { map[e.note] = e.slot; });
+      res({ used: S.plan.used, map });
+    }, 300));
+  });
+  check("音高对应：6 个音的曲子用满 6 根手指",
+    star.used.length === 6 && star.used.every(v => v > 0), JSON.stringify(star.used));
+  const pitches = Object.keys(star.map).map(Number).sort((a, b) => a - b);
+  check("音高对应：音越高、手指越靠小指侧",
+    pitches.every((n, i) => i === 0 || star.map[n] >= star.map[pitches[i - 1]]),
+    JSON.stringify(star.map));
+  await page.evaluate(() => { document.querySelector("#selMap").value = "rr"; analyze(); });
 
   // 内置示例：《两只老虎》—— 不选文件也应该能一键加载
   await click("#btnSample");

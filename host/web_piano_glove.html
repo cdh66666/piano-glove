@@ -386,10 +386,16 @@ pre#log .sys{color:#c9a5ff}
 <section class="page" id="p-play">
   <div class="card">
     <h2><span class="stepno">5</span>用 MIDI 驱动手套</h2>
-    <p class="desc">导入一个 MIDI 文件，手套会按它的节奏带动你的手指，让你感受原曲的速度和节拍。</p>
+    <p class="desc">导入一个 MIDI 文件，手套会按它的节奏带动你的手指，让你感受原曲的速度和节拍。曲库里的样本都<b>不含指法</b>——哪个音用哪根手指，是载入后现场算出来的。</p>
     <div class="gate" id="playGate"><b>先完成第 3 步和第 4 步</b>需要先校准并确认动作正常。</div>
 
     <div id="playBody" style="display:none">
+      <div class="row">
+        <label>曲库</label>
+        <select id="songLib" style="flex:1;min-width:220px"></select>
+      </div>
+      <p class="desc" id="songDesc" style="margin:0 0 10px">按级别从 L1 到 L5 排好了，挑一首直接载入。</p>
+
       <div class="drop" id="drop">把 <b>.mid</b> 文件拖到这里，或点一下选择文件</div>
       <input type="file" id="file" accept=".mid,.midi,audio/midi" style="display:none">
       <div class="row" style="margin-top:10px">
@@ -1973,20 +1979,24 @@ function buildPlan(notes, mode){
   const events = [];                 // {t, slot, on, vel, note, durMs}
   const droppedNotes = [];           // 被丢掉的音, 只在卷帘图上画灰影, 不产生动作
   const busyUntil = new Array(6).fill(-1);
-  const pitchRank  = new Array(6).fill(0);
   let dropped = 0;
   const used = new Array(6).fill(0);
 
-  /* 音高对应模式: 按音域把 6 个槽位排成从低到高的偏好序 */
-  const lo = Math.min(...notes.map(n => n.note), 60);
-  const hi = Math.max(...notes.map(n => n.note), 72);
+  /* 音高对应模式：把**本曲的实际音域**均分给 6 个槽位，低音落拇指侧、高音落小指侧。
+     这里有两个坑，都是实测才露出来的（《小星星》六个音本该一根手指一个，实际只占满 4 根）：
+       1. 不能兜底音域。曾经写 Math.max(hi, 72)，本是怕单音曲子除零，
+          结果《小星星》只跨 9 个半音却被撑到 12，六个音全挤在低音区，小指全程闲着。
+       2. 不能 floor(ratio * 6)。最高音会算成 6，再被 min(5, …) 压回 5，
+          正好和倒数第二个音撞在同一根手指上。两端要落在 0 和 5，就得 round(ratio * 5)。 */
+  const lo = Math.min(...notes.map(n => n.note));
+  const hi = Math.max(...notes.map(n => n.note));
   const span = Math.max(1, hi - lo);
 
   let lastSlot = -1;
   for(const n of notes){
     let slot = -1;
     if(mode === "pitch"){
-      const want = Math.min(5, Math.floor((n.note - lo) / span * 6));
+      const want = Math.max(0, Math.min(5, Math.round((n.note - lo) / span * 5)));
       slot = pickFree(busyUntil, n.t, want);
     }else{
       slot = pickFree(busyUntil, n.t, (lastSlot + 1) % 6);
@@ -2055,6 +2065,93 @@ function b64ToFile(b64, name){
   return new File([u8], name, {type: "audio/midi"});
 }
 $("#btnSample").onclick = () => loadMidiFile(b64ToFile(SAMPLE_MIDI_B64, "两只老虎.mid"));
+
+/* ---------- 5.3b 曲库 ----------
+   十首分级样本，L1 入门 → L5 挑战。**这些样本里没有任何指法信息**：
+   每个文件只含「曲名/速度/拍号/音符」，手指分配是载入后由 buildPlan() 现算的，
+   所以同一首曲子切换「轮流分配 / 音高对应」会得到两套完全不同的指法。
+   指法表（跑真实分配算法导出的那份）见 host/samples/FINGERING.md。 */
+/* === SONG LIB BEGIN === */
+const SONG_LIB = [
+  {slug:"twinkle", title:"小星星", level:1, levelName:"入门", bpm:100, timesig:[4,4],
+   notes:42, seconds:28.8, beats:48.0,
+   tests:"编号核对 · 一音对一指", desc:"旋律只用 C D E F G A 六个音，正好一个音一根手指。拿来核对「编号 ↔ 手指」最合适：听哪个音不对，就知道哪根手指编错了。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABnwD/AwnlsI/mmJ/mmJ8A/1EDCSfAAP9YBAQCGAgAkDxkgwCAPABgkDxkgwCAPABgkENkgwCAQwBgkENkgwCAQwBgkEVkgwCARQBgkEVkgwCARQBgkENkhgCAQwCBQJBBZIMAgEEAYJBBZIMAgEEAYJBAZIMAgEAAYJBAZIMAgEAAYJA+ZIMAgD4AYJA+ZIMAgD4AYJA8ZIYAgDwAgUCQQ2SDAIBDAGCQQ2SDAIBDAGCQQWSDAIBBAGCQQWSDAIBBAGCQQGSDAIBAAGCQQGSDAIBAAGCQPmSGAIA+AIFAkENkgwCAQwBgkENkgwCAQwBgkEFkgwCAQQBgkEFkgwCAQQBgkEBkgwCAQABgkEBkgwCAQABgkD5khgCAPgCBQJA8ZIMAgDwAYJA8ZIMAgDwAYJBDZIMAgEMAYJBDZIMAgEMAYJBFZIMAgEUAYJBFZIMAgEUAYJBDZIYAgEMAgUCQQWSDAIBBAGCQQWSDAIBBAGCQQGSDAIBAAGCQQGSDAIBAAGCQPmSDAIA+AGCQPmSDAIA+AGCQPGSGAIA8AAD/LwA="},
+  {slug:"mary", title:"玛丽有只小羊羔", level:1, levelName:"入门", bpm:110, timesig:[4,4],
+   notes:26, seconds:17.5, beats:32.0,
+   tests:"起停干净 · 不粘键", desc:"同样六个音，但要求每个音独立起停 —— 考验「按一下、完全抬起、再按下一个」这个最基本的动作序列会不会粘键。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABGQD/AxXnjpvkuL3mnInlj6rlsI/nvornvpQA/1EDCFKuAP9YBAQCGAgAkEBkgwCAQABgkD5kgwCAPgBgkDxkgwCAPABgkD5kgwCAPgBgkEBkgwCAQABgkEBkgwCAQABgkEBkhgCAQACBQJA+ZIMAgD4AYJA+ZIMAgD4AYJA+ZIYAgD4AgUCQQGSDAIBAAGCQQ2SDAIBDAGCQQ2SGAIBDAIFAkEBkgwCAQABgkD5kgwCAPgBgkDxkgwCAPABgkD5kgwCAPgBgkEBkgwCAQABgkEBkgwCAQABgkEBkgwCAQABgkEBkgwCAQABgkD5kgwCAPgBgkD5kgwCAPgBgkEBkgwCAQABgkD5kgwCAPgBgkDxkjACAPAAA/y8A"},
+  {slug:"ode-to-joy", title:"欢乐颂", level:2, levelName:"简单", bpm:108, timesig:[4,4],
+   notes:30, seconds:17.8, beats:32.0,
+   tests:"附点节奏 · 时值区分", desc:"音阶级进为主，加入了附点节奏（1.5 拍 + 0.5 拍）。附点会让两个相邻音的间隔明显不一样，能看出节奏有没有被固件拖平。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABMQD/AwnmrKLkuZDpooIA/1EDCHojAP9YBAQCGAgAkEBkgwCAQABgkEBkgwCAQABgkEFkgwCAQQBgkENkgwCAQwBgkENkgwCAQwBgkEFkgwCAQQBgkEBkgwCAQABgkD5kgwCAPgBgkDxkgwCAPABgkDxkgwCAPABgkD5kgwCAPgBgkEBkgwCAQABgkEBkhECAQACBEJA+ZIFAgD4AMJA+ZIYAgD4AgUCQQGSDAIBAAGCQQGSDAIBAAGCQQWSDAIBBAGCQQ2SDAIBDAGCQQ2SDAIBDAGCQQWSDAIBBAGCQQGSDAIBAAGCQPmSDAIA+AGCQPGSDAIA8AGCQPGSDAIA8AGCQPmSDAIA+AGCQQGSDAIBAAGCQPmSEQIA+AIEQkDxkgUCAPAAwkDxkhgCAPAAA/y8A"},
+  {slug:"london-bridge", title:"伦敦桥", level:2, levelName:"简单", bpm:112, timesig:[4,4],
+   notes:24, seconds:17.1, beats:32.0,
+   tests:"级进分配 · 略快速度", desc:"级进旋律 + 一次跨四度的跳进。速度稍快，看分配算法在相邻音之间会不会来回抢同一根手指。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAAA/QD/AwnkvKbmlabmoaUA/1EDCCyiAP9YBAQCGAgAkENkgwCAQwBgkEVkgwCARQBgkENkgwCAQwBgkEFkgwCAQQBgkEBkgwCAQABgkEFkgwCAQQBgkENkhgCAQwCBQJA+ZIMAgD4AYJBAZIMAgEAAYJBBZIYAgEEAgUCQQGSDAIBAAGCQQWSDAIBBAGCQQ2SGAIBDAIFAkENkgwCAQwBgkEVkgwCARQBgkENkgwCAQwBgkEFkgwCAQQBgkEBkgwCAQABgkEFkgwCAQQBgkENkhgCAQwCBQJA+ZIMAgD4AYJBDZIMAgEMAYJBAZIYAgEAAgUCQPGSMAIA8AAD/LwA="},
+  {slug:"jingle-bells", title:"铃儿响叮当", level:3, levelName:"初级", bpm:120, timesig:[4,4],
+   notes:25, seconds:16.0, beats:32.0,
+   tests:"同音反复 · 漏音检测", desc:"开头是连续的同音反复（E E E / E E E）。同音反复是最好抓的漏音场景：少一下马上就听得出来。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABCwD/Aw/pk4PlhL/lk43lj67lvZMA/1EDB6EgAP9YBAQCGAgAkEBkgwCAQABgkEBkgwCAQABgkEBkhgCAQACBQJBAZIMAgEAAYJBAZIMAgEAAYJBAZIYAgEAAgUCQQGSDAIBAAGCQQ2SDAIBDAGCQPGSDAIA8AGCQPmSDAIA+AGCQQGSMAIBAAIMAkEFkgwCAQQBgkEFkgwCAQQBgkEFkgwCAQQBgkEFkgwCAQQBgkEFkgwCAQQBgkEBkgwCAQABgkEBkgwCAQABgkEBkgwCAQABgkEBkgwCAQABgkD5kgwCAPgBgkD5kgwCAPgBgkEBkgwCAQABgkD5khgCAPgCBQJBDZIYAgEMAAP8vAA=="},
+  {slug:"silent-night", title:"平安夜", level:3, levelName:"初级", bpm:96, timesig:[3,4],
+   notes:35, seconds:33.8, beats:54.0,
+   tests:"3/4 拍 · 长音保持", desc:"3/4 拍，附点 + 长音交替。长音期间手指是闲着的，可以观察手套能不能在长音里安静待住、不发抖。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABbAD/AwnlubPlronlpJwA/1EDCYloAP9YBAMCGAgAkENkhECAQwCBEJBFZIFAgEUAMJBDZIMAgEMAYJBAZIkAgEAAgiCQQ2SEQIBDAIEQkEVkgUCARQAwkENkgwCAQwBgkEBkiQCAQACCIJBKZIYAgEoAgUCQSmSDAIBKAGCQR2SJAIBHAIIgkEhkhgCASACBQJBIZIMAgEgAYJBDZIkAgEMAgiCQRWSGAIBFAIFAkEVkgwCARQBgkEhkhECASACBEJBHZIFAgEcAMJBFZIMAgEUAYJBDZIYAgEMAgUCQQ2SDAIBDAGCQRWSEQIBFAIEQkENkgUCAQwAwkEBkgwCAQABgkEhkhgCASACBQJBIZIMAgEgAYJBKZIRAgEoAgRCQR2SBQIBHADCQQ2SDAIBDAGCQRWSJAIBFAIIgkENkhECAQwCBEJBFZIFAgEUAMJBDZIMAgEMAYJBAZIkAgEAAgiCQSGSJAIBIAAD/LwA="},
+  {slug:"fur-elise", title:"致爱丽丝", level:4, levelName:"中级", bpm:100, timesig:[3,4],
+   notes:35, seconds:12.0, beats:20.0,
+   tests:"半音邻音 · 宽音域", desc:"半音邻音（E–D#–E）密集出现，音域从 C4 拉到 E5。半音相邻的两个音在「音高对应」分配下会落到相邻手指，是分配质量的分水岭。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABXgD/Awzoh7TniLHkuL3kuJ0A/1EDCSfAAP9YBAMCGAgAkExkgUCATAAwkEtkgUCASwAwkExkgUCATAAwkEtkgUCASwAwkExkgUCATAAwkEdkgUCARwAwkEpkgUCASgAwkEhkgUCASAAwkEVkgUCARQAwkDxkgUCAPAAwkEBkgUCAQAAwkEVkgUCARQAwkEdkgUCARwAwkEBkgUCAQAAwkERkgUCARAAwkEdkgUCARwAwkEhkgUCASAAwkEBkgUCAQAAwkExkgUCATAAwkEtkgUCASwAwkExkgUCATAAwkEtkgUCASwAwkExkgUCATAAwkEdkgUCARwAwkEpkgUCASgAwkEhkgUCASAAwkEVkgUCARQAwkDxkgUCAPAAwkEBkgUCAQAAwkEVkgUCARQAwkEdkgUCARwAwkEBkgUCAQAAwkEhkgUCASAAwkEdkgUCARwAwkEVkiQCARQAA/y8A"},
+  {slug:"canon", title:"卡农", level:4, levelName:"中级", bpm:84, timesig:[4,4],
+   notes:24, seconds:35.7, beats:50.0,
+   tests:"基准线 · 应当零丢音", desc:"每音两拍，音域跨 C#4~F#5。音符少、间隔大，是不丢音的基准线 ——如果连它都丢音，说明问题不在速度，而在分配或通信。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAABDAD/AwbljaHlhpwA/1EDCuYtAP9YBAQCGAgAkE5khgCATgCBQJBMZIYAgEwAgUCQSmSGAIBKAIFAkElkhgCASQCBQJBHZIYAgEcAgUCQRWSGAIBFAIFAkEdkhgCARwCBQJBJZIYAgEkAgUCQSmSGAIBKAIFAkElkhgCASQCBQJBHZIYAgEcAgUCQRWSGAIBFAIFAkENkhgCAQwCBQJBCZIYAgEIAgUCQQ2SGAIBDAIFAkEBkhgCAQACBQJBCZIYAgEIAgUCQQGSGAIBAAIFAkD5khgCAPgCBQJA9ZIYAgD0AgUCQPmSGAIA+AIFAkEBkhgCAQACBQJBCZIYAgEIAgUCQQmSMAIBCAAD/LwA="},
+  {slug:"moonlight", title:"月光奏鸣曲（一）", level:5, levelName:"挑战", bpm:50, timesig:[4,4],
+   notes:104, seconds:38.4, beats:32.0,
+   tests:"三连音密集 · 和弦同响 · 预期丢音", desc:"连绵不断的三连音 + 左手低音同响，全曲没有一处空隙，手指一直在动。它会稳定地丢掉一部分音 —— 这正是设计目标：保住节奏、主动降级，绝不卡住。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAADzwD/AxjmnIjlhYnlpY/puKPmm7LvvIjkuIDvvIkA/1EDEk+AAP9YBAQCGAgAkDhkAJAxZIEgkD1kgQCAPQAgkEBkgQCAQAAggDgAAIAxAACQOGSBAIA4ACCQPWSBAIA9ACCQQGSBAIBAACCQOGSBAIA4ACCQPWSBAIA9ACCQQGSBAIBAACCQOGSBAIA4ACCQPWSBAIA9ACCQQGSBAIBAACCQOGQAkDFkgSCQPWSBAIA9ACCQQGSBAIBAACCAOAAAgDEAAJA4ZIEAgDgAIJA9ZIEAgD0AIJBAZIEAgEAAIJA4ZIEAgDgAIJA9ZIEAgD0AIJBAZIEAgEAAIJA4ZIEAgDgAIJA9ZIEAgD0AIJBAZIEAgEAAIJA0ZACQLWSBIJA5ZIEAgDkAIJA9ZIEAgD0AIIA0AACALQAAkDRkgQCANAAgkDlkgQCAOQAgkD1kgQCAPQAgkDRkgQCANAAgkDlkgQCAOQAgkD1kgQCAPQAgkDRkgQCANAAgkDlkgQCAOQAgkD1kgQCAPQAgkDRkAJAtZIEgkDlkgQCAOQAgkD1kgQCAPQAggDQAAIAtAACQNGSBAIA0ACCQOWSBAIA5ACCQPWSBAIA9ACCQNGSBAIA0ACCQOWSBAIA5ACCQPWSBAIA9ACCQNGSBAIA0ACCQOWSBAIA5ACCQPWSBAIA9ACCQPWQAkCpkgSCQQmSBAIBCACCQRWSBAIBFACCAPQAAgCoAAJA9ZIEAgD0AIJBCZIEAgEIAIJBFZIEAgEUAIJA9ZIEAgD0AIJBCZIEAgEIAIJBFZIEAgEUAIJA9ZIEAgD0AIJBCZIEAgEIAIJBFZIEAgEUAIJA9ZACQKmSBIJBCZIEAgEIAIJBFZIEAgEUAIIA9AACAKgAAkD1kgQCAPQAgkEJkgQCAQgAgkEVkgQCARQAgkD1kgQCAPQAgkEJkgQCAQgAgkEVkgQCARQAgkD1kgQCAPQAgkEJkgQCAQgAgkEVkgQCARQAgkDtkAJAsZIEgkD9kgQCAPwAgkERkgQCARAAggDsAAIAsAACQO2SBAIA7ACCQP2SBAIA/ACCQRGSBAIBEACCQO2SBAIA7ACCQP2SBAIA/ACCQRGSBAIBEACCQO2SBAIA7ACCQP2SBAIA/ACCQRGSBAIBEACCQO2QAkCxkgSCQP2SBAIA/ACCQRGSBAIBEACCAOwAAgCwAAJA7ZIEAgDsAIJA/ZIEAgD8AIJBEZIEAgEQAIJA7ZIEAgDsAIJA/ZIEAgD8AIJBEZIEAgEQAIJA7ZIEAgDsAIJA/ZIEAgD8AIJBEZIEAgEQAAP8vAA=="},
+  {slug:"revolutionary", title:"革命练习曲", level:5, levelName:"挑战", bpm:160, timesig:[4,4],
+   notes:240, seconds:12.0, beats:32.0,
+   tests:"多声部叠加 · 同时音最多 · 命令速率上限", desc:"肖邦 Op.10 No.12 的开头动机：左手十六分音符琶音全程不停，右手每拍一记柱式和弦。**10 首里唯一真正「音比手多」的样本** —— 拍点上同时响 5 个音，约 21 个音/秒、峰值 40+ 条命令/秒，专门用来压固件的命令速率上限。",
+   b64:"TVRoZAAAAAYAAAABAeBNVHJrAAAHpgD/Aw/pnanlkb3nu4PkuaDmm7IA/1EDBbjYAP9YBAQCGAgAkDBkAJA8ZACQP2QAkENkAJBIZGCAMAAAgDwAAIA/AACAQwAAgEgAGJAzZGCAMwAYkDdkYIA3ABiQPGRggDwAGJA/ZACQPGQAkENkAJBIZGCAPwAAgDwAAIBDAACASAAYkENkYIBDABiQSGRggEgAGJBLZGCASwAYkEtkAJA8ZACQP2QAkENkAJBIZGCASwAAgDwAAIA/AACAQwAAgEgAGJBIZGCASAAYkENkYIBDABiQP2RggD8AGJA8ZACQP2QAkENkAJBIZGCAPAAAgD8AAIBDAACASAAYkDdkYIA3ABiQM2RggDMAGJAwZGCAMAAYkCxkAJA4ZACQPGQAkD9kAJBEZGCALAAAgDgAAIA8AACAPwAAgEQAGJAwZGCAMAAYkDNkYIAzABiQOGRggDgAGJA8ZACQOGQAkD9kAJBEZGCAPAAAgDgAAIA/AACARAAYkD9kYIA/ABiQRGRggEQAGJBIZGCASAAYkEhkAJA4ZACQPGQAkD9kAJBEZGCASAAAgDgAAIA8AACAPwAAgEQAGJBEZGCARAAYkD9kYIA/ABiQPGRggDwAGJA4ZACQPGQAkD9kAJBEZGCAOAAAgDwAAIA/AACARAAYkDNkYIAzABiQMGRggDAAGJAsZGCALAAYkCtkAJA3ZACQO2QAkD5kAJBDZGCAKwAAgDcAAIA7AACAPgAAgEMAGJAvZGCALwAYkDJkYIAyABiQN2RggDcAGJA7ZACQN2QAkD5kAJBDZGCAOwAAgDcAAIA+AACAQwAYkD5kYIA+ABiQQ2RggEMAGJBHZGCARwAYkEdkAJA3ZACQO2QAkD5kAJBDZGCARwAAgDcAAIA7AACAPgAAgEMAGJBDZGCAQwAYkD5kYIA+ABiQO2RggDsAGJA3ZACQO2QAkD5kAJBDZGCANwAAgDsAAIA+AACAQwAYkDJkYIAyABiQL2RggC8AGJArZGCAKwAYkDBkAJA8ZACQP2QAkENkAJBIZGCAMAAAgDwAAIA/AACAQwAAgEgAGJAzZGCAMwAYkDdkYIA3ABiQPGRggDwAGJA/ZACQPGQAkENkAJBIZGCAPwAAgDwAAIBDAACASAAYkENkYIBDABiQSGRggEgAGJBLZGCASwAYkEtkAJA8ZACQP2QAkENkAJBIZGCASwAAgDwAAIA/AACAQwAAgEgAGJBIZGCASAAYkENkYIBDABiQP2RggD8AGJA8ZACQP2QAkENkAJBIZGCAPAAAgD8AAIBDAACASAAYkDdkYIA3ABiQM2RggDMAGJAwZGCAMAAYkDBkAJA8ZACQP2QAkENkAJBIZGCAMAAAgDwAAIA/AACAQwAAgEgAGJAzZGCAMwAYkDdkYIA3ABiQPGRggDwAGJA/ZACQPGQAkENkAJBIZGCAPwAAgDwAAIBDAACASAAYkENkYIBDABiQSGRggEgAGJBLZGCASwAYkEtkAJA8ZACQP2QAkENkAJBIZGCASwAAgDwAAIA/AACAQwAAgEgAGJBIZGCASAAYkENkYIBDABiQP2RggD8AGJA8ZACQP2QAkENkAJBIZGCAPAAAgD8AAIBDAACASAAYkDdkYIA3ABiQM2RggDMAGJAwZGCAMAAYkCxkAJA4ZACQPGQAkD9kAJBEZGCALAAAgDgAAIA8AACAPwAAgEQAGJAwZGCAMAAYkDNkYIAzABiQOGRggDgAGJA8ZACQOGQAkD9kAJBEZGCAPAAAgDgAAIA/AACARAAYkD9kYIA/ABiQRGRggEQAGJBIZGCASAAYkEhkAJA4ZACQPGQAkD9kAJBEZGCASAAAgDgAAIA8AACAPwAAgEQAGJBEZGCARAAYkD9kYIA/ABiQPGRggDwAGJA4ZACQPGQAkD9kAJBEZGCAOAAAgDwAAIA/AACARAAYkDNkYIAzABiQMGRggDAAGJAsZGCALAAYkCtkAJA3ZACQO2QAkD5kAJBDZGCAKwAAgDcAAIA7AACAPgAAgEMAGJAvZGCALwAYkDJkYIAyABiQN2RggDcAGJA7ZACQN2QAkD5kAJBDZGCAOwAAgDcAAIA+AACAQwAYkD5kYIA+ABiQQ2RggEMAGJBHZGCARwAYkEdkAJA3ZACQO2QAkD5kAJBDZGCARwAAgDcAAIA7AACAPgAAgEMAGJBDZGCAQwAYkD5kYIA+ABiQO2RggDsAGJA3ZACQO2QAkD5kAJBDZGCANwAAgDsAAIA+AACAQwAYkDJkYIAyABiQL2RggC8AGJArZGCAKwAYkDBkAJA8ZACQP2QAkENkAJBIZGCAMAAAgDwAAIA/AACAQwAAgEgAGJAzZGCAMwAYkDdkYIA3ABiQPGRggDwAGJA/ZACQPGQAkENkAJBIZGCAPwAAgDwAAIBDAACASAAYkENkYIBDABiQSGRggEgAGJBLZGCASwAYkEtkAJA8ZACQP2QAkENkAJBIZGCASwAAgDwAAIA/AACAQwAAgEgAGJBIZGCASAAYkENkYIBDABiQP2RggD8AGJA8ZACQP2QAkENkAJBIZGCAPAAAgD8AAIBDAACASAAYkDdkYIA3ABiQM2RggDMAGJAwZGCAMAAA/y8A"}
+];
+/* === SONG LIB END === */
+
+function fillSongLib(){
+  const sel = $("#songLib");
+  sel.innerHTML = "";
+  let last = -1, grp = null;
+  SONG_LIB.forEach((s, i) => {
+    if(s.level !== last){                       // 按级别分组，一眼看出难度
+      last = s.level;
+      grp = document.createElement("optgroup");
+      grp.label = "L" + s.level + " " + s.levelName;
+      sel.appendChild(grp);
+    }
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = s.title + "　" + s.bpm + " BPM　" + s.notes + " 音";
+    grp.appendChild(o);
+  });
+}
+function songDescHtml(s){
+  return "<b>L" + s.level + " " + s.levelName + " · " + s.title + "</b>"
+       + "　" + s.bpm + " BPM " + s.timesig[0] + "/" + s.timesig[1]
+       + "　" + s.notes + " 个音　" + s.seconds + " 秒"
+       + "<br><span style='color:var(--sub)'>测试点：" + s.tests + "</span>"
+       + "<br>" + s.desc;
+}
+fillSongLib();
+if(SONG_LIB.length){
+  $("#songLib").value = "0";
+  $("#songDesc").innerHTML = songDescHtml(SONG_LIB[0]);
+}
+$("#songLib").onchange = () => {
+  const s = SONG_LIB[+$("#songLib").value];
+  if(!s) return;
+  $("#songDesc").innerHTML = songDescHtml(s);
+  S.songSlug = s.slug;
+  loadMidiFile(b64ToFile(s.b64, s.slug + ".mid"));
+};
 
 async function loadMidiFile(f){
   $("#midiMsg").style.display = "block";
