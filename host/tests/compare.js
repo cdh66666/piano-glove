@@ -37,7 +37,10 @@ const server = http.createServer((req,res)=>{
   const b = await chromium.launch({ executablePath: EXE, headless:true });
   const pg = await b.newPage();
   pg.on("pageerror", e => console.log("PAGEERROR:", e.message));
-  await pg.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html`);
+/* ?sim=1：调试台已经**没有**模拟模式入口了，串口默认走本机 bridge。
+   这些脚本跑在没有桥的环境里（静态服务器 / file://），必须用这个自测后门
+   让页面内置的假固件顶替串口，否则连接页会停在一个红色的"找不到串口服务"上。 */
+  await pg.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html?sim=1`);
   await pg.waitForTimeout(300);
 
   const buf = fs.readFileSync(path.join(HERE, "test.mid"));

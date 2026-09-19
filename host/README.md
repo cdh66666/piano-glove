@@ -8,23 +8,60 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| **`web_piano_glove.html`** ★ | **分页式调试台（当前主用）**。底部导航 6 个页面：连接 / 编号 / 校准 / 试动作 / 演奏 / 日志。内置模拟固件，无硬件也能走完全流程；含 MIDI 导入与演奏引擎 |
-| **`glove_fw.py`** | PIANO_GLOVE 协议的 Python 封装 + CLI |
+| **`bridge.py`** ★ | **本地串口桥（跑调试台必须先起它）**。pyserial 在本机进程里开串口，同时把 `host/` 当静态站点托管，页面只发 HTTP。自动枚举串口 → 按芯片打分 → 逐个问 `INFO` → 谁答连谁；热插拔自己重连。这样**侧边栏浏览器 / 内嵌 WebView 也能连板子**（它们没有 `navigator.serial`） |
+| **`web_piano_glove.html`** ★ | **分页式调试台（当前主用）**。底部导航 6 个页面：连接 / 编号 / 校准 / 试动作 / 演奏 / 日志。含 MIDI 导入与演奏引擎 |
+| **`start-debug.bat`** | 一键：缺 pyserial 自动装 → 起桥 → 打开浏览器 |
+| **`glove_fw.py`** | PIANO_GLOVE 协议的 Python 封装 + CLI（命令行直接操作板子走这条） |
 | **`assign_ids.py`** | 舵机编号向导（命令行版，全自动，只需插拔舵机）。支持 `--from N` 断点续跑；内含串口异常自动恢复、`SCAN` 不可靠改用逐个 `PING`、改号后等待重启复核等实战逻辑 |
 | `live.html` | 编号向导的实时进度网页，读 `assign_log.txt`，1.5s 自动刷新 |
 | `assign_log.txt` | 编号向导运行日志，含固件回复原文 —— **协议逆向的第一手证据，勿删** |
-| `tests/` | 无硬件自测脚本（端到端流程 + MIDI 解析器交叉验证），见 [tests/README.md](tests/README.md) |
+| `tests/` | 自测脚本（串口桥 + 页面端到端 + MIDI 解析器交叉验证），见 [tests/README.md](tests/README.md) |
 | `samples/` | **10 首分级演奏样本**（L1 入门 → L5 挑战）+ 自动指法表，见 [samples/README.md](samples/README.md) |
 | `scservo_sdk/` | 飞特官方 Python SDK（原始 SCS/STS 协议用）。注意 `sc.PacketHandler` 在新版已移除，应使用 `sc.sms_sts(portHandler)` |
 | `legacy/` | ⚠️ **与当前固件不兼容**，见下 |
 
+## 串口为什么不在页面里
+
+页面想开串口只有 Web Serial（`navigator.serial`）。它要求：电脑版 Chrome/Edge + 安全上下文。
+落到实际使用上就是：
+
+- 侧边栏浏览器 / 内嵌 WebView / 微信内置浏览器 → **没有这个 API**，点「连接」永远没反应；
+- 每次连接都要弹系统级的选口框 → 没法"自动选推荐口"；
+- 双击 `.html` 走 `file://` → 直接没有。
+
+所以 `bridge.py` 把串口搬到了 Python 侧。页面只跟 `127.0.0.1:8123` 说 HTTP，
+**用什么浏览器都能用**，而且选口这件事完全不用用户操心。
+
+### 桥的 HTTP API
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/status` | 桥/串口状态 + 端口清单（含打分与理由）+ 推荐口 |
+| `GET /api/lines?since=N&wait=S` | 长轮询拉异步行（`RATE_DONE` 这类"过一会儿才吐"的回复靠它） |
+| `POST /api/scan` | 重扫串口 |
+| `POST /api/connect` | `{}` = 自动挑推荐口；`{"port":"COM4"}` = 指定 |
+| `POST /api/disconnect` | 断开，并**暂停**自动重连（否则前脚断开后脚又连回来） |
+| `POST /api/send` | `{cmd,timeoutMs,quietMs,since}` → `{pre,lines,first,ms,seq}` |
+| `POST /api/fire` | 只发不等（整曲演奏时用，不能被固件延迟卡住） |
+
+`pre` 是「命令发出前就已经在缓冲里的行」（板子上电主动上报的 `BOOT` 之类），
+单独还给页面，免得混进命令回复里。
+
+安全上只 bind `127.0.0.1`，并校验 `Origin`：**别的网站发起的跨站请求一律 403** ——
+不然随手打开的某个网页就能 POST `/api/fire` 去拧你的舵机。
+
+> 降级路径：桥不在时页面会明确告诉你去跑 `start-debug.bat`，并留一个「改用浏览器内置串口直连」的按钮。
+> 那是真串口（Web Serial），不是模拟，只是要求 Chrome/Edge。
+
 ## 调试台怎么用
 
-打开 `web_piano_glove.html`，底部 6 个页面按顺序走一遍就是完整流程。没接硬件时选「模拟模式」，全流程一样能跑通。
+先双击 `start-debug.bat` 把桥起起来，浏览器打开它给的地址。底部 6 个页面按顺序走一遍就是完整流程。
+
+**第 1 页不用做任何事**：桥会自动找到板子并连上，页面只是把状态画出来。
 
 | 页面 | 做什么 | 过关标志 |
 | --- | --- | --- |
-| 1 连接 | 选模拟 / 实机，点连接，读 INFO，把档位设成 `STS3032` | 顶栏「已连接」，档位显示「正确」 |
+| 1 连接 | 什么都不用点（自动扫描 + 自动连接）；确认档位是 `STS3032` | 顶栏「已连接 COMx」、状态块打绿勾、档位显示「正确」 |
 | 2 编号 | **一次只插一个舵机**，轮流改成 1~6 号并贴标签 | 6 个进度点全绿 |
 | 3 校准 | 先把 6 个舵机接回总线确认全在线，再采样活动手指 | 顶栏「已校准」 |
 | 4 试动作 | 使能后逐个「按一下」，核对编号↔手指、按压方向 | 每根手指动作正确 |
@@ -51,7 +88,10 @@
 > 实现细节：`Transport.send()` 收到第一行回复后，只要 **140ms** 安静就立即返回，
 > 不再死等 `timeoutMs`。计时写进 `T.last = {first, ms, lines}`，`first` 就是往返延迟。
 > 这个改动同时让编号向导这类连续命令的操作快了一个数量级。
-> 模拟模式下延迟是假的（固定 24ms），界面上会明确标出来，别拿模拟数字下结论。
+>
+> 走本地桥时这套收尾逻辑在 `bridge.py` 的 `Bridge.send()` 里（同样是"第一行之后安静
+> `quietMs` 就收工"），页面只是把 `first/ms/lines` 搬过来用 —— 所以测速卡和演奏调度的
+> 判据在桥模式下没有变味。
 
 ## 演奏页（MIDI → 手套）
 
@@ -147,10 +187,15 @@ python glove_fw.py raw "CAL STATUS"      # 发任意命令
 网页调试台：
 
 ```bash
-python -m http.server 8123 --bind 127.0.0.1
-# 浏览器打开 http://localhost:8123/web_piano_glove.html
-# 实机模式需 Chrome / Edge，波特率固定 115200
+python bridge.py                       # 起串口桥（自动扫描 + 自动连接），127.0.0.1:8123
+# 浏览器打开 http://127.0.0.1:8123/web_piano_glove.html
+# 或者直接双击 start-debug.bat，它会顺带把 pyserial 装上、把浏览器打开
+
+python bridge.py --url COM4            # 写死某个串口
+python bridge.py --no-auto             # 只提供 API，不自动连（手动用 /api/connect）
 ```
+
+波特率固定 **115200**。
 
 ## 写客户端时要注意的几条
 

@@ -38,7 +38,10 @@ const server = http.createServer((req,res)=>{
   const b = await chromium.launch({ executablePath: EXE, headless:true });
   const pg = await b.newPage({ viewport:{width:430,height:860}, deviceScaleFactor:2 });
   pg.on("pageerror", e=>console.log("PAGEERROR:", e.message));
-  await pg.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html`);
+/* ?sim=1：调试台已经**没有**模拟模式入口了，串口默认走本机 bridge。
+   这些脚本跑在没有桥的环境里（静态服务器 / file://），必须用这个自测后门
+   让页面内置的假固件顶替串口，否则连接页会停在一个红色的"找不到串口服务"上。 */
+  await pg.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html?sim=1`);
   await pg.waitForTimeout(300);
   const shot = n => pg.screenshot({ path: path.join(OUT, n + ".png") });   // 视口截图
 
@@ -83,7 +86,7 @@ const server = http.createServer((req,res)=>{
 
   // 窄屏手机尺寸检查
   const m = await b.newPage({ viewport:{width:360,height:740}, deviceScaleFactor:2 });
-  await m.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html`);
+  await m.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html?sim=1`);
   await m.waitForTimeout(400);
   await m.screenshot({ path: path.join(OUT,"v8-mobile-connect.png") });
   const hScroll = await m.evaluate(()=> document.documentElement.scrollWidth > window.innerWidth + 1);

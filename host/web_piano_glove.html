@@ -138,13 +138,31 @@ pre#log .sys{color:#c9a5ff}
 .warnbox b{font-weight:600}
 .gate{background:#f2f5f8;border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;color:var(--sub);font-size:13.5px}
 .gate b{display:block;color:var(--ink);font-size:14.5px;font-weight:600;margin-bottom:4px}
+/* 串口自动扫描状态块 */
+.scanbox{display:flex;gap:11px;align-items:center;background:#f2f5f8;border:1px solid var(--line);
+  border-radius:12px;padding:13px 14px;margin-bottom:12px}
+.scanbox.ok{background:#eef8f0;border-color:#bfe3c7}
+.scanbox.bad{background:#fdf0f0;border-color:#f0c8c8}
+.scanbox b{display:block;font-size:14.5px;color:var(--ink);margin-bottom:2px}
+.scanbox .s{font-size:12.5px;color:var(--sub);line-height:1.5}
+.spin{width:18px;height:18px;flex:0 0 18px;border:2.5px solid #c7d2dd;border-top-color:#1a6ef0;
+  border-radius:50%;animation:sp .8s linear infinite}
+.scanbox.ok .spin,.scanbox.bad .spin{animation:none;border-color:transparent;font-size:16px;
+  width:auto;height:auto;flex:none}
+.scanbox.ok .spin:after{content:"✔";color:#2f9e44}
+.scanbox.bad .spin:after{content:"✕";color:#e5484d}
+@keyframes sp{to{transform:rotate(360deg)}}
+.portrow{font-size:12.5px}
+.portrow .tag{display:inline-block;padding:1px 6px;border-radius:5px;font-size:11px;margin-right:5px}
+.portrow .tag.rec{background:#e6f0ff;color:#1a6ef0}
+.portrow .tag.no{background:#f0f0f0;color:#8a97a4}
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="t1">钢琴手套 · 调试台
-    <span class="chip" id="cMode">模拟模式</span></div>
+    <span class="chip" id="cMode">未通路</span></div>
   <div class="t2">微雪 ESP32 主控板 + 6 × Feetech STS3032 舵机　·　USB 串口 115200</div>
   <div class="chips">
     <span class="chip bad" id="cConn">未连接</span>
@@ -160,24 +178,41 @@ pre#log .sys{color:#c9a5ff}
 <section class="page active" id="p-connect">
   <div class="card">
     <h2><span class="stepno">1</span>连接设备</h2>
-    <p class="desc">先选一种模式。不知道选哪个就用「模拟模式」，它不需要任何硬件，可以把后面所有步骤走一遍。</p>
+    <p class="desc">不用选串口、不用点连接 —— 页面会自己找到手套主板并连上。</p>
+
+    <div class="scanbox" id="scanBox">
+      <div class="spin"></div>
+      <div>
+        <b id="scanTitle">正在检查本地串口服务…</b>
+        <div class="s" id="scanSub"></div>
+      </div>
+    </div>
 
     <div class="row">
-      <button id="mSim" class="primary" style="flex:1">模拟模式<span style="display:block;font-size:11.5px;opacity:.85">无需硬件</span></button>
-      <button id="mReal" style="flex:1">实机模式<span style="display:block;font-size:11.5px;color:var(--sub)">接真板子</span></button>
+      <button id="btnConn" class="primary big">重新扫描并连接</button>
+      <button id="btnBridgeDown" class="ghost" style="display:none">断开</button>
     </div>
-    <div class="row">
-      <button id="btnConn" class="primary big">连接</button>
+
+    <div class="tw" id="portWrap" style="display:none">
+      <table><thead><tr><th>端口</th><th>设备</th><th>判断</th></tr></thead>
+      <tbody id="portBody"></tbody></table></div>
+
+    <div class="msg" id="connMsg">正在启动…</div>
+
+    <div class="warnbox" id="bridgeDown" style="display:none">
+      <b>没找到本地串口服务（bridge）</b>
+      网页自己开不了串口 —— 只有电脑版 Chrome/Edge 的 Web Serial 才行，
+      侧边栏浏览器、内置浏览器、微信里打开的网页**都没有**这个能力。
+      所以串口由 Python 侧的 <code>bridge.py</code> 代开。<br>
+      解决办法：双击 <code>host/start-debug.bat</code>，用它的地址打开本页。
+      <div class="row" style="margin-top:9px">
+        <button id="btnUseWebSerial" class="ghost">改用浏览器内置串口直连</button>
+      </div>
     </div>
-    <div class="row" id="realOpts" style="display:none">
-      <label>波特率</label><input type="number" id="baud" value="115200">
-      <label><input type="checkbox" id="autoPoll" checked> 自动刷新状态</label>
-    </div>
-    <div class="msg" id="connMsg">未连接。点上面的「连接」开始。</div>
-    <p class="hint">实机模式需要电脑版 <b>Chrome 或 Edge</b>，点连接后会弹出串口选择框，选 <code>CP210x</code> 那个口。
-      如果板子插上电脑没反应，先装
-      <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener">CP210x 驱动</a>。
-      <br>接实机时别忘了给舵机接 <b>5V/5A 的 DC 电源</b>，只插 USB 舵机是不动的。</p>
+
+    <p class="hint">波特率 115200。板子拔了再插，页面会自己重新连上。
+      如果一直找不到：确认 USB 线是数据线、舵机那边接了 <b>5V/5A 的 DC 电源</b>；
+      另外看看是不是有别的程序（串口监视器、另一个标签页）占着这个口。</p>
   </div>
 
   <div class="card">
@@ -940,11 +975,36 @@ class MockFirmware{
 }
 
 /* ======================= 传输层 ======================= */
+/* 三条通路，优先级从高到低：
+
+   "bridge" —— **默认，也是唯一给用户用的**。
+       串口开在本地 Python 进程里（host/bridge.py），页面只跟 http://127.0.0.1
+       说 HTTP。为什么必须这样：
+         · Web Serial 只有电脑版 Chrome/Edge 有，侧边栏浏览器 / 内嵌 WebView /
+           微信里打开的网页**一律没有** —— 那些环境里「点连接没反应」是必然的；
+         · Web Serial 每次连都要弹一个系统级选口框，很烦，而且没法自动选推荐口。
+       桥还顺手解决了「自动选推荐串口」：口在 Python 那边，扫描/打分/试探都是它干的。
+
+   "ws" —— 浏览器原生 Web Serial 直连。**只在桥不可用时才降级到它**
+       （比如直接双击 .html、或页面被别的静态服务器托管）。这条是真串口，不是模拟。
+
+   "sim" —— 页面内置的假固件。**只在 URL 带 ?sim=1 时启用，界面上没有任何入口**。
+       它存在的唯一原因是自动化自测：没有硬件也要能把上百条断言跑完。
+       用户正常打开页面永远碰不到它。 */
+const SIM_ENABLED = /(?:^|[?&])sim=1(?:&|$)/.test(location.search);
+
 class Transport{
   constructor(){
-    this.mode = "sim"; this.port = null; this.reader = null; this.buf = "";
+    this.mode = "none"; this.port = null; this.reader = null; this.buf = "";
     this.connected = false; this.listeners = []; this.mock = new MockFirmware();
     this.inflight = 0;
+    /* 桥相关 */
+    this.bridge = null;        // 最近一次 /api/status 的结果
+    this.bridgeSeen = false;   // 有没有连上过本地桥
+    this.seq = 0;              // 已消费到第几行（长轮询游标）
+    this.portName = null;      // 实际连着的口，给界面显示
+    this._polling = false;     // 长轮询在飞
+    this._sending = false;     // 有 send 在飞时暂停轮询，免得两边的游标打架
     /* 模拟固件的异步输出（RATE_DONE 这种"跑完才吐"的行）直接转成普通收入行 */
     this.mock.onAsync = l => this.emit(l);
     setInterval(()=>this.mock.tick(), 100);
@@ -952,12 +1012,74 @@ class Transport{
   onLine(fn){ this.listeners.push(fn); }
   emit(line){ this.listeners.slice().forEach(f=>f(line)); }
 
-  async connectSim(baud){ this.mode = "sim"; this.connected = true; }
-  async connectReal(baud){
-    if(!("serial" in navigator)) throw new Error("这个浏览器不支持串口，请用电脑版 Chrome 或 Edge");
+  /* ---------- 本地桥 ---------- */
+  /* 判断「有没有桥」不能靠 fetch 抛不抛异常：被别的静态服务器托管时，
+     /api/status 会返回那个服务器的 404 页面，fetch 是**成功**的。
+     所以必须验 body 里有没有 bridge 标记。 */
+  async detectBridge(){
+    try{
+      const r = await fetch("/api/status", {cache:"no-store"});
+      if(!r.ok) return null;
+      const j = await r.json();
+      if(!j || j.bridge !== 1) return null;
+      this.bridge = j; this.bridgeSeen = true;
+      return j;
+    }catch(e){ return null; }
+  }
+  async bridgePost(path, body){
+    const r = await fetch(path, {method:"POST", cache:"no-store",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body || {})});
+    return await r.json();
+  }
+  /* 让桥去连（不传 port 就是「自动挑推荐口」） */
+  async connectBridge(){
+    const j = await this.bridgePost("/api/connect", {});
+    if(!j || !j.ok) throw new Error((j && j.msg) || "没找到能连的串口");
+    this.attachBridge(j);
+    return j;
+  }
+  /* 桥已经连上了 —— 页面这边把状态对齐并开始长轮询 */
+  attachBridge(st){
+    const first = !this.connected || this.mode !== "bridge";
+    this.mode = "bridge";
+    this.connected = true;
+    this.portName = st.port || this.portName;
+    if(typeof st.seq === "number") this.seq = st.seq;
+    if(first){ this.last = null; this._polling = false; this.startBridgePoll(); }
+    return first;
+  }
+  detachBridge(){
+    this.connected = false; this.mode = "none"; this.portName = null;
+    clearTimeout(this._pollT);
+  }
+  /* 长轮询：把固件主动吐的行（RATE_DONE 这类）实时拉回来。
+     只允许一个在飞，send 在飞时让路（否则两边抢同一段 seq）。 */
+  startBridgePoll(){
+    const tick = async () => {
+      if(!this.connected || this.mode !== "bridge") return;
+      if(this._sending){ this._pollT = setTimeout(tick, 120); return; }
+      this._polling = true;
+      try{
+        const r = await fetch("/api/lines?since=" + this.seq + "&wait=1", {cache:"no-store"});
+        const j = await r.json();
+        if(j && j.lines){
+          j.lines.forEach(it => { this.seq = it.seq; this.emit(it.line); logRecv(it.line); });
+        }
+        if(j && typeof j.seq === "number") this.seq = Math.max(this.seq, j.seq);
+      }catch(e){ /* 断线了就下一轮再看 */ }
+      this._polling = false;
+      if(this.connected && this.mode === "bridge") this._pollT = setTimeout(tick, 60);
+    };
+    tick();
+  }
+
+  /* ---------- 浏览器原生串口（降级用） ---------- */
+  async connectWebSerial(baud){
+    if(!("serial" in navigator)) throw new Error("这个浏览器没有串口 API（请用电脑版 Chrome/Edge，或者直接跑 start-debug.bat 走本地桥）");
     this.port = await navigator.serial.requestPort();
-    await this.port.open({ baudRate: baud });
-    this.mode = "real"; this.connected = true;
+    await this.port.open({baudRate: baud || 115200});
+    this.mode = "ws"; this.connected = true;
+    this.portName = "浏览器直连";
     this._readLoop();
   }
   async _readLoop(){
@@ -982,13 +1104,26 @@ class Transport{
       await sleep(200);
     }
   }
+  async connectSim(){ this.mode = "sim"; this.connected = true; this.portName = "模拟固件"; }
+
   async disconnect(){
     this.connected = false;
+    clearTimeout(this._pollT);
+    if(this.mode === "bridge"){
+      try{ await this.bridgePost("/api/disconnect", {}); }catch(e){}
+      this.bridge = null;
+      this.mode = "none";
+      return;
+    }
     try{ if(this.reader) await this.reader.cancel(); }catch(e){}
     try{ if(this.port) await this.port.close(); }catch(e){}
     this.port = null; this.reader = null;
   }
   async _write(cmd){
+    if(this.mode === "bridge"){
+      await this.bridgePost("/api/fire", {cmd});
+      return;
+    }
     const w = this.port.writable.getWriter();
     await w.write(new TextEncoder().encode(cmd + "\r\n"));
     w.releaseLock();
@@ -1014,6 +1149,33 @@ class Transport{
         };
         setTimeout(step, 24);
       });
+    }
+    /* 桥：整条命令往返都交给 Python 那边收尾，页面只负责把行吐到界面上。
+       since 传当前游标，桥会把「命令发出前就在缓冲里的杂线」（pre）单独还给我，
+       这样长轮询和 send 抢游标时不会丢行、也不会重复。 */
+    if(this.mode === "bridge"){
+      this._sending = true;
+      return this.bridgePost("/api/send",
+        {cmd, timeoutMs, quietMs, since:this.seq})
+        .then(j => {
+          this._sending = false;
+          if(!j || !j.ok){
+            logLine("串口没连上" + (j && j.error ? ": " + j.error : ""), "err");
+            this.last = {first:null, ms:0, lines:0};
+            return [];
+          }
+          (j.pre || []).forEach(l => { this.emit(l); logRecv(l); });
+          (j.lines || []).forEach(l => { this.emit(l); logRecv(l); });
+          if(typeof j.seq === "number") this.seq = Math.max(this.seq, j.seq);
+          this.last = {first:j.first, ms:j.ms, lines:(j.lines || []).length};
+          return j.lines || [];
+        })
+        .catch(e => {
+          this._sending = false;
+          logLine("桥请求失败: " + e.message, "err");
+          this.last = {first:null, ms:0, lines:0};
+          return [];
+        });
     }
     return new Promise(res=>{
       const got = [];
@@ -1048,6 +1210,9 @@ class Transport{
   }
 }
 const T = new Transport();
+/* 用户界面上不该出现「模拟模式」这四个字 —— 只有自测会带 ?sim=1 进来。
+   这里在页面最早期就把模式定下来，后面所有 isSim() 分支都跟着走。 */
+if(SIM_ENABLED){ T.mode = "sim"; }
 
 /* ======================= 全局状态 ======================= */
 const S = {
@@ -1062,9 +1227,12 @@ const isSim = () => T.mode === "sim";
 
 /* ======================= 顶栏状态 ======================= */
 function refreshChips(){
-  $("#cMode").textContent = isSim() ? "模拟模式" : "实机模式";
+  const connLabel = { bridge:"本地桥", ws:"浏览器直连", sim:"模拟固件", none:"未通路" }[T.mode] || T.mode;
+  $("#cMode").textContent = isSim() ? "模拟固件（自测）" : connLabel;
   $("#cMode").className = "chip" + (isSim() ? "" : " ok");
-  $("#cConn").textContent = T.connected ? (isSim() ? "模拟已连接" : "实机已连接") : "未连接";
+  $("#cConn").textContent = T.connected
+    ? (isSim() ? "模拟已连接" : "已连接" + (T.portName ? " " + T.portName : ""))
+    : "未连接";
   $("#cConn").className = "chip " + (T.connected ? "ok" : "bad");
   const on = Object.values(S.slots).filter(d=>d.online === "1").length;
   $("#cOnline").textContent = "舵机 " + (Object.keys(S.slots).length ? on + "/6" : "—/6");
@@ -1118,35 +1286,140 @@ $$("#tabbar button").forEach(b => b.onclick = () => goto(b.dataset.p));
 window.addEventListener("hashchange", () => goto(location.hash.slice(1)));
 
 /* ======================= 1. 连接 ======================= */
-function setMode(m){
-  $("#mSim").className  = m === "sim"  ? "primary" : "";
-  $("#mReal").className = m === "real" ? "primary" : "";
-  $("#realOpts").style.display = m === "real" ? "flex" : "none";
+/* 这一页没有「选模式」也没有「选串口」—— 全都自动：
+     1) 先问本机有没有串口桥（bridge.py）；
+     2) 有桥 → 桥自己扫描串口、按芯片打分、谁回 OK INFO 就连谁（这就是"自动选推荐口"）；
+     3) 页面只负责把桥的状态画出来，并周期性地看它连上没有。
+   板子拔了再插不用管：桥那边会自己重连，页面看到 connected 变 true 就接管后续流程。 */
+const BAUD = 115200;
+
+function scanUI(state, title, sub){
+  const box = $("#scanBox");
+  box.className = "scanbox" + (state ? " " + state : "");
+  $("#scanTitle").textContent = title;
+  $("#scanSub").innerHTML = sub || "";
 }
-setMode("sim");
-$("#mSim").onclick  = () => setMode("sim");
-$("#mReal").onclick = () => setMode("real");
+function renderPorts(ports){
+  const tb = $("#portBody");
+  if(!ports || !ports.length){ $("#portWrap").style.display = "none"; return; }
+  $("#portWrap").style.display = "";
+  tb.innerHTML = "";
+  ports.forEach(p => {
+    tb.insertAdjacentHTML("beforeend",
+      '<tr class="portrow"><td><b>' + esc(p.device) + "</b></td><td>" + esc((p.desc || "").slice(0, 30)) +
+      '</td><td><span class="tag ' + (p.candidate ? "rec" : "no") + '">' +
+      esc(p.candidate ? "会去试" : "跳过") + "</span>" + esc(p.reason || "") + "</td></tr>");
+  });
+}
+
+let bridgeWatch = null, attachPending = false;
+/* 桥连上之后要做的「接管」动作：只做一次 */
+async function onBridgeUp(st){
+  const fresh = T.attachBridge(st);
+  refreshChips();
+  if(!fresh) return;
+  scanUI("ok", "已连接 " + (T.portName || ""), "串口开在本机的 bridge 里，页面只发 HTTP。");
+  $("#bridgeDown").style.display = "none";
+  $("#btnBridgeDown").style.display = "";
+  $("#connMsg").className = "msg ok";
+  $("#connMsg").innerHTML = "已连接：<b>" + esc(T.portName || "") + "</b> · " + (st.baud || BAUD) + " bps";
+  logLine("已连接 " + (T.portName || "") + "（本地桥自动选择）", "sys");
+  await refreshInfo();
+  startPolling();
+}
+/* 桥在但没连上串口 —— 把原因摊开说，别让人干等 */
+function onBridgeWaiting(st){
+  const ports = st.ports || [];
+  renderPorts(ports);
+  const cand = ports.filter(p => p.candidate);
+  let sub = st.error ? esc(st.error) : "";
+  if(!ports.length)       sub = "这台电脑现在一个串口都没有。板子插了吗？USB 线是数据线吗？";
+  else if(!cand.length)   sub = "发现的串口都不像 USB 设备（" + ports.map(p => esc(p.device)).join("、") + "）。";
+  else                    sub = "正在逐个试探：" + cand.map(p => esc(p.device)).join("、") + " —— 谁回 OK INFO 就连谁。";
+  scanUI("", "正在找手套主板…", sub + "<br>每 2 秒重扫一次，插上板子会自动连上，不用刷新页面。");
+  $("#connMsg").className = "msg";
+  $("#connMsg").textContent = "未连接。";
+}
+/* 页面侧的状态巡视。桥自己会连，这里只是"看"，连上就接管。 */
+function startBridgeWatch(){
+  clearInterval(bridgeWatch);
+  bridgeWatch = setInterval(async () => {
+    if(T.connected) { clearInterval(bridgeWatch); bridgeWatch = null; return; }
+    const st = await T.detectBridge();
+    if(!st){ clearInterval(bridgeWatch); bridgeWatch = null; showBridgeDown(); return; }
+    if(st.connected && !attachPending){
+      attachPending = true;
+      try{ await onBridgeUp(st); }finally{ attachPending = false; }
+    }else if(!st.connected){
+      onBridgeWaiting(st);
+    }
+  }, 1500);
+}
+function showBridgeDown(){
+  scanUI("bad", "没找到本地串口服务", "这个页面不是由 host/start-debug.bat 打开的。");
+  $("#bridgeDown").style.display = "";
+  $("#portWrap").style.display = "none";
+  $("#connMsg").className = "msg err";
+  $("#connMsg").textContent = "读不到串口。双击 host/start-debug.bat，用它的地址打开本页。";
+  logLine("没有检测到本地串口桥（/api/status 没有回应）。如果是直接双击 .html 打开的，换成 start-debug.bat。", "err");
+}
 
 $("#btnConn").onclick = async () => {
-  const baud = parseInt($("#baud").value,10) || 115200;
-  try{
-    if($("#mReal").className === "primary") await T.connectReal(baud);
-    else await T.connectSim(baud);
-    $("#btnConn").disabled = true;
+  clearInterval(bridgeWatch); bridgeWatch = null;
+  if(isSim()){                                   // 只可能来自 ?sim=1（自测）
+    await T.connectSim();
     $("#connMsg").className = "msg ok";
-    $("#connMsg").innerHTML = "已连接：" + (isSim() ? "<b>模拟固件</b>（没有硬件，但后面每一步都能走）"
-                                                   : "<b>实机</b> · " + baud + " bps");
-    logLine("已连接 (" + T.mode + ")", "sys");
-    refreshChips();
-    await refreshInfo();
-    logLine(isSim() ? "提示：模拟模式下初始档位是 SC09（和真实板子一样），请点「设为 STS3032 档」。" : "", "sys");
-    startPolling();
+    $("#connMsg").textContent = "已连接：自测用假固件";
+    refreshChips(); await refreshInfo(); startPolling(); return;
+  }
+  if(T.mode === "ws"){                           // 已降级到浏览器直连，这个按钮就重连它
+    return connectWebSerial();
+  }
+  scanUI("", "正在扫描串口…", "让本机的串口桥去挑一个。");
+  $("#btnConn").disabled = true;
+  try{
+    const st = await T.detectBridge();
+    if(!st){ showBridgeDown(); return; }
+    const j = await T.bridgePost("/api/connect", {});
+    if(j && j.ok){ await onBridgeUp(j); return; }
+    onBridgeWaiting(st);
+    $("#connMsg").className = "msg err";
+    $("#connMsg").textContent = "暂时没连上：" + ((j && j.msg) || "没有串口回应 INFO");
+  }catch(e){
+    showBridgeDown();
+  }finally{
+    $("#btnConn").disabled = false;
+    if(!T.connected) startBridgeWatch();
+  }
+};
+$("#btnBridgeDown").onclick = async () => {
+  await T.disconnect();
+  stopPolling();
+  refreshChips(); updateGates();
+  $("#btnBridgeDown").style.display = "none";
+  $("#connMsg").className = "msg";
+  $("#connMsg").textContent = "已断开。";
+  logLine("已断开串口（桥那边也关了，自动重连已暂停）", "sys");
+  scanUI("bad", "已断开", "桥不会再自动连。点「重新扫描并连接」恢复。");
+};
+$("#btnUseWebSerial").onclick = () => connectWebSerial();
+async function connectWebSerial(){
+  const baud = BAUD;
+  try{
+    await T.connectWebSerial(baud);
+    $("#bridgeDown").style.display = "none";
+    $("#btnBridgeDown").style.display = "";
+    scanUI("ok", "已用浏览器直连", "没有本地桥时的降级路径。");
+    $("#connMsg").className = "msg ok";
+    $("#connMsg").innerHTML = "已连接：<b>浏览器直连</b> · " + baud + " bps";
+    logLine("已连接（Web Serial 直连）", "sys");
+    refreshChips(); await refreshInfo(); startPolling();
   }catch(e){
     $("#connMsg").className = "msg err";
     $("#connMsg").textContent = "连接失败：" + e.message;
     logLine("连接失败: " + e.message, "err");
   }
-};
+}
 
 async function refreshInfo(){
   const lines = await T.send("INFO", 3000);
@@ -1172,10 +1445,9 @@ $("#btnProfile").onclick = async () => {
   $("#connMsg").textContent = "档位已设为 STS3032。";
 };
 
-/* 自动轮询状态 */
+/* 自动轮询状态（常开：以前这里挂着一个「自动刷新」勾选框，实际没人会去取消它） */
 function startPolling(){
   stopPolling();
-  if(!$("#autoPoll").checked) return;
   S.pollTimer = setInterval(async () => {
     if(!T.connected) return;
     await refreshSlots(true);
@@ -1183,7 +1455,6 @@ function startPolling(){
   }, 3000);
 }
 function stopPolling(){ if(S.pollTimer) clearInterval(S.pollTimer); S.pollTimer = null; }
-$("#autoPoll").onchange = startPolling;
 
 /* ======================= 2. 编号 ======================= */
 /* 状态机 —— 这里是修掉「日志里反复刷『请把它拔下来』死循环」的关键:
@@ -2771,7 +3042,27 @@ $("#btnCopyLog").onclick  = () => navigator.clipboard && navigator.clipboard.wri
 /* ======================= 启动 ======================= */
 renderSlots(); renderTest(); renderWizard(); refreshChips();
 goto(location.hash.slice(1) || "connect");
-logLine("调试台已就绪。默认「模拟模式」：在第 1 步点「连接」就能走完 编号 → 校准 → 试动作 → 演奏 全流程。", "sys");
+
+if(SIM_ENABLED){
+  /* 只有自测会走到这 —— 界面上没有引导，也不该有 */
+  logLine("自测模式（?sim=1）：串口由页面内置的假固件顶替，数字不代表实机。", "sys");
+}else{
+  (async () => {
+    scanUI("", "正在检查本地串口服务…", "");
+    const st = await T.detectBridge();
+    if(!st){
+      showBridgeDown();
+      return;
+    }
+    if(st.connected){
+      await onBridgeUp(st);
+    }else{
+      onBridgeWaiting(st);
+      logLine("等待板子接入 —— 串口桥每 2 秒扫一次，插上就自动连。", "sys");
+      startBridgeWatch();
+    }
+  })();
+}
 </script>
 </body>
 </html>

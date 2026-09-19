@@ -63,7 +63,10 @@ function verdict(rate){
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
 
-  await page.goto("file:///" + PAGE.replace(/\\/g, "/"), { waitUntil: "load" });
+/* ?sim=1：调试台已经**没有**模拟模式入口了，串口默认走本机 bridge。
+   这些脚本跑在没有桥的环境里（静态服务器 / file://），必须用这个自测后门
+   让页面内置的假固件顶替串口，否则连接页会停在一个红色的"找不到串口服务"上。 */
+  await page.goto("file:///" + PAGE.replace(/\\/g, "/") + "?sim=1", { waitUntil: "load" });
   await page.waitForTimeout(400);
 
   const lib = await page.evaluate(() => SONG_LIB.map((s, i) => ({

@@ -1,19 +1,20 @@
 # tests · 自测与实机验证
 
-分两类：
+分三类：
 
 | 类别 | 需要板子？ | 干嘛的 |
 | --- | --- | --- |
-| **模拟端到端** | ❌ 不用 | 网页调试台内置模拟固件，不接板子就能把「编号 → 校准 → 试动作 → MIDI 演奏」整条链路跑一遍 |
+| **串口桥自测** | ❌ 不用 | 真 `bridge.py` 进程 + 假板子（TCP 装串口），验「自动选推荐口 / 自动连接 / 长轮询 / 跨站拦截」 |
+| **页面端到端** | ❌ 不用 | 用页面内置假固件顶替串口（`?sim=1`），把「编号 → 校准 → 试动作 → MIDI 演奏」整条链路跑一遍，并反过来验「页面上没有模拟模式、打开就自动连上」 |
 | **实机验证** | ✅ 要 | 直接对板子发指令、读回包，用**数字**回答「舵机到底动没动、能跑多快」 |
 
-模拟那一侧用真实浏览器（Chromium）打开页面、点按钮、检查结果，用来在接硬件之前确认界面没坏。
+前两类都用真实浏览器（Chromium）打开页面、点按钮、检查结果，用来在接硬件之前确认界面没坏。
 实机那一侧不猜、只量 —— 发指令前后各读一次位置，比差值。
 
 ## 依赖
 
 ```bash
-pip install pyserial          # 只有 glove_fw.py 需要，测试本身不需要
+pip install pyserial          # bridge.py / bridge_check.py / 实机脚本需要（start-debug.bat 会自动装）
 npm i playwright-core         # 浏览器驱动
 npx playwright install chromium   # 或者用系统已有的 Chrome，设 CHROME_PATH 环境变量
 ```
@@ -28,14 +29,34 @@ python make_midi.py       # 生成测试用 MIDI（含 format 1 / format 0 两�
 python ref_parse.py       # 参考实现解析 -> ref.json
 node compare.js           # 两边结果比对
 
-# 2) 端到端流程自测（模拟固件，无需硬件）
-node e2e.js               # 输出 131 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
+# 2) 串口桥自测（真进程 + 假板子，无需硬件）
+python bridge_check.py    # 输出 35 项 PASS/FAIL
 
-# 3) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
+# 3) 页面端到端自测（内置假固件，无需硬件）
+node e2e.js               # 输出 148 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
+
+# 4) 往"桥"那条路上注入退化，确认对应断言真的会变红
+node mutate_bridge.js
+
+# 5) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
 node shots.js
 ```
 
 `CHROME_PATH=/path/to/chrome node e2e.js` 可以指定浏览器。
+`PYTHON=/path/to/python python bridge_check.py` 可以指定解释器（默认跟随 `sys.executable`，
+`e2e.js` 在 Windows 上默认用本机的托管运行时，可用 `PYTHON` 环境变量覆盖）。
+
+### 假板子是怎么回事
+
+`fake_glove.py` 是一个说手套文本协议的 TCP 服务。pyserial 支持 `socket://host:port`
+这种「串口 URL」，所以 `bridge.py --url socket://127.0.0.1:9701` 就能把 TCP 当串口用。
+
+于是 `bridge_check.py` 里**假的东西只有"对面那块板子"**：真 bridge 进程、真 HTTP、
+真 pyserial、真收发线程、真长轮询。这比"把桥也 mock 掉"值钱得多 ——
+`/api/lines` 能不能捞到延迟吐出的 `RATE_DONE`，只有这样才测得出来。
+
+它故意**不**照抄页面里那份 `MockFirmware`：那份服务于"没有串口的页面级自测"，
+这份服务于"真串口链路"，两者假的东西不一样，重复是必要的。
 
 ### 实机（插上板子和舵机）
 
@@ -84,7 +105,10 @@ node   fingering_report.js      # 导出 host/samples/FINGERING.md 自动指法�
 | `make_midi.py` | 生成测试 MIDI。故意包含 **running status**、多轨、变速、密集快速音、五音和弦 —— 覆盖解析器最容易出错的分支 |
 | `ref_parse.py` | **独立写的** MIDI 参考解析器（Python）。两边独立实现，结果一致才说明网页端解析器是对的 |
 | `compare.js` | 逐音符比对网页端解析器与参考实现的时间/音高/时长/力度 |
-| `e2e.js` | 端到端流程自测：连接 → 6 轮编号 → 校准 → 使能 → 单指测试 → 4C 测速 → MIDI 演奏（含音乐↔动作卷帘）→ 日志，并检查全程无 JS 报错 |
+| `e2e.js` | 页面端到端自测：连接 → 6 轮编号 → 校准 → 使能 → 单指测试 → 4C 测速 → MIDI 演奏（含音乐↔动作卷帘）→ 日志 → **第 8 节真桥自动连接**，并检查全程无 JS 报错 |
+| `bridge_check.py` | 串口桥自测：推荐口打分、自动选口决策顺序、HTTP 接口、长轮询异步行、跨站拦截、断开语义 |
+| `fake_glove.py` | 假手套：TCP 说手套文本协议，供 pyserial 的 `socket://` 接进来 |
+| `mutate_bridge.js` | 变异测试：往"桥"那条路注入 3 处退化，确认对应的 5 条断言都会变红 |
 | `shots.js` | 关键页面视觉抽查 |
 | `bench_move.py` | **实机主力脚本**。验位移 + 测速；带两道安全闸（见上） |
 | `diag_state.py` | 读板子真实状态：`INFO` / `CAL STATUS` / `STATUS_ALL` / `BUSINFO` |
@@ -175,3 +199,33 @@ node   fingering_report.js      # 导出 host/samples/FINGERING.md 自动指法�
   不去重的话文件标称 256 个音、解析出来只有 240 —— 差的那 16 个是撞车的。
   一个键按不了两次，DAW 和上位机都会把后一个 note-on 当重复触发合并掉。
   生成器里做了去重，断言里也比对了「解析音符数 == catalog 里标的音符数」。
+
+### 写「串口桥」这一层时踩的坑
+
+- **`open()` 里千万别 `reset_input_buffer()`。** 桥原来是「打开 → 睡 0.25s → reset → 读一坨
+  当"上电主动上报"」，而 reset 恰好把板子上电自己吐的那行 `BOOT` 清掉了。
+  自测里那条「上电上报必须作为 `pre` 还回来」的断言就是这么照出来的。
+  正确做法：`open()` 之后**立刻**起读线程，什么都不会漏。
+- **开串口会让 ESP32 复位**（CP2102 的 DTR/RTS 接着自动复位电路）。所以
+  「先探测、再连接」= 复位两次，而且探测那一发 `INFO` 十有八九打在启动过程里，
+  把真板子判成"不是它" —— 自动连接就成了随机事件。
+  现在的做法：直接打开，然后 `_wait_info()` 耐心问 4 次（约 2.8 秒），答了就是它。
+- **`/api/disconnect` 必须把自动重连停掉。** 一开始没停，结果「断开」按钮前脚按下去、
+  后脚那个 1 秒一轮的重连循环又给连回来了，按钮等于没用（断言 `paused` 就是这么加的）。
+- **「自动选推荐口」不能依赖调用方排序。** `autoconnect_once()` 原来直接用 `self.ports` 的顺序，
+  上游哪天忘了 sort 就悄悄退化成"按枚举顺序碰运气"。现在它自己 `cands.sort(by -score)` ——
+  这条是单测（`test_autoconnect_order`）逼出来的，它故意喂了一个乱序列表。
+- **异步行必须"立刻发出去"，不能先攒着。** `fake_glove.py` 最初把回复 `append` 进一个列表、
+  等 `handle()` 返回后统一发。`RATE_DONE` 是 0.45 秒后才 append 的，那时列表早发完并丢弃了 ——
+  一个字都出不去。改成 `emit` 立刻发。
+- **变异测试脚本要处理 CRLF。** 源码是 CRLF 而模式串照着 LF 手写，`includes()` 永远 false，
+  脚本会误报「变异点找不到（源码变了？）」—— 于是三条变异里两条**根本没注入**，
+  却看起来像是"源码变了"。而且还原要挂在 `process.on("exit")` 上，绝不能把变异留进工作区。
+- **断言 `window.T` 是取不到的。** 页面里 `T` 是顶层 `const`，只在全局**词法**作用域里，
+  没有挂到 `window`。得用 `typeof T !== "undefined"` 探。
+- **查"正文里还有没有某字样"要用 `innerText`，不能用 `textContent`。**
+  `textContent` 会把 `<script>` / `<style>` 里的文本也算进去，
+  于是源码注释里那几处「模拟模式」让断言永远红。
+- **判断元素可见性前要先切到那一页。** `#assignBody` 在 `#p-assign` 里，
+  停在连接页时 `isVisible()` 对非活动页永远返回 false。
+

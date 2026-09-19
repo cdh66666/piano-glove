@@ -1,8 +1,16 @@
-/* 钢琴手套调试台 · 端到端自测（模拟固件，无需硬件） */
+/* 钢琴手套调试台 · 端到端自测
+   第 0~7 节：页面逻辑，串口由页面内置假固件顶替（?sim=1），不需要硬件。
+   第 8 节：**真** bridge.py 进程 + 假手套（TCP 当串口），验"自动选口自动连接"这条路。 */
 const { chromium } = require("playwright-core");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const PYTHON = process.env.PYTHON || (process.platform === "win32"
+  ? "C:\\Users\\admin\\.workbuddy\\binaries\\python\\versions\\3.13.12\\python.exe"
+  : "python3");
 
 const ROOT = path.resolve(__dirname, "..");
 const OUT  = path.join(__dirname, "shots");
@@ -100,7 +108,13 @@ function metaKinds(buf){
   page.on("console", m => { logs.push(m.type() + ": " + m.text());
     if(m.type() === "error") errors.push("console.error: " + m.text()); });
 
-  await page.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html`, { waitUntil: "load" });
+  /* ⚠️ 必须带 ?sim=1。
+     调试台**没有**「模拟模式」这个入口了 —— 用户拿到的版本只有串口一条路。
+     但自动化自测不能没有硬件就跑不动，所以页面留了一个只有 URL 能打开的开关：
+     ?sim=1 时串口由页面内置的假固件顶替。第 8 节会反过来验证
+     「不带 ?sim=1 时，页面上根本没有模拟模式」。
+     下面这一大段的断言跑的是**协议/几何/播放逻辑**，跟串口走哪条路无关。 */
+  await page.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html?sim=1`, { waitUntil: "load" });
   await page.waitForTimeout(400);
 
   const txt = s => page.textContent(s);
@@ -794,6 +808,123 @@ function metaKinds(buf){
       await page.waitForTimeout(60);
     }
   check("反复切换后无异常", errors.length === 0, errors.slice(0,3).join(" ; "));
+
+  /* ---------- 8. 本地串口桥：真进程 + 假手套 ----------
+     这一节和上面几节完全不同：串口**不在页面里**了，在 bridge.py 进程里。
+     假的东西只有"对面那块板子"（fake_glove.py 用 TCP 说手套协议，
+     pyserial 用 socket:// 接上去）。bridge.py、HTTP、收发线程全是真的。
+
+     要证明的正是用户抱怨的那件事：
+       「侧边栏/内嵌浏览器用不了串口」→ 现在串口压根不经过浏览器，只发 HTTP；
+       「不需要模拟模式，自动选推荐串口自动连接」→ 页面打开就该自己连上，
+         一次点击都不需要。 */
+  console.log("\n=== 8. 本地串口桥（真 bridge.py + 假手套） ===");
+  const BRIDGE_PORT = 8139, FAKE_PORT = 9702;
+  const fake = spawn(PYTHON, ["-u", path.join(__dirname, "fake_glove.py"), String(FAKE_PORT)],
+                     { stdio: "ignore" });
+  await sleep(700);
+  const bridge = spawn(PYTHON, ["-u", path.join(ROOT, "bridge.py"),
+                                "--port", String(BRIDGE_PORT),
+                                "--url", `socket://127.0.0.1:${FAKE_PORT}`],
+                       { cwd: ROOT, stdio: "ignore" });
+  const brErrors = [];
+  try{
+    const bp = await browser.newPage({ viewport: { width: 430, height: 900 }, deviceScaleFactor: 2 });
+    bp.on("pageerror", e => brErrors.push("pageerror: " + e.message));
+    bp.on("console", m => { if(m.type() === "error") brErrors.push("console.error: " + m.text()); });
+
+    // 不带 ?sim=1 —— 用户看到的就是这个
+    await bp.goto(`http://127.0.0.1:${BRIDGE_PORT}/web_piano_glove.html`, { waitUntil: "load" });
+
+    // 「自动连接」的硬证据：全程不点任何按钮，等页面自己连上
+    // ⚠️ 不能写 window.T —— 页面里 T 是顶层 const，只活在全局**词法**作用域里，
+    //    压根没挂到 window 上（window.T === undefined，这条断言会永远绿不了、
+    //    也永远红得莫名其妙）。要用 typeof 直接探那个词法绑定。
+    let autoOk = true;
+    try{
+      await bp.waitForFunction(() => typeof T !== "undefined" && T.connected,
+                               null, { timeout: 15000 });
+    }catch(e){ autoOk = false; }
+    check("打开页面后**不用点任何按钮**就自动连上了串口", autoOk,
+      autoOk ? "" : await bp.textContent("#connMsg"));
+
+    const st = await bp.evaluate(() => ({ mode: T.mode, port: T.portName, connected: T.connected,
+                                          sim: SIM_ENABLED, box: $("#scanBox").className }));
+    check("走的是本地桥，不是浏览器直连/模拟", st.mode === "bridge", st.mode);
+    check("页面上没有 ?sim=1，模拟固件是关的", st.sim === false, st.sim);
+    check("界面亮出「已连接」状态块", st.connected && st.box.includes("ok"), st.box);
+    check("顶栏连接方式写「本地桥」", (await bp.textContent("#cMode")).includes("本地桥"),
+      await bp.textContent("#cMode"));
+    check("顶栏显示端口名", (await bp.textContent("#cConn")).includes("已连接"),
+      await bp.textContent("#cConn"));
+
+    /* 模拟模式必须从界面上彻底消失 —— 这是用户的明确要求。
+       注意不能只查文案：得查 DOM 里那两个入口按钮真的不存在了。
+       查正文要用 innerText，**不能用 textContent** —— textContent 会把
+       <script>/<style> 里的文本也算进去，于是源码注释里那几处"模拟模式"
+       会让这条断言永远红（第一次写就是这么错的）。 */
+    check("界面上没有「模拟模式」入口按钮",
+      (await bp.$("#mSim")) === null && (await bp.$("#mReal")) === null);
+    const visibleText = await bp.$eval("body", e => e.innerText);
+    check("屏幕上不再出现「模拟模式」字样",
+      !/模拟模式/.test(visibleText) && !/模拟(固件|固件顶替)/.test(visibleText),
+      (visibleText.match(/模拟[^\s]{0,4}/) || [""])[0]);
+    check("连接页没有「选模式」这一步，只有自动连接面板",
+      await bp.isVisible("#scanBox") && await bp.isVisible("#btnConn"));
+    check("没有串口选择框（口由桥自己挑）",
+      (await bp.$("#portSelect")) === null && (await bp.$("#baud")) === null);
+
+    // 桥模式下 send / fire 真的走到 HTTP 上去了
+    const echo = await bp.evaluate(() => T.send("ECHO 桥模式", 3000));
+    check("桥模式下 send 真的从串口拿回了回复",
+      echo.some(l => l.includes("OK ECHO") && l.includes("桥模式")), echo.join(" | "));
+    const timing = await bp.evaluate(() => T.last);
+    check("桥模式下也有往返延迟数据（测速/演奏靠它）",
+      timing && typeof timing.first === "number", JSON.stringify(timing));
+
+    // 板子信息、闸门：说明整条链路是通的，不只是"连上了"
+    await bp.waitForTimeout(400);
+    check("桥模式下自动读出了板子信息",
+      (await bp.textContent("#infoKv")).includes("PIANO_GLOVE_2"),
+      (await bp.textContent("#infoKv")).slice(0, 50));
+    /* ⚠️ 闸门判断前必须先切到那一页：#assignBody 在 #p-assign 里，
+       而当前停在连接页 —— isVisible() 对非活动页永远返回 false。 */
+    await bp.click('#tabbar button[data-p="assign"]');
+    await bp.waitForTimeout(200);
+    check("桥模式下后续页面的闸门被打开",
+      await bp.isVisible("#assignBody") && !(await bp.isVisible("#assignGate")));
+    await bp.click('#tabbar button[data-p="connect"]');
+    await bp.waitForTimeout(150);
+
+    /* 「断开」不能被自动重连当场撤销 —— 这是本节唯一一条会真去点按钮的用例，
+       它照出的 bug 是：断开后自动重连循环立刻又给连回去了，按钮等于没用。 */
+    await bp.click("#btnBridgeDown");
+    await bp.waitForTimeout(2500);                    // 跨过好几轮自动重连
+    const afterDown = await bp.evaluate(async () => {
+      const r = await fetch("/api/status", { cache: "no-store" });
+      const j = await r.json();
+      return { pageConn: T.connected, bridgeConn: j.connected, paused: j.paused };
+    });
+    check("点了「断开」之后不会立刻自己连回来",
+      !afterDown.pageConn && afterDown.bridgeConn === false && afterDown.paused === true,
+      JSON.stringify(afterDown));
+
+    await bp.click("#btnConn");
+    await bp.waitForFunction(() => window.T && T.connected, null, { timeout: 12000 }).catch(() => {});
+    const back = await bp.evaluate(async () => {
+      const j = await (await fetch("/api/status", { cache: "no-store" })).json();
+      return { pageConn: T.connected, bridgeConn: j.connected, paused: j.paused };
+    });
+    check("点「重新扫描并连接」能恢复（自动重连开关被重新打开）",
+      back.pageConn && back.bridgeConn && back.paused === false, JSON.stringify(back));
+
+    check("桥这一段没有 JS 报错", brErrors.length === 0, brErrors.slice(0, 3).join(" ; "));
+    await bp.close();
+  }finally{
+    try{ bridge.kill(); }catch(e){}
+    try{ fake.kill(); }catch(e){}
+    await sleep(200);
+  }
 
   /* ---------- 收尾 ---------- */
   console.log("\n=== JS 错误 ===");
