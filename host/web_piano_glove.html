@@ -593,6 +593,11 @@ pre#log .sys{color:#c9a5ff}
           <button id="btnSndTest" class="ghost">🔔 试听一下</button>
           <span id="sndState" style="font-size:12px;color:var(--sub);flex:1">音频未启动</span>
         </div>
+        <div class="row">
+          <label title="声音整体提前多少毫秒提交，用来抵消声卡的固定延迟">音画对齐</label>
+          <input type="range" id="avLead" min="-60" max="60" step="5" value="0" style="flex:1;min-width:120px">
+          <span id="avLeadLabel" style="width:104px;text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)">待启动</span>
+        </div>
         <p class="hint" style="margin-top:-2px">
           如果试听有声音、演奏却没有，那是<b>播放速度</b>或<b>「播放声音」没勾</b>；
           如果试听也没声音，点上面的按钮 —— 浏览器要求音频必须由一次点击启动，
@@ -1431,6 +1436,8 @@ const S = {
   calSamples:{},
   midi:null, plan:null, notes:null,
   playing:false, cursor:0, raf:null, t0:0, fired:0, startedAt:0, lastRateAt:0, lastRateCount:0,
+  sndCursor:0,            // 声音游标：独立于动作游标，因为声音要提前「提交」（见 audioLeadMs）
+  sndLead:0,              // 本次演奏的补偿量（毫秒）；开场定住，中途不改
   pollTimer:null,
   latchApplied:false,     // 本次演奏有没有真的把侧摆摆过去（停止时决定要不要送回位）
   latchTouched:false      // 用户动过使能位滑块没有（没动过就跟随已记住的值）
@@ -3173,6 +3180,7 @@ $("#btnPlay").onclick = async () => {
   const ev = S.plan.events;
   S.playing = true; S.cursor = 0; S.fired = 0;
   S.dCursor = 0; S.sndFired = 0;          // 丢音游标 / 起音计数（自测要用）
+  S.sndCursor = 0; S.sndLead = audioLeadMs();   // 声音游标 + 音画对齐补偿量（开场定住）
   S.fireQuiet = 0;                        // 演奏期间被折叠进批次的命令数（不写日志）
   S.lastRateAt = performance.now(); S.lastRateCount = 0;
   T.fireStats = {batches:0, cmds:0, maxBatch:0};   // 本次演奏的批量发送统计
@@ -3187,7 +3195,21 @@ $("#btnPlay").onclick = async () => {
     const now = performance.now();
     const t = (now - S.t0) * speed;
 
-    /* 追赶: 一次最多补发 40 条, 防止长时间卡顿后雪崩 */
+    /* 声音要**提前**提交（见 audioLeadMs）：音频链有固定延迟，不补的话每个音都晚那么多。
+       提前量换算到曲谱域就是 lead × speed；但不能超过已播时间，
+       否则曲子开头那几个音会挤进第一帧一起响。 */
+    const leadScore = Math.min(S.sndLead * speed, t);
+
+    /* ① 声音：独立游标，提前 leadScore 触发 —— 物理出声正好落回动作那一刻。
+       传 holdReal（真实毫秒）而不是 durMs：durMs 是曲谱时长，
+       不除掉速度倍率的话 200% 下每个音都拖成两倍长、糊成一片。 */
+    while(S.sndCursor < ev.length && ev[S.sndCursor].t <= t + leadScore){
+      const e = ev[S.sndCursor++];
+      if(e.on) tone(e.note, e.holdReal, e.vel);
+    }
+
+    /* ② 动作：照旧，按真实时刻准点发出。
+       追赶: 一次最多补发 40 条, 防止长时间卡顿后雪崩 */
     let sent = 0;
     while(S.cursor < ev.length && ev[S.cursor].t <= t && sent < 40){
       const e = ev[S.cursor++];
@@ -3199,12 +3221,6 @@ $("#btnPlay").onclick = async () => {
       const d = e.on ? ampOf(e.vel) * fingerDepth() : 0;   // 力度 → 深度见 ampOf()
       depth[e.slot] = d;
       T.fire("MOVE " + slotIdOf(e.slot) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
-      /* 同一个事件流里顺手起音 —— 声音和动作在**同一帧**产生，
-         所以「听到的节拍」和「看到的动作」不会错开。
-         传 holdReal（真实毫秒）而不是 durMs：durMs 是曲谱时长，
-         不除掉速度倍率的话 200% 下每个音都拖成两倍长、糊成一片 ——
-         那正是用户说的"音乐对不上"。 */
-      if(e.on) tone(e.note, e.holdReal, e.vel);
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */
@@ -3217,7 +3233,8 @@ $("#btnPlay").onclick = async () => {
        画面上一眼看得出丢在哪，耳朵上也听得出。 */
     if($("#sndAll").checked && S.plan.droppedNotes){
       const dn = S.plan.droppedNotes;
-      while(S.dCursor < dn.length && dn[S.dCursor].t <= t){
+      /* 同样提前 leadScore —— 补齐的音也是声音，要和手套按下的那些音同一把尺子 */
+      while(S.dCursor < dn.length && dn[S.dCursor].t <= t + leadScore){
         const n = dn[S.dCursor++];
         /* 同样换成真实时长 —— 和手套真正按下去的那些音用同一把尺子 */
         const dReal = Math.max(60, Math.min(n.d / speed * 0.9, MAX_HOLD_MS));
@@ -3238,7 +3255,7 @@ $("#btnPlay").onclick = async () => {
     }
 
     if(S.cursor >= ev.length && t >= ev[ev.length-1].t + 260){
-      if(loopOn()){ S.cursor = 0; S.dCursor = 0; S.t0 = performance.now(); }
+      if(loopOn()){ S.cursor = 0; S.dCursor = 0; S.sndCursor = 0; S.t0 = performance.now(); }
       else { stopPlay(false); $("#planMsg").className = "msg ok"; $("#planMsg").textContent = "演奏结束。"; return; }
     }
     S.raf = requestAnimationFrame(frame);
@@ -3253,6 +3270,36 @@ $("#btnPlay").onclick = async () => {
       不会出现「音频和动作对不齐」这种最难查的错；
    3. 用户不用另外准备音频文件，导入 MIDI 就能听。 */
 const SND = { ctx:null, master:null, live:[] };
+
+/* tone() 从「决定发声」到「排进音频时间轴」的提前量（毫秒）。
+   start(t) 的 t 若已经过去，浏览器会立即开始，反而不好控制，所以统一提前一点。 */
+const TONE_LEAD_MS = 10;
+
+/* ============ 音画对齐补偿 ============
+   用户反馈：「舵机按下去感觉要过一会声音才会响，没有声音是从手指按下触发的感觉」。
+
+   量出来是**固定延迟**（不是越拖越慢）：WebAudio 的 ctx.currentTime 到真正出声，
+   中间还要过 baseLatency（渲染送出）+ outputLatency（设备缓冲），
+   本机实测 10 + 40 = 50ms，再加上面那 10ms 调度提前量，一共 60ms。
+   而舵机命令几乎不等 —— 动作在 t 那一刻就开始动，声音却晚 60ms 才到耳朵。
+   60ms 已经在人能察觉音画不同步的区间里，所以感觉「按下去没跟着响」。
+
+   解法：把声音的**提交时刻提前**这么多。物理出声 = 提交时刻 + 固定延迟，
+   提前提交就正好抵消，响声落回动作那一刻。注意方向 ——
+   补偿是让声音「早提交」，不是「晚出声」，所以不会让音往后拖。 */
+const ALIGN_KEY = "pg_align_offset";
+function alignOffset(){
+  const v = parseInt(localStorage.getItem(ALIGN_KEY) || "0", 10);
+  return Number.isFinite(v) ? Math.max(-80, Math.min(80, v)) : 0;
+}
+/* 本次该提前多少毫秒。自动取声卡报的延迟；声卡不报就退回只补调度提前量。
+   上限 300ms 是为了防止某个驱动报出离谱的数，把声音整段提到动作前面去。 */
+function audioLeadMs(){
+  const c = SND.ctx;
+  const auto = (c ? (c.baseLatency || 0) * 1000 + (c.outputLatency || 0) * 1000 : 0)
+             + TONE_LEAD_MS;
+  return Math.max(0, Math.min(300, Math.round(auto + alignOffset())));
+}
 
 function volLevel(){ return (parseInt($("#sndVol").value, 10) || 0) / 100; }
 function noteHz(note){ return 440 * Math.pow(2, (note - 69) / 12); }
@@ -3273,7 +3320,30 @@ function setAudioBadge(kind, extra){
   const m = map[kind] || map.ok;
   el.style.color = m[0];
   el.textContent = m[1] + (extra ? "（" + extra + "）" : "");
+  renderAlign();                 // 音频一就绪就把「实测延迟」显示出来
 }
+
+/* 「音画对齐」控件：自动量到的延迟 + 用户微调，都摆出来，别让人猜。
+   为什么必须留手动入口：自动读的是声卡自报的 baseLatency + outputLatency，
+   不同驱动/耳机报的值未必准（蓝牙尤其离谱），最后还得用户耳朵说了算。 */
+function renderAlign(){
+  const el = $("#avLead"), lb = $("#avLeadLabel");
+  if(!el || !lb) return;
+  const off = alignOffset();
+  el.value = String(off);
+  const c = SND.ctx;
+  const auto = c ? Math.round(((c.baseLatency || 0) + (c.outputLatency || 0)) * 1000 + TONE_LEAD_MS)
+                 : null;
+  lb.textContent = (auto === null ? "待启动" : "实测 " + auto + "ms")
+                 + (off ? "　" + (off > 0 ? "+" : "") + off : "");
+  lb.title = "声音整体提前这么多毫秒提交，用来抵消声卡的固定延迟。\n"
+           + "还觉得声音比动作晚就往右调；觉得声音抢在动作前头了就往左调。";
+}
+$("#avLead").oninput = () => {
+  const v = parseInt($("#avLead").value, 10) || 0;
+  try{ localStorage.setItem(ALIGN_KEY, String(v)); }catch(e){}
+  renderAlign();
+};
 
 function audioCtx(){
   if(!SND.ctx){
@@ -3326,7 +3396,7 @@ function tone(note, durMs, vel, force){
   if(!force && !$("#sndOn").checked) return;
   S.sndFired = (S.sndFired || 0) + 1;      // 给自测断言用：声音确实被调度了
   const ctx = audioCtx(); if(!ctx) return;
-  const t0  = ctx.currentTime + 0.01;
+  const t0  = ctx.currentTime + TONE_LEAD_MS / 1000;
   const amp = Math.max(0.08, Math.min(1, vel || 0.8));
   /* 衰减尾巴必须短。原来最短 0.14s + 0.30s 尾巴，而 200% 速度的革命练习曲
      音符间隔本来就不足 140ms —— 每个音都拖 0.44s，全糊在一起。

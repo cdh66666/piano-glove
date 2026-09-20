@@ -833,9 +833,11 @@ function metaKinds(buf){
   await click("#btnPlay");
   await page.waitForTimeout(900);
   const live = await page.evaluate(() => {
-    let onsSent = 0;
+    let onsSent = 0, onsRung = 0;
     for(let i = 0; i < S.cursor; i++) if(S.plan.events[i].on) onsSent++;
-    return {head: ROLL.head, head0: window.__head0, snd: S.sndFired, onsSent,
+    for(let i = 0; i < S.sndCursor; i++) if(S.plan.events[i].on) onsRung++;
+    return {head: ROLL.head, head0: window.__head0, snd: S.sndFired, onsSent, onsRung,
+            sndCursor: S.sndCursor, cursor: S.cursor, lead: S.sndLead,
             playing: S.playing, ctx: SND.ctx ? SND.ctx.state : "none"};
   });
   /* 直接在「播放中」调用 stopPlay 并**立刻**读节点数 —— 只有这样才能测到 silence()。
@@ -850,8 +852,15 @@ function metaKinds(buf){
     "head0=" + live.head0 + " head=" + Math.round(live.head));
   check("播放时确实起了音", live.snd > 0,
     "起音 " + live.snd + " 次（AudioContext=" + live.ctx + "）");
-  check("起音数 == 已发出的「按下」数（同一条事件流）", live.snd === live.onsSent,
-    "起音 " + live.snd + " / 按下 " + live.onsSent);
+  /* 声音由**自己的游标**驱动 —— 音画对齐要把声音提前提交（见页面的 audioLeadMs），
+     所以它对应的是「声音游标越过的按下数」，不是动作游标的。
+     原先这里比的是动作游标：在小星星这种稀疏曲子上恰好相等、侥幸为真，
+     换一首密集的曲子就会红 —— 属于隐性假绿，不是真过。 */
+  check("起音数 == 声音游标越过的「按下」数（声音只有一个来源）",
+    live.snd === live.onsRung, "起音 " + live.snd + " / 声音游标按下 " + live.onsRung);
+  check("声音游标不落后于动作游标（补偿只会让声音提前）",
+    live.sndCursor >= live.cursor,
+    "声音游标 " + live.sndCursor + " / 动作游标 " + live.cursor);
   check("停止后音频节点被清空", afterStop.n === 0, "剩余节点 " + afterStop.n);
   check("停止后播放头回到起点", afterStop.head === 0, "head=" + afterStop.head);
 
@@ -867,6 +876,76 @@ function metaKinds(buf){
     muted.snd === 0 && muted.fired > 0,
     "起音 " + muted.snd + " / 动作 " + muted.fired);
   await shot("08b-roll");
+
+  /* ★ 音画对齐（用户反馈「舵机按下去要过一会声音才响」的回归）——
+     声音必须真的**提前提交**，抵消声卡那条 baseLatency + outputLatency 的固定延迟。
+
+     为什么不能只看音符个数：补偿窗口只有 ~60ms，而小星星的音符间隔是 3.3 秒，
+     窗口里根本没有第二个音，那种写法怎么写都是绿的。
+     这里改成**逐个音**比对：包住 tone 记下每个音的「提交时刻」，
+     再和该音在曲谱里的理论时刻比 —— 有补偿就该早约 lead 毫秒，且每个音都测得出来。
+     用密集曲子（革命练习曲，真实间隔 188ms）保证样本够。
+     关掉「补齐按不了的音」：丢音补齐也走 tone，会把样本顺序搅乱。 */
+  const align = await page.evaluate(async () => {
+    const idx = SONG_LIB.findIndex(s => s.slug === "revolutionary");
+    const sel = document.querySelector("#songLib");
+    sel.value = String(idx);
+    sel.dispatchEvent(new Event("change"));
+    await new Promise(r => setTimeout(r, 600));
+    if(S.info.armed !== "1"){ await T.send("ARM", 3000); await refreshInfo(); }
+
+    const allEl = document.querySelector("#sndAll");
+    const wasAll = allEl.checked;
+    allEl.checked = false;
+    document.querySelector("#sndOn").checked = true;
+
+    const rec = [];
+    const orig = window.tone;
+    window.tone = function(){
+      if(S.playing) rec.push(performance.now() - S.t0);   // 提交时刻（真实毫秒，从 t0 起算）
+      return orig.apply(this, arguments);
+    };
+    document.querySelector("#btnPlay").click();
+    await new Promise(r => setTimeout(r, 4500));
+    document.querySelector("#btnStop").click();
+    await new Promise(r => setTimeout(r, 200));
+    window.tone = orig;
+    allEl.checked = wasAll;
+
+    const k = curSpeed();
+    /* 第 i 次 tone 调用 = 第 i 个 on 事件（声音游标按事件顺序推进，同一个来源） */
+    const ons = S.plan.events.filter(e => e.on);
+    const early = [];
+    for(let i = 0; i < Math.min(rec.length, ons.length); i++){
+      early.push(ons[i].t / k - rec[i]);                 // 正数 = 提前了
+    }
+    early.sort((a, b) => a - b);
+    return {
+      n: early.length, lead: S.sndLead,
+      med: early.length ? early[Math.floor(early.length / 2)] : null,
+      lo: early.length ? early[0] : null,
+      hi: early.length ? early[early.length - 1] : null
+    };
+  });
+  check("音画对齐：声音确实提前提交了（提前量≈实测声卡延迟，逐个音验过）",
+    align.n >= 5 && align.med > align.lead * 0.5 && align.med <= align.lead + 40,
+    "提前量 中位 " + Math.round(align.med) + "ms（补偿 " + align.lead
+      + "ms，样本 " + align.n + " 个音，范围 " + Math.round(align.lo) + "~" + Math.round(align.hi) + "ms）");
+
+  /* 控件：实测值要显示出来、微调要存得住 —— 两者缺一，「自动补的不合适」时用户就没法自救 */
+  const avUi = await page.evaluate(() => {
+    const el = document.querySelector("#avLead");
+    const before = document.querySelector("#avLeadLabel").textContent;
+    el.value = "25"; el.dispatchEvent(new Event("input"));
+    const after = document.querySelector("#avLeadLabel").textContent;
+    const stored = localStorage.getItem("pg_align_offset");
+    el.value = "0"; el.dispatchEvent(new Event("input"));      // 还原，别影响后面的断言
+    return {before, after, stored};
+  });
+  check("音画对齐控件把实测延迟显示出来", /实测 \d+ms/.test(avUi.before), avUi.before);
+  check("音画对齐的微调会存进浏览器（下次打开还在）",
+    avUi.stored === "25" && /\+25/.test(avUi.after), JSON.stringify(avUi));
+  await shot("08c-align");
 
   /* 回归：演奏引擎必须按**真实映射**取舵机 id，不能假设「槽位 i 的 id 就是 i+1」。
      原先写的是 `MOVE (slot+1)`：对出厂的 [1,2,3,4,5,6] 碰巧成立，

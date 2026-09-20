@@ -79,6 +79,15 @@ const MUTANTS = [
     find: '    if(parseInt(raw[0], 10) !== LATCH_SLOT) return null;',
     repl: '    if(false) return null;',
     expect: "对调后使能位不会串到另一根轴上" },
+
+  /* ---- 音画对齐：声音要提前提交，抵消声卡的固定延迟（2026-09-20 加） ---- */
+  { name: "声音不提前提交（音画对齐补偿失效）",
+    file: "web_piano_glove.html",
+    find: "    const leadScore = Math.min(S.sndLead * speed, t);",
+    repl: "    const leadScore = 0; void S.sndLead;",
+    /* 注意这条期望的是**新加的**那条逐个音比对的断言。
+       不能指望「起音数 == 声音游标按下数」去咬它 —— 补偿没了，那个等式照样成立。 */
+    expect: "音画对齐：声音确实提前提交了" },
 ];
 
 /* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 7 个都重跑一遍：
