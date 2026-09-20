@@ -115,6 +115,22 @@ const server = http.createServer((req,res)=>{
   await shot("v7c-latch-row");
   await pg.click("#btnStop");
 
+  /* 起音点：卷帘图动作条上那道刻度 + 两个控件的读数（2026-09-20 加）。
+     那道刻度是"声音在动作的哪一刻响"**唯一**的可视凭证 ——
+     不单独放大拍一张的话，出了偏差就只能靠耳朵吵。
+     用元素截图而不是视口截图：刻度只有 1px 宽，缩进整页图里根本看不清。 */
+  await pg.evaluate(() => {
+    const el = document.querySelector("#roll"); if(el) el.scrollIntoView({ block: "center" });
+  });
+  await pg.waitForTimeout(250);
+  const rollEl = await pg.$("#roll");
+  if(rollEl) await rollEl.screenshot({ path: path.join(OUT, "v7d-attack-tick.png") });
+  await pg.evaluate(() => {
+    const el = document.querySelector("#avAttack"); if(el) el.scrollIntoView({ block: "center" });
+  });
+  await pg.waitForTimeout(200);
+  await shot("v7e-attack-rows");
+
   // 窄屏手机尺寸检查
   const m = await b.newPage({ viewport:{width:360,height:740}, deviceScaleFactor:2 });
   await m.goto(`http://127.0.0.1:${PORT}/web_piano_glove.html?sim=1`);

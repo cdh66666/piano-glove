@@ -80,14 +80,27 @@ const MUTANTS = [
     repl: '    if(false) return null;',
     expect: "对调后使能位不会串到另一根轴上" },
 
-  /* ---- 音画对齐：声音要提前提交，抵消声卡的固定延迟（2026-09-20 加） ---- */
-  { name: "声音不提前提交（音画对齐补偿失效）",
+  /* ---- 起音点 / 音画对齐：声音落在「手指走到行程一半」那一刻（2026-09-20 加） ----
+     出声时刻（真实毫秒）= 按下时刻 + 行程×起音点 − 声卡延迟，这一条式子拆成两个变异：
+       · 砍掉声卡延迟 → 声音整段晚一个延迟（用户第一轮的原始症状）
+       · 砍掉起音点   → 声音回到"手指一动就响"（用户第二轮的原始症状）
+     两个都被同一条逐个音比对的断言咬住。
+
+     ⚠️ 这条断言有分辨力是有前提的：e2e 里特意把「手指行程时间」拉到 200ms 再测，
+     让 行程×起音点 = 100ms 远大于一帧的量化误差（16.7ms）。
+     用默认的 90ms 时，预期提前量才 -40 → 差一点点就落进容差里，变成假绿。 */
+  { name: "声卡延迟不补偿（声音整段晚一个延迟）",
     file: "web_piano_glove.html",
-    find: "    const leadScore = Math.min(S.sndLead * speed, t);",
-    repl: "    const leadScore = 0; void S.sndLead;",
-    /* 注意这条期望的是**新加的**那条逐个音比对的断言。
-       不能指望「起音数 == 声音游标按下数」去咬它 —— 补偿没了，那个等式照样成立。 */
-    expect: "音画对齐：声音确实提前提交了" },
+    find: "    const strikeAhead = S.sndLead - S.plan.stroke * S.sndAttack;",
+    repl: "    const strikeAhead = -S.plan.stroke * S.sndAttack; void S.sndLead;",
+    /* 不能指望「起音数 == 声音游标按下数」去咬它 —— 补偿没了，那个等式照样成立。 */
+    expect: "起音点：声音落在" },
+
+  { name: "起音点被忽略（声音回到「手指一动就响」）",
+    file: "web_piano_glove.html",
+    find: "    const strikeAhead = S.sndLead - S.plan.stroke * S.sndAttack;",
+    repl: "    const strikeAhead = S.sndLead; void S.sndAttack;",
+    expect: "起音点：声音落在" },
 
   /* ---- 跨来源找桥（2026-09-20 加）----
      用户实际踩的坑：页面被别的本地服务器托管、或直接双击 .html 打开时，

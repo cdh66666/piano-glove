@@ -596,10 +596,16 @@ pre#log .sys{color:#c9a5ff}
           <span id="sndState" style="font-size:12px;color:var(--sub);flex:1">音频未启动</span>
         </div>
         <div class="row">
-          <label title="声音整体提前多少毫秒提交，用来抵消声卡的固定延迟">音画对齐</label>
+          <label title="声音在手指走完这段行程的百分之多少时响。真钢琴也是按到一半就击弦，不是等按到底">起音点</label>
+          <input type="range" id="avAttack" min="0" max="90" step="5" value="50" style="flex:1;min-width:120px">
+          <span id="avAttackLabel" style="width:104px;text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)">—</span>
+        </div>
+        <div class="row">
+          <label title="声音整体提前多少毫秒提交，用来抵消声卡的固定延迟。起音点已经算进去了，这里只是最后的微调">音画对齐</label>
           <input type="range" id="avLead" min="-60" max="60" step="5" value="0" style="flex:1;min-width:120px">
           <span id="avLeadLabel" style="width:104px;text-align:right;font-variant-numeric:tabular-nums;color:var(--sub)">待启动</span>
         </div>
+        <div id="avNet" style="font-size:12px;color:var(--sub);margin:-4px 0 2px"></div>
         <p class="hint" style="margin-top:-2px">
           如果试听有声音、演奏却没有，那是<b>播放速度</b>或<b>「播放声音」没勾</b>；
           如果试听也没声音，点上面的按钮 —— 浏览器要求音频必须由一次点击启动，
@@ -1475,8 +1481,9 @@ const S = {
   calSamples:{},
   midi:null, plan:null, notes:null,
   playing:false, cursor:0, raf:null, t0:0, fired:0, startedAt:0, lastRateAt:0, lastRateCount:0,
-  sndCursor:0,            // 声音游标：独立于动作游标，因为声音要提前「提交」（见 audioLeadMs）
-  sndLead:0,              // 本次演奏的补偿量（毫秒）；开场定住，中途不改
+  sndCursor:0,            // 声音游标：独立于动作游标，因为声音要「提交」得比动作早（见 audioLeadMs）
+  sndLead:0,              // 本次演奏的声卡补偿量（毫秒）；开场定住，中途不改
+  sndAttack:0.5,          // 本次演奏的起音点：声音落在手指行程的百分之多少（0~0.9）
   pollTimer:null,
   latchApplied:false,     // 本次演奏有没有真的把侧摆摆过去（停止时决定要不要送回位）
   latchTouched:false      // 用户动过使能位滑块没有（没动过就跟随已记住的值）
@@ -3071,6 +3078,9 @@ function ampOf(vel){
    否则界面上的丢音数、卷帘图和实际发出的动作会对不上。 */
 $("#fStroke").oninput = () => {
   $("#fStrokeLabel").textContent = strokeMs() + "ms";
+  /* 行程一变，「起音点 = 行程的百分之多少」换算出来的毫秒数也跟着变，
+     那行读数必须同步 —— 否则用户看到的是旧行程算出来的数。 */
+  if(typeof renderAlign === "function") renderAlign();
   if(S.midi) analyze();
 };
 $("#fStrokeLabel").textContent = strokeMs() + "ms";
@@ -3227,6 +3237,9 @@ $("#btnPlay").onclick = async () => {
   S.playing = true; S.cursor = 0; S.fired = 0;
   S.dCursor = 0; S.sndFired = 0;          // 丢音游标 / 起音计数（自测要用）
   S.sndCursor = 0; S.sndLead = audioLeadMs();   // 声音游标 + 音画对齐补偿量（开场定住）
+  /* 起音点也开场定住 —— 演奏中途滑滑块不该让这一场的声音跳一下。
+     它和 sndLead 一起决定「声音落在按下后的第几毫秒」。 */
+  S.sndAttack = attackPct();
   S.fireQuiet = 0;                        // 演奏期间被折叠进批次的命令数（不写日志）
   S.lastRateAt = performance.now(); S.lastRateCount = 0;
   T.fireStats = {batches:0, cmds:0, maxBatch:0};   // 本次演奏的批量发送统计
@@ -3241,12 +3254,19 @@ $("#btnPlay").onclick = async () => {
     const now = performance.now();
     const t = (now - S.t0) * speed;
 
-    /* 声音要**提前**提交（见 audioLeadMs）：音频链有固定延迟，不补的话每个音都晚那么多。
-       提前量换算到曲谱域就是 lead × speed；但不能超过已播时间，
+    /* ★ 声音什么时候响 = 手指走到行程的**起音点**（默认一半）那一刻。
+       真钢琴就是这样：压到中段击弦，不是等琴键按到底。
+       从这个「想让声音响的时刻」倒推出**提交时刻**：
+           提交时刻 = 按下时刻 + 行程×起音点 − 声卡延迟
+       换算成"要提前看多少毫秒的事件"就是 strikeAhead（正 = 早于按下，
+       负 = 比按下还晚 —— 起音点超过声卡延迟时就会这样，正是 50% 行程时的情形）。
+       提前量换算到曲谱域要乘 speed；但不能超过已播时间，
        否则曲子开头那几个音会挤进第一帧一起响。 */
-    const leadScore = Math.min(S.sndLead * speed, t);
+    const strikeAhead = S.sndLead - S.plan.stroke * S.sndAttack;
+    const leadScore = Math.min(strikeAhead * speed, t);
 
-    /* ① 声音：独立游标，提前 leadScore 触发 —— 物理出声正好落回动作那一刻。
+    /* ① 声音：独立游标，按上面算出的提交时刻触发 ——
+       手指走到起音点（行程一半）的那一刻，耳朵里正好听到。
        传 holdReal（真实毫秒）而不是 durMs：durMs 是曲谱时长，
        不除掉速度倍率的话 200% 下每个音都拖成两倍长、糊成一片。 */
     while(S.sndCursor < ev.length && ev[S.sndCursor].t <= t + leadScore){
@@ -3279,7 +3299,8 @@ $("#btnPlay").onclick = async () => {
        画面上一眼看得出丢在哪，耳朵上也听得出。 */
     if($("#sndAll").checked && S.plan.droppedNotes){
       const dn = S.plan.droppedNotes;
-      /* 同样提前 leadScore —— 补齐的音也是声音，要和手套按下的那些音同一把尺子 */
+      /* 同一个 leadScore —— 补齐的音没有手指动作，但它必须和手套真按的那批音
+         **同一时刻响**，否则整首曲子会听起来有两个错开的节奏 */
       while(S.dCursor < dn.length && dn[S.dCursor].t <= t + leadScore){
         const n = dn[S.dCursor++];
         /* 同样换成真实时长 —— 和手套真正按下去的那些音用同一把尺子 */
@@ -3330,13 +3351,24 @@ const TONE_LEAD_MS = 10;
    而舵机命令几乎不等 —— 动作在 t 那一刻就开始动，声音却晚 60ms 才到耳朵。
    60ms 已经在人能察觉音画不同步的区间里，所以感觉「按下去没跟着响」。
 
-   解法：把声音的**提交时刻提前**这么多。物理出声 = 提交时刻 + 固定延迟，
-   提前提交就正好抵消，响声落回动作那一刻。注意方向 ——
-   补偿是让声音「早提交」，不是「晚出声」，所以不会让音往后拖。 */
+   解法分两步，缺一不可：
+     ① **起音点**：真钢琴不是等琴键按到底才响，是压到行程中段就击弦。
+        手套同理 —— 手指刚离开待命位那一刻（0%）根本还没碰到琴键，
+        声音搁在那里就会显得"抢在手指前头"。默认落在**行程 50%**。
+     ② **声卡延迟**：物理出声 = 提交时刻 + 固定延迟，所以提交要提前这么多。
+   最终提交时刻 = 按下时刻 + 行程×起音点 − 声卡延迟。
+   起音点（正）把声音往后推，声卡延迟（正）把它往前拉，两者相抵才是耳朵听到的落点。 */
 const ALIGN_KEY = "pg_align_offset";
 function alignOffset(){
   const v = parseInt(localStorage.getItem(ALIGN_KEY) || "0", 10);
   return Number.isFinite(v) ? Math.max(-80, Math.min(80, v)) : 0;
+}
+
+/* 起音点：声音落在手指行程的百分之多少处（0~90）。存的是百分数。 */
+const ATTACK_KEY = "pg_attack_pct";
+function attackPct(){
+  const v = parseInt(localStorage.getItem(ATTACK_KEY) || "50", 10);
+  return Number.isFinite(v) ? Math.max(0, Math.min(90, v)) / 100 : 0.5;
 }
 /* 本次该提前多少毫秒。自动取声卡报的延迟；声卡不报就退回只补调度提前量。
    上限 300ms 是为了防止某个驱动报出离谱的数，把声音整段提到动作前面去。 */
@@ -3369,27 +3401,65 @@ function setAudioBadge(kind, extra){
   renderAlign();                 // 音频一就绪就把「实测延迟」显示出来
 }
 
-/* 「音画对齐」控件：自动量到的延迟 + 用户微调，都摆出来，别让人猜。
+/* 「起音点 / 音画对齐」控件：自动量到的延迟 + 用户微调，都摆出来，别让人猜。
    为什么必须留手动入口：自动读的是声卡自报的 baseLatency + outputLatency，
    不同驱动/耳机报的值未必准（蓝牙尤其离谱），最后还得用户耳朵说了算。 */
 function renderAlign(){
   const el = $("#avLead"), lb = $("#avLeadLabel");
-  if(!el || !lb) return;
+  const at = $("#avAttack"), atlb = $("#avAttackLabel"), net = $("#avNet");
+  const stroke = strokeMs();
+  const pct = attackPct();
   const off = alignOffset();
-  el.value = String(off);
   const c = SND.ctx;
   const auto = c ? Math.round(((c.baseLatency || 0) + (c.outputLatency || 0)) * 1000 + TONE_LEAD_MS)
                  : null;
-  lb.textContent = (auto === null ? "待启动" : "实测 " + auto + "ms")
-                 + (off ? "　" + (off > 0 ? "+" : "") + off : "");
-  lb.title = "声音整体提前这么多毫秒提交，用来抵消声卡的固定延迟。\n"
-           + "还觉得声音比动作晚就往右调；觉得声音抢在动作前头了就往左调。";
+
+  if(at && atlb){
+    at.value = String(Math.round(pct * 100));
+    atlb.textContent = "行程 " + Math.round(pct * 100) + "% ＝ "
+                     + Math.round(stroke * pct) + "ms";
+    atlb.title = "手指走完整段行程要 " + stroke + "ms（第 4 步「手指行程时间」），"
+               + "声音落在其中 " + Math.round(pct * 100) + "% 处，也就是按下后 "
+               + Math.round(stroke * pct) + "ms。\n"
+               + "真钢琴是压到中段就击弦；调到 0% 就是「手指一动就响」，调到 90% 就是「快按到底才响」。";
+  }
+  if(el && lb){
+    el.value = String(off);
+    lb.textContent = (auto === null ? "待启动" : "实测 " + auto + "ms")
+                   + (off ? "　" + (off > 0 ? "+" : "") + off : "");
+    lb.title = "声音整体提前这么多毫秒提交，用来抵消声卡的固定延迟。\n"
+             + "它是在「起音点」之上做最后的微调；还觉得声音比动作晚就往右调。";
+  }
+  /* 净落点 = 起音点把声音往后推、声卡延迟把它往前拉，两者相抵的结果。
+     只写"提前 15ms"这种数字用户没法核对，干脆把三个数都摊开。 */
+  if(net){
+    const hw = auto === null ? null : Math.round(auto + off);   // 声卡延迟（含微调）
+    if(hw === null){
+      net.textContent = "声音落点：按下后 " + Math.round(stroke * pct) + "ms"
+                      + "（声卡延迟要等音频启动后才能量）";
+    }else{
+      const ahead = hw - stroke * pct;      // 正数 = 提交时刻早于「手指开始动」
+      net.innerHTML = "声音落点：手指走到 <b>" + Math.round(stroke * pct) + "ms</b>（行程 "
+        + Math.round(pct * 100) + "%）时出声　│　声卡 <b>" + hw + "ms</b>　│　提交时刻 "
+        + "<b>" + (ahead >= 0 ? "提前 " + Math.round(ahead) : "推后 " + Math.round(-ahead)) + "ms</b>";
+    }
+  }
 }
+$("#avAttack").oninput = () => {
+  const v = parseInt($("#avAttack").value, 10) || 0;
+  try{ localStorage.setItem(ATTACK_KEY, String(v)); }catch(e){}
+  renderAlign();
+  /* 卷帘图动作条上的起音刻度跟着走 —— 不重画的话用户拖了滑块也看不到变化 */
+  try{ refreshRoll(S.playing ? (performance.now() - S.t0) * curSpeed() : 0); }catch(e){}
+};
 $("#avLead").oninput = () => {
   const v = parseInt($("#avLead").value, 10) || 0;
   try{ localStorage.setItem(ALIGN_KEY, String(v)); }catch(e){}
   renderAlign();
 };
+/* 首屏就把两个数摆出来：起音点那行不能空着等用户去点一下才显示。
+   此时音频还没启动，声卡延迟显示「待启动」，但起音点的 ms 已经算得出来。 */
+renderAlign();
 
 function audioCtx(){
   if(!SND.ctx){
@@ -3595,7 +3665,10 @@ function rollWindow(centerMs){
 function rollSig(){
   const dn = (S.plan && S.plan.droppedNotes) ? S.plan.droppedNotes.length : 0;
   const en = (S.plan && S.plan.events) ? S.plan.events.length : 0;
-  return $("#rollMode").value + "|" + en + ":" + dn;
+  /* 起音点 / 行程也在签名里：动作条上的那道刻度是它们算出来的，
+     改了这两个旋钮而签名没变的话，画布会拿旧的静态层继续贴 —— 刻度就"不跟手"了。 */
+  const atk = Math.round(attackPct() * 100) + "@" + (S.plan ? S.plan.stroke : 0);
+  return $("#rollMode").value + "|" + en + ":" + dn + "|" + atk;
 }
 function rollNeedsRedraw(centerMs){
   if(rollSig() !== ROLL.sig) return true;
@@ -3661,6 +3734,26 @@ function drawRollStatic(){
     g.fillStyle = SLOT_COLOR[e.slot];
     g.fillRect(x, L.yBot + r * ROWH + 3, Math.max(2, Math.min(w, L.x1 - x)), ROWH - 6);
   });
+  /* ★ 起音点刻度：这根手指按下去的过程中，**声音在第几毫秒响**。
+     条宽 = 这一按的**真实**按住时长，所以刻度的相对位置 = 行程×起音点 ÷ 按住时长
+     （真实域和曲谱域是同一个比值，直接除即可）。
+     于是长音上刻度靠在最左边（一按就响，然后一直按住），短音上正好落在中段 ——
+     一眼看得出"声音到底在动作的哪一刻响"，不用靠耳朵猜。
+     深浅两道并排画：动作条颜色有亮有暗，单色线条总会在某根手指上看不见。 */
+  const atkMs = (S.plan.stroke || 0) * (S.playing ? S.sndAttack : attackPct());
+  if(atkMs > 0){
+    ons.forEach(e => {
+      const r = PLAY_SLOTS.indexOf(e.slot);
+      if(r < 0 || !(e.holdReal > 0)) return;
+      const x = X(e.t), w = Math.max(2, e.durMs / ROLL.span * W);
+      if(x + w < L.x0 || x > L.x1 || w < 8) return;
+      const frac = atkMs / e.holdReal;
+      if(frac > 0.95) return;                       // 刻度贴到条尾就不画了，省得糊成一条边
+      const tx = Math.round(x + w * frac);
+      g.fillStyle = "#1f2733"; g.fillRect(tx, L.yBot + r * ROWH + 4, 1, ROWH - 8);
+      g.fillStyle = "#ffffff"; g.fillRect(tx - 1, L.yBot + r * ROWH + 4, 1, ROWH - 8);
+    });
+  }
   /* 轨名 + 分隔线 */
   g.font = "10px sans-serif"; g.textBaseline = "middle";
   for(let r = 0; r < rollRows(); r++){
@@ -3719,6 +3812,8 @@ function renderRollLegend(){
       esc(SLOTS[s]) + '</span>').join("") +
     '<span style="display:inline-flex;align-items:center;gap:4px">' +
     '<i style="width:10px;height:10px;border-radius:3px;background:#d7dde5;display:inline-block"></i>丢掉的音</span>' +
+    '<span style="display:inline-flex;align-items:center;gap:4px">' +
+    '<i style="width:10px;height:12px;background:linear-gradient(90deg,#fff 0 50%,#1f2733 50% 100%);display:inline-block"></i>起音点（这里出声）</span>' +
     (LATCH_SLOT >= 0
       ? '<span style="color:#9aa4b2">' + esc(SLOTS[LATCH_SLOT]) + '（侧摆）不参与演奏，整场不动</span>'
       : "");

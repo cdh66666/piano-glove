@@ -838,6 +838,7 @@ function metaKinds(buf){
     for(let i = 0; i < S.sndCursor; i++) if(S.plan.events[i].on) onsRung++;
     return {head: ROLL.head, head0: window.__head0, snd: S.sndFired, onsSent, onsRung,
             sndCursor: S.sndCursor, cursor: S.cursor, lead: S.sndLead,
+            attack: S.sndAttack, stroke: S.plan.stroke,
             playing: S.playing, ctx: SND.ctx ? SND.ctx.state : "none"};
   });
   /* 直接在「播放中」调用 stopPlay 并**立刻**读节点数 —— 只有这样才能测到 silence()。
@@ -858,9 +859,16 @@ function metaKinds(buf){
      换一首密集的曲子就会红 —— 属于隐性假绿，不是真过。 */
   check("起音数 == 声音游标越过的「按下」数（声音只有一个来源）",
     live.snd === live.onsRung, "起音 " + live.snd + " / 声音游标按下 " + live.onsRung);
-  check("声音游标不落后于动作游标（补偿只会让声音提前）",
-    live.sndCursor >= live.cursor,
-    "声音游标 " + live.sndCursor + " / 动作游标 " + live.cursor);
+  /* 声音游标与动作游标的**先后**由「起音点 ÷ 声卡延迟」决定：
+     起音点（行程一半）把声音往后推、声卡延迟把它往前拉，谁大就谁说了算。
+     所以不能死写「声音游标一定不落后」—— 本机声卡延迟 60ms > 行程一半 45ms 时成立，
+     换一块只报 30ms 的声卡就不成立，那种断言属于把本机参数焊进测试里。 */
+  const aheadSign = live.lead - live.stroke * live.attack;
+  check("声音游标与动作游标的先后 == 「起音点 vs 声卡延迟」算出来的方向",
+    aheadSign >= 0 ? live.sndCursor >= live.cursor : live.sndCursor <= live.cursor,
+    "起音点 " + Math.round(live.stroke * live.attack) + "ms vs 声卡 " + live.lead
+      + "ms（" + (aheadSign >= 0 ? "净提前" : "净推后") + "）→ 声音游标 "
+      + live.sndCursor + " / 动作游标 " + live.cursor);
   check("停止后音频节点被清空", afterStop.n === 0, "剩余节点 " + afterStop.n);
   check("停止后播放头回到起点", afterStop.head === 0, "head=" + afterStop.head);
 
@@ -877,14 +885,16 @@ function metaKinds(buf){
     "起音 " + muted.snd + " / 动作 " + muted.fired);
   await shot("08b-roll");
 
-  /* ★ 音画对齐（用户反馈「舵机按下去要过一会声音才响」的回归）——
-     声音必须真的**提前提交**，抵消声卡那条 baseLatency + outputLatency 的固定延迟。
+  /* ★ 起音点 + 音画对齐（用户两轮反馈的回归）——
+     第一轮：「舵机按下去要过一会声音才响」→ 声音要**提前提交**抵消声卡固定延迟。
+     第二轮：「应该在按下行程的一半就发出声音，跟弹钢琴一样」
+           → 出声时刻不是"手指一动"，而是"手指走到行程的一半"。
 
-     为什么不能只看音符个数：补偿窗口只有 ~60ms，而小星星的音符间隔是 3.3 秒，
-     窗口里根本没有第二个音，那种写法怎么写都是绿的。
-     这里改成**逐个音**比对：包住 tone 记下每个音的「提交时刻」，
-     再和该音在曲谱里的理论时刻比 —— 有补偿就该早约 lead 毫秒，且每个音都测得出来。
-     用密集曲子（革命练习曲，真实间隔 188ms）保证样本够。
+     合起来就一条式子（真实毫秒）：
+         提交时刻 = 按下时刻 + 行程 × 起音点 − 声卡延迟
+     这里**逐个音**验证这条式子真的被算进去了 —— 小星星音符间隔 3.3 秒，
+     补偿窗口里根本没有第二个音，那种"数一数有没有提前"的写法怎么写都是绿的。
+     改用密集曲子（革命练习曲，真实间隔 188ms）保证样本够。
      关掉「补齐按不了的音」：丢音补齐也走 tone，会把样本顺序搅乱。 */
   const align = await page.evaluate(async () => {
     const idx = SONG_LIB.findIndex(s => s.slug === "revolutionary");
@@ -894,10 +904,22 @@ function metaKinds(buf){
     await new Promise(r => setTimeout(r, 600));
     if(S.info.armed !== "1"){ await T.send("ARM", 3000); await refreshInfo(); }
 
+    /* ★ 把「手指行程时间」拉到 200ms 再测：这样 行程×起音点 = 100ms，
+       远大于一帧的量化误差（16.7ms），"起音点有没有被算进去"才测得出来。
+       用默认 90ms 时预期提前量是 −40ms，和"完全没减行程"只差 45ms，
+       被帧量化吃掉一半就滑进容差里 —— 又是一个假绿。测完还原。 */
+    const stEl = document.querySelector("#fStroke");
+    stEl.value = "200"; stEl.dispatchEvent(new Event("input"));
+    await new Promise(r => setTimeout(r, 400));
+
     const allEl = document.querySelector("#sndAll");
     const wasAll = allEl.checked;
     allEl.checked = false;
     document.querySelector("#sndOn").checked = true;
+    /* 起音点用默认的一半 —— 显式写一次，免得上一个用例把 localStorage 改了，
+       这里量到的提前量就跟着漂（断言是按默认值算的预期） */
+    const atkEl = document.querySelector("#avAttack");
+    atkEl.value = "50"; atkEl.dispatchEvent(new Event("input"));
 
     const rec = [];
     const orig = window.tone;
@@ -910,27 +932,89 @@ function metaKinds(buf){
     document.querySelector("#btnStop").click();
     await new Promise(r => setTimeout(r, 200));
     window.tone = orig;
-    allEl.checked = wasAll;
 
+    /* ★ 所有要断言的数据必须在这里**一次读干净**，不能等还原行程之后再读。
+       踩过的坑：先还原行程（那会触发 analyze() 重算 plan），再返回 S.plan.stroke ——
+       读到的是还原后那份（90），于是预期提前量算成 15ms 而不是 −40ms；
+       更糟的是 S.plan.events 也被换成了"按 90ms 算、丢音更少"的新列表，
+       和刚才实际演奏时那批 `on` 事件**下标全错位**，
+       量出来的"提前量"中位数成了 −1322ms 这种鬼数字。
+       教训：被测状态要在**受干扰之前**快照出来，别让"还原现场"的动作污染观测。 */
     const k = curSpeed();
+    const ons = S.plan.events.filter(e => e.on).map(e => e.t);
+    const snap = { stroke: S.plan.stroke, attack: S.sndAttack, lead: S.sndLead };
+
+    allEl.checked = wasAll;
+    stEl.value = "90"; stEl.dispatchEvent(new Event("input"));   // 还原行程，别影响后面的断言
+    await new Promise(r => setTimeout(r, 200));
+
     /* 第 i 次 tone 调用 = 第 i 个 on 事件（声音游标按事件顺序推进，同一个来源） */
-    const ons = S.plan.events.filter(e => e.on);
     const early = [];
     for(let i = 0; i < Math.min(rec.length, ons.length); i++){
-      early.push(ons[i].t / k - rec[i]);                 // 正数 = 提前了
+      early.push(ons[i] / k - rec[i]);                    // 正数 = 提交时刻早于「手指开始动」
     }
     early.sort((a, b) => a - b);
+    /* 理论提交时刻 = 声卡延迟 − 行程×起音点（**净提前量**，正 = 早于"手指开始动"提交）。
+       注意方向别想当然：行程一半 100ms 比声卡延迟 60ms 大，所以这一项是 **−40ms**
+       —— 意思是"手指都走了一半（100ms）声音才该响，可声卡只欠 60ms，
+       于是提交时刻反而要落在按下之后 40ms"。
+       提交只可能比理论时刻**晚**（rAF 一帧的量化误差），不可能更早。 */
     return {
-      n: early.length, lead: S.sndLead,
+      n: early.length, lead: snap.lead, stroke: snap.stroke, attack: snap.attack,
+      target: snap.lead - snap.stroke * snap.attack,
       med: early.length ? early[Math.floor(early.length / 2)] : null,
       lo: early.length ? early[0] : null,
       hi: early.length ? early[early.length - 1] : null
     };
   });
-  check("音画对齐：声音确实提前提交了（提前量≈实测声卡延迟，逐个音验过）",
-    align.n >= 5 && align.med > align.lead * 0.5 && align.med <= align.lead + 40,
-    "提前量 中位 " + Math.round(align.med) + "ms（补偿 " + align.lead
-      + "ms，样本 " + align.n + " 个音，范围 " + Math.round(align.lo) + "~" + Math.round(align.hi) + "ms）");
+  /* 先把"这个用例有分辨力"当前提断言掉：行程×起音点必须够大，
+     否则预期提前量跟"完全不减行程"差不了几毫秒，变异也测不出来。 */
+  check("起音点有分辨力：行程 × 起音点 要远大于一帧的量化误差（否则这个用例测不出东西）",
+    align.stroke * align.attack >= 60,
+    "行程 " + align.stroke + "ms × 起音点 " + Math.round(align.attack * 100)
+      + "% = " + Math.round(align.stroke * align.attack) + "ms");
+  /* ★ 这条断言是**单边**的，故意的：声音只可能比理论时刻**晚**（rAF 一帧的量化误差，
+     0~16.7ms），不可能在算出来的时刻之前提交。所以上界卡死在理论值 +2ms，
+     下界给足 30ms 让帧抖动过去。
+     单边窗口比"±25ms 对称容差"咬得紧得多：对称容差下"起音点被忽略"只差 20ms，
+     会整个滑进容差里 —— 又是一次假绿。 */
+  check("起音点：声音落在「手指走到行程一半」时（提交时刻 = 声卡延迟 − 行程×起音点，逐个音验过）",
+    align.n >= 5 && align.med <= align.target + 2 && align.med >= align.target - 30,
+    "实测提交时刻 中位 " + Math.round(align.med) + "ms（正数=早于手指开始动，负数=晚于），应为 "
+      + Math.round(align.target) + "ms ＝ 声卡 " + align.lead + " − 行程 " + align.stroke + "×"
+      + Math.round(align.attack * 100) + "%；样本 " + align.n
+      + " 个音，范围 " + Math.round(align.lo) + "~" + Math.round(align.hi) + "ms");
+
+  /* 起音点控件：默认一半、改得动、存得住、读数跟着行程换 —— 四件事缺一，
+     "声音位置不对"时用户就没法自救（这正是第一轮的教训：自动算的一定要留手动口子）。 */
+  const atkUi = await page.evaluate(() => {
+    const el = document.querySelector("#avAttack");
+    const def = el.value;
+    const atkLb = document.querySelector("#avAttackLabel").textContent;
+    const net0 = document.querySelector("#avNet").textContent;
+    el.value = "0"; el.dispatchEvent(new Event("input"));
+    const zeroLb = document.querySelector("#avAttackLabel").textContent;
+    el.value = "90"; el.dispatchEvent(new Event("input"));
+    const maxLb = document.querySelector("#avAttackLabel").textContent;
+    /* ⚠️ 必须**分别**读两次：踩过的坑是先设 90、再还原 50，然后才读 localStorage ——
+       读到的是还原后的 50，而期望却写的 90，断言就没意义了。 */
+    const stored90 = localStorage.getItem("pg_attack_pct");
+    el.value = "50"; el.dispatchEvent(new Event("input"));      // 还原，别影响后面的断言
+    const stored50 = localStorage.getItem("pg_attack_pct");
+    return {def, atkLb, net0, zeroLb, maxLb, stored90, stored50};
+  });
+  check("起音点控件默认落在行程一半，且读数把毫秒算出来",
+    atkUi.def === "50" && /行程 50%/.test(atkUi.atkLb) && /＝ \d+ms/.test(atkUi.atkLb),
+    JSON.stringify(atkUi.atkLb));
+  check("起音点两头都拉得动（0% = 手指一动就响，90% = 快按到底才响）",
+    /行程 0%/.test(atkUi.zeroLb) && /行程 90%/.test(atkUi.maxLb),
+    atkUi.zeroLb + " / " + atkUi.maxLb);
+  check("起音点的选择真的写进了浏览器（改 90 存 90，改回 50 存 50）",
+    atkUi.stored90 === "90" && atkUi.stored50 === "50",
+    "设 90 时存 " + atkUi.stored90 + "，设回 50 时存 " + atkUi.stored50);
+  check("「声音落点」那行把三个数都摊开（落点 / 声卡 / 提交提前量）",
+    /落点/.test(atkUi.net0) && /声卡/.test(atkUi.net0) && /提交时刻/.test(atkUi.net0),
+    atkUi.net0.replace(/\s+/g, " ").slice(0, 120));
 
   /* 控件：实测值要显示出来、微调要存得住 —— 两者缺一，「自动补的不合适」时用户就没法自救 */
   const avUi = await page.evaluate(() => {
