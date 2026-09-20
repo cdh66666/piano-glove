@@ -60,6 +60,25 @@ const MUTANTS = [
     find: '    if($("#sndAll").checked && S.plan.droppedNotes){',
     repl: '    if(false && S.plan.droppedNotes){',
     expect: "补齐按不了的音」真的多出声" },
+
+  /* ---- 拇指两轴：侧摆只使能、不演奏（2026-09-20 加） ---- */
+  { name: "侧摆也被算成一根能按琴键的手指",
+    file: "web_piano_glove.html",
+    find: '  PLAY_SLOTS = [0,1,2,3,4,5].filter(s => ROLES[s] !== "latch");',
+    repl: '  PLAY_SLOTS = [0,1,2,3,4,5];',
+    expect: "侧摆槽位拿不到任何音符" },
+
+  { name: "演奏前不把侧摆摆到使能位",
+    file: "web_piano_glove.html",
+    find: "  await latchEngage(true);",
+    repl: "  await latchEngage(false);",
+    expect: "演奏开始时侧摆恰好发一条命令" },
+
+  { name: "使能位不核对槽位（对调角色后会串到另一根轴上）",
+    file: "web_piano_glove.html",
+    find: '    if(parseInt(raw[0], 10) !== LATCH_SLOT) return null;',
+    repl: '    if(false) return null;',
+    expect: "对调后使能位不会串到另一根轴上" },
 ];
 
 /* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 7 个都重跑一遍：
@@ -76,6 +95,57 @@ function load(p){
 }
 function save(o, text){
   fs.writeFileSync(o.path, o.crlf ? text.replace(/\n/g, "\r\n") : text, "utf8");
+}
+
+/* ★ 崩溃自愈：这个脚本会把**正在开发的源码**临时改坏。
+   如果它自己被杀掉（超时、Ctrl-C、外层 timeout），finally 来不及执行，
+   源码就带着变异留在磁盘上 —— 下一轮会报"变异点找不到"，而且更糟的是
+   你可能带着一处假改动继续开发/提交（真踩过：holdReal 的下界被留成 Math.min）。
+   所以：开跑前先把原来那份存成 .mutbak，跑完删掉；下次启动看到 .mutbak
+   就说明上一轮没善终，先把它还原回去再干活。 */
+function backupPath(p){ return p + ".mutbak"; }
+function healLeftovers(files){
+  for(const p of files){
+    const b = backupPath(p);
+    if(fs.existsSync(b)){
+      fs.copyFileSync(b, p);
+      fs.unlinkSync(b);
+      console.log("!! 发现上一轮残留的变异备份，已把源码还原：" + path.basename(p));
+    }
+  }
+}
+/* ★ 还原一律以**磁盘上的备份**为准，不用内存里那份 f.text。
+   踩过的坑：内存还原 + 外层 SIGTERM 之后我手动 cp 回来，下一轮又被 kill，
+   源码就带着第 7 处变异（`if(false && S.plan.droppedNotes)`）继续往下开发，
+   一路改文案、一路没人发现，最后是 e2e 的「补齐按不了的音」断言把它抓出来的。
+   教训：内存里的字符串和磁盘上的文件是两回事，还原就 copyFileSync，字节级。
+   返回是否真的还原过（没备份=本来就没改，也算成功）。 */
+function restoreFromBackup(p){
+  const b = backupPath(p);
+  if(!fs.existsSync(b)) return false;
+  fs.copyFileSync(b, p);
+  fs.unlinkSync(b);
+  return true;
+}
+
+/* ★ 开跑前 / 收尾后都验一遍：每一处「本该在」的片段是否都还在。
+   残留变异的表现是「变异点找不到」+「源码静默带毒」，光靠 heal 挡不住
+   （备份本身也可能就是脏的）。这里直接把磁盘读回来核对，宁可当场停 ——
+   带着一处假改动跑完 181 项、还绿着提交，才是真正的灾难。 */
+function verifyClean(){
+  const dirty = [];
+  for(const m of MUTANTS){
+    const o = load(path.join(HOST, m.file));
+    if(!o.text.includes(m.find)) dirty.push(m.name + "  ← " + m.file
+      + " 里找不到「" + m.find.trim().slice(0, 46) + "…」");
+  }
+  if(dirty.length){
+    console.log("\n!! 源码不干净，先修好再跑（下面这些变异点本该存在却不在）：");
+    for(const d of dirty) console.log("   ✗ " + d);
+    console.log("   提示：git diff host/web_piano_glove.html 看有没有 if(false && / void el; 之类残留。");
+    process.exit(2);
+  }
+  console.log("源码自检通过：" + MUTANTS.length + " 处变异点全部处于「正常」状态。");
 }
 
 function runE2E(){
@@ -96,6 +166,8 @@ function runE2E(){
   const run = ONLY ? MUTANTS.filter(m => m.name.includes(ONLY)) : MUTANTS;
   console.log("=== 变异测试：每条断言都必须咬人 ===" +
               (ONLY ? "（只跑含「" + ONLY + "」的 " + run.length + " 处）" : ""));
+  healLeftovers([...new Set(MUTANTS.map(m => path.join(HOST, m.file)))]);
+  verifyClean();
   for(const m of run){
     const f = load(path.join(HOST, m.file));
     if(!f.text.includes(m.find)){
@@ -103,6 +175,7 @@ function runE2E(){
       bad++;
       continue;
     }
+    fs.writeFileSync(backupPath(f.path), f.crlf ? f.text.replace(/\n/g, "\r\n") : f.text, "utf8");
     save(f, f.text.replace(m.find, m.repl));
     let out = "";
     try{
@@ -110,7 +183,7 @@ function runE2E(){
     }catch(e){
       out = "跑挂了：" + e.message;
     }finally{
-      save(f, f.text);                      // 无论如何都要还原
+      restoreFromBackup(f.path);            // 以磁盘备份为准，字节级还原
     }
     const fails = out.split("\n").filter(l => l.includes("FAIL"));
     const hit = fails.some(l => l.includes(m.expect));
@@ -122,6 +195,7 @@ function runE2E(){
     }
   }
   try{ fs.unlinkSync(LOG); }catch(e){}
+  verifyClean();                            // 收尾再验一次：确认没留毒
   console.log("\n" + (bad ? "有 " + bad + " 处没咬住 ✘" : "全部咬住 ✔"));
   process.exit(bad ? 1 : 0);
 })();

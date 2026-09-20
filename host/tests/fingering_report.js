@@ -74,7 +74,14 @@ function verdict(rate){
     bpm: s.bpm, timesig: s.timesig, notes: s.notes, seconds: s.seconds,
     tests: s.tests, desc: s.desc,
   })));
-  const slots = await page.evaluate(() => SLOTS);
+  /* 角色从**页面**读，不在这里另写一份 ——
+     拇指那两根轴谁是"按压"谁是"侧摆"是用户在第 4 步一键定的，
+     报告里写死的话，对调一次就和实际演奏对不上了。 */
+  const roleInfo = await page.evaluate(() => ({
+    slots: SLOTS.slice(), roles: ROLES.slice(),
+    play: PLAY_SLOTS.slice(), latch: LATCH_SLOT
+  }));
+  const slots = roleInfo.slots;
   const gloveHz = await page.evaluate(() => GLOVE_MAX_PRESS_HZ);
   const speedMax = await page.evaluate(() => parseInt($("#speed").max, 10));
   console.log("曲库 " + lib.length + " 首：" + lib.map(s => s.slug).join(", "));
@@ -152,12 +159,23 @@ function verdict(rate){
   L.push("> 所以这里写的指法与实际演奏时手套执行的指法**必然是同一份数据**。");
   L.push("> 重新生成：`node host/tests/fingering_report.js`");
   L.push("");
-  L.push("## 六根手指");
+  L.push("## " + roleInfo.play.length + " 根参与演奏的手指（+ 1 根侧摆）");
   L.push("");
-  L.push("| 槽位 | 手指 | 角色 |");
-  L.push("| --- | --- | --- |");
-  const roles = ["拇指侧向按压", "拇指下压", "食指", "中指", "无名指", "小指"];
-  slots.forEach((s, i) => L.push("| " + i + " | " + s + " | " + roles[i] + " |"));
+  L.push("手套有 6 个舵机，但**只有 " + roleInfo.play.length + " 根真的按琴键**：");
+  L.push("");
+  L.push("| 槽位 | 手指 | 角色 | 参与演奏 |");
+  L.push("| --- | --- | --- | --- |");
+  slots.forEach((s, i) => {
+    const latch = i === roleInfo.latch;
+    L.push("| " + i + " | " + s + " | " +
+      (latch ? "把拇指摆到能压到琴键的位置（使能位，第 3C 步调）" : "按压琴键") +
+      " | " + (latch ? "✘ 否" : "✔ 是") + " |");
+  });
+  L.push("");
+  L.push("> **拇指为什么只算一根**：两根舵机里只有一根真的把拇指压到琴键上");
+  L.push("> （= 上面这根的「按压」），另一根只负责在开始演奏前把拇指**摆到合适的位置**，");
+  L.push("> 到位之后整场不动 —— 它不是一个可以独立演奏的自由度。");
+  L.push("> 所以「同时几个音」的上限是 " + roleInfo.play.length + "，不是 6。");
   L.push("");
   L.push("> 槽位（slot）是软件里的编号，和舵机 ID 是两回事，映射关系见调试台第 2 页。");
   L.push("");
@@ -184,7 +202,7 @@ function verdict(rate){
       " | " + verdict(rate) + " |");
   }
   L.push("");
-  L.push("**怎么读这张表**：算法只给了手套 6 个自由度，音比手多时它会**主动丢音保节奏**，");
+  L.push("**怎么读这张表**：算法只能用手套那 " + roleInfo.play.length + " 根参与演奏的手指，音比手多时它会**主动丢音保节奏**，");
   L.push("绝不会卡住不动。所以「丢音」不是故障，是设计好的降级 —— L1~L3 应当零丢音，");
   L.push("L4 应当极少丢音，L5 就是故意让它丢，用来看固件在超载下会不会被压死。");
   L.push("");
@@ -242,11 +260,12 @@ function verdict(rate){
     L.push("- " + song.desc);
     L.push("");
 
-    L.push("| 分配方式 | 已分配 | 丢音 | 峰值命令 | 六根手指各动了多少次 |");
+    L.push("| 分配方式 | 已分配 | 丢音 | 峰值命令 | " + roleInfo.play.length + " 根手指各动了多少次 |");
     L.push("| --- | ---: | ---: | ---: | --- |");
     for(const [k, label] of [["rr", "轮流分配"], ["pitch", "音高对应"]]){
       const m = modes[k];
-      const load = m.used.map((u, i) => slots[i] + " " + u).join(" · ");
+      /* 只列参与演奏的槽位：侧摆恒为 0，列出来会被读成"这根手指没派上用场" */
+      const load = roleInfo.play.map(i => slots[i] + " " + m.used[i]).join(" · ");
       L.push("| " + label + " | " + m.ons + "/" + m.total + " | " + m.dropped +
         "（" + pct(m.dropped, m.total) + "） | " + m.peak + " 条/秒 | " + load + " |");
     }
@@ -265,7 +284,7 @@ function verdict(rate){
     }else if(keys.length){
       L.push("**音 → 手指**：音域跨 " + keys.length + " 个半音（" +
         noteName(keys[0]) + "~" + noteName(keys[keys.length - 1]) +
-        "），6 根手指要覆盖整段音域，一个音高会按邻近关系落到不同手指。");
+        "），" + roleInfo.play.length + " 根手指要覆盖整段音域，一个音高会按邻近关系落到不同手指。");
       L.push("");
     }
 

@@ -68,9 +68,32 @@ const server = http.createServer((req,res)=>{
   await pg.click("#btnCalSave"); await pg.waitForTimeout(800);
   await shot("v4-cal-done");
 
+  /* 第 3C 步：拇指侧摆的「使能位」。这张卡片只有在**校准完成**之后
+     才会从"先完成第 3 步"变成可操作，所以必须拍在校准之后、试动作之前。
+     顺手把滑块拖到 35% 再点「记住这个位置」——拍下来的就是用户真看到的样子，
+     而不是一张空壳卡片。 */
+  await pg.evaluate(() => {
+    const el = document.querySelector("#latchPct");
+    if(el){ el.value = "35"; el.dispatchEvent(new Event("input")); }
+  });
+  await pg.waitForTimeout(300);
+  await pg.click("#btnLatchSave"); await pg.waitForTimeout(300);
+  await pg.evaluate(() => document.querySelector("#latchBody").scrollIntoView({ block: "start" }));
+  await pg.waitForTimeout(250);
+  await shot("v4b-latch-pos");
+  console.log("3C 使能位卡片:", await pg.textContent("#latchRow"));
+
   await pg.click('#tabbar button[data-p="test"]'); await pg.waitForTimeout(300);
   await pg.click("#btnArm"); await pg.waitForTimeout(500);
   await shot("v5-test");
+
+  /* 第 4 步的「两根轴对调」确认框 —— 拇指那两根轴谁按谁摆全靠它定，
+     下面的槽位表也多了「名称 / 角色」两列。 */
+  await pg.evaluate(() => {
+    const el = document.querySelector("#roleBox"); if(el) el.scrollIntoView({ block: "start" });
+  });
+  await pg.waitForTimeout(250);
+  await shot("v5b-role");
 
   await pg.click('#tabbar button[data-p="play"]'); await pg.waitForTimeout(300);
   await pg.setInputFiles("#file", path.join(HERE,"test.mid"));
@@ -82,6 +105,14 @@ const server = http.createServer((req,res)=>{
   await shot("v7-playing-a");
   await pg.waitForTimeout(1500);
   await shot("v7-playing-b");
+
+  /* 演奏页里侧摆那一行 —— 它显示的是「使能位」而不是深度，且必须写明不参与演奏。
+     这块文案是用户最容易被误导的地方（以前这里会让拇指侧摆也跟着按琴键）。 */
+  await pg.evaluate(() => {
+    const el = document.querySelector("#latchRow"); if(el) el.scrollIntoView({ block: "center" });
+  });
+  await pg.waitForTimeout(200);
+  await shot("v7c-latch-row");
   await pg.click("#btnStop");
 
   // 窄屏手机尺寸检查

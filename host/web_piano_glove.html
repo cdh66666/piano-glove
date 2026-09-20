@@ -163,10 +163,11 @@ pre#log .sys{color:#c9a5ff}
 <div class="topbar">
   <div class="t1">钢琴手套 · 调试台
     <span class="chip" id="cMode">未通路</span></div>
-  <div class="t2">微雪 ESP32 主控板 + 6 × Feetech STS3032 舵机　·　USB 串口 115200</div>
+  <div class="t2">微雪 ESP32 主控板 + 6 × Feetech STS3032 舵机　·　USB 串口 115200　·　拇指 2 轴 = 按压 + 侧摆</div>
   <div class="chips">
     <span class="chip bad" id="cConn">未连接</span>
     <span class="chip" id="cOnline">舵机 —/6</span>
+    <span class="chip" id="cFingers">参与演奏 —</span>
     <span class="chip" id="cCal">未校准</span>
     <span class="chip" id="cArm">未使能</span>
   </div>
@@ -276,7 +277,7 @@ pre#log .sys{color:#c9a5ff}
         <button id="btnSimBus" class="ghost">模拟：把 6 个舵机全部接回总线</button>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>槽位</th><th>手指</th><th>ID</th><th>状态</th><th>最小</th><th>中位</th><th>最大</th><th>行程</th><th>方向</th></tr></thead>
+        <thead><tr><th>槽位</th><th>名称</th><th>角色</th><th>ID</th><th>状态</th><th>最小</th><th>中位</th><th>最大</th><th>行程</th><th>方向</th></tr></thead>
         <tbody id="slotBody"></tbody></table></div>
       <div class="deplist" id="slotBars"></div>
       <p class="hint">行程条：<span style="color:#1a6ef0">蓝线</span>=中位　<span style="color:#e5484d">红线</span>=最大　浅蓝块=活动区间。</p>
@@ -310,8 +311,49 @@ pre#log .sys{color:#c9a5ff}
       <div class="tw" style="margin-top:12px"><table>
         <thead><tr><th>槽位</th><th>手指</th><th>采样数</th><th>最小</th><th>最大</th><th>幅度</th></tr></thead>
         <tbody id="calBody2"></tbody></table></div>
-      <p class="hint">采样开始后请反复做这几个动作：<b>拇指直直往下按到底 ↔ 松开</b>、<b>拇指往侧面压到底 ↔ 松开</b>、<b>其余四指伸直 ↔ 用力握拳</b>。
+      <p class="hint">采样开始后请反复做这几个动作：<b>拇指往下按到底 ↔ 松开</b>（按压轴）、
+        <b>拇指往侧面摆到头 ↔ 摆回</b>（侧摆轴，虽然它不参与演奏，但要靠这段范围来挑使能位）、
+        <b>其余四指伸直 ↔ 用力握拳</b>。
         幅度太小的槽位不会被记录，校准会失败。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="stepno">3C</span>设定拇指侧摆的「使能位」</h2>
+    <p class="desc">
+      拇指侧摆<b>不参与演奏</b>。它只干一件事：开始演奏前把拇指<b>摆到能压到琴键的位置</b>，
+      然后就停在那儿不动 —— 真正按下去的是拇指按压轴。
+      摆到哪个位置最合适，跟你的手形和连杆有关，<b>得试出来</b>，所以这一步要在手套戴在手上时做。
+    </p>
+    <div class="gate" id="latchGate"><b>先完成第 3 步</b>校准完成后才能调使能位。</div>
+    <div id="latchBody" style="display:none">
+      <div class="msg" id="latchHint">还没设定。</div>
+      <div class="row">
+        <label id="latchSlotLabel">侧摆轴</label>
+        <button id="btnLatchDown" class="ghost" title="往小位置走一点">◀</button>
+        <input type="range" id="latchPct" min="0" max="100" step="1" value="50" style="flex:1;min-width:120px">
+        <button id="btnLatchUp" class="ghost" title="往大位置走一点">▶</button>
+        <span id="latchPctL" style="width:104px;text-align:right;font-variant-numeric:tabular-nums">50%</span>
+      </div>
+      <div class="row">
+        <button id="btnLatchMove" class="primary">试这个位置（会动拇指）</button>
+        <button id="btnLatchRead" class="ghost">读当前位置</button>
+      </div>
+      <div class="row">
+        <button id="btnLatchSave" class="ok">记住这个位置</button>
+        <button id="btnLatchGo" class="ghost">回到使能位</button>
+        <button id="btnLatchClear" class="ghost">清除</button>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="latchAuto" checked> 每次开始演奏前自动摆到位</label>
+      </div>
+      <div class="msg" id="latchMsg">拖动滑块、点「试这个位置」来回试，摆到拇指刚好压在琴键上方时点「记住」。</div>
+      <p class="hint">
+        滑块的范围 = 这个槽位校准出来的整个侧摆行程。
+        <b>怎么算摆对了</b>：拇指指尖落在琴键正上方、再往下压时不会打滑、也不会顶到旁边的键。<br>
+        记不住具体数值没关系 —— 点「读当前位置」会把舵机现在的位置抄进滑块（你先用手把拇指摆好也认）。<br>
+        使能位<b>只在每次开始演奏时发一次</b>；演奏中它一动不动，停止后自动回到松开位。
+      </p>
     </div>
   </div>
 </section>
@@ -330,13 +372,25 @@ pre#log .sys{color:#c9a5ff}
       </div>
       <div class="msg" id="armMsg">点「使能」后才能驱动手指。</div>
       <div class="tw" style="margin-top:12px"><table>
-        <thead><tr><th>编号</th><th>手指</th><th>单独试</th><th>按下方向</th></tr></thead>
+        <thead><tr><th>编号</th><th>名称</th><th>角色</th><th>单独试</th><th>按下方向</th></tr></thead>
         <tbody id="testBody2"></tbody></table></div>
       <p class="hint">
         按方向不对就用右侧下拉改，会立刻写到固件（<code>SETDIR</code>）。
         「按一下」= 从<b>松开位一路按到你校准的最深处</b>，看到的就是<b>完整行程</b>；
         如果感觉只走了一小半，去第 3 步点一下「修正静止位」。
       </p>
+
+      <div class="warnbox" id="roleBox">
+        <b>先确认拇指这两根轴谁是谁</b>
+        点 1 号「按一下」，再点 2 号「按一下」，看拇指实际是怎么动的：<br>
+        · 拇指<b>往琴键方向压下去</b> → 这一根就是<b>按压轴</b>（参与演奏）<br>
+        · 拇指<b>往旁边摆过去</b>（贴向或离开食指方向） → 这一根就是<b>侧摆轴</b>（只使能，不演奏）<br>
+        <div class="row" style="margin-top:9px">
+          <button id="btnSwapThumb" class="ok">两根轴对调</button>
+          <span id="roleNow" class="msg" style="margin:0;flex:1"></span>
+        </div>
+        <div style="margin-top:6px">对调只改<b>角色</b>，不动舵机编号，所以<b>校准不会作废</b>。</div>
+      </div>
     </div>
   </div>
 
@@ -361,8 +415,11 @@ pre#log .sys{color:#c9a5ff}
         <div class="msg" id="latVerdict"></div>
       </div>
       <p class="hint">
-        为什么要测：一次演奏 = 按下 + 抬起两条命令。6 根手指跑 <b>6 Hz</b> 就是
-        6 × 6 × 2 = <b>72 条/秒</b>。固件如果每条命令都要死等一个固定窗口，这个数就上不去。
+        为什么要测：一次演奏 = 按下 + 抬起两条命令，所以「命令速率 = 动作频率 × 手指根数 × 2」。
+        协议要求<b>单指动作频率不低于 2 Hz</b>（拇指的侧摆与下压算复合动作，不单独计频率），
+        按 5 根演奏手指就是 5 × 2 × 2 = <b>20 条/秒</b>；而要跑快曲（6 Hz）就得
+        5 × 6 × 2 = <b>60 条/秒</b>（按全部 6 根留余量则是 72 条/秒）。
+        固件如果每条命令都要死等一个固定窗口，这个数就上不去。
       </p>
     </div>
   </div>
@@ -520,9 +577,10 @@ pre#log .sys{color:#c9a5ff}
             style="width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:9px;background:var(--panel)"></canvas>
           <div id="rollLegend" style="display:flex;flex-wrap:wrap;gap:3px 10px;font-size:11px;color:var(--sub);margin-top:8px"></div>
           <p class="hint" style="margin-top:6px">
-            上半张是<b>曲子本身</b>（横轴时间、纵轴音高），下半张是<b>手套的动作</b>（6 行 = 6 根手指）。
+            上半张是<b>曲子本身</b>（横轴时间、纵轴音高），下半张是<b>手套的动作</b>（一行一根<b>参与演奏</b>的手指）。
             同一根手指用同一种颜色，竖线是当前播放位置 —— 上下对齐看，就知道每个音是哪根手指按的。
-            灰色的小块是手套来不及按、被丢掉的音（只有 6 个自由度，保节奏优先）。
+            灰色的小块是手套来不及按、被丢掉的音（能按琴键的只有 5 根手指，保节奏优先）。
+            拇指侧摆那根轴整场不动，所以没有它的一行。
           </p>
         </div>
 
@@ -546,7 +604,7 @@ pre#log .sys{color:#c9a5ff}
         <div id="dropStat" style="font-size:12px;color:var(--sub);margin:-2px 0 2px"></div>
         <p class="hint" style="margin-top:-2px">
           声音是<b>浏览器现场合成</b>的（三角波 + 一点二次谐波），不需要额外的音频文件。
-          手套只有 6 根手指，遇到快的曲子必然有音按不了 ——
+          手套只有 5 根手指能按琴键，遇到快的曲子必然有音按不了 ——
           这些音在卷帘图上是<b>灰块</b>，上面这行会告诉你这首曲子有多少个。
           勾着的话它们<b>只用声音补齐</b>（手指不动），曲子听起来是完整的；
           取消勾选就只响手套真的按下去的那些音，便于对比两者差多少。
@@ -561,14 +619,9 @@ pre#log .sys{color:#c9a5ff}
           <rect id="f-thumb"  x="22"  y="88" width="46" height="19" rx="9.5" fill="#cfd8e3"/>
           <text x="83" y="145" font-size="10" fill="#8b949e" text-anchor="middle" font-family="sans-serif">手掌</text>
         </svg>
-        <div class="deplist">
-          <div class="dep"><span class="nm">拇指侧压</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-          <div class="dep"><span class="nm">拇指下压</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-          <div class="dep"><span class="nm">食指</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-          <div class="dep"><span class="nm">中指</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-          <div class="dep"><span class="nm">无名指</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-          <div class="dep"><span class="nm">小指</span><span class="bar"><i style="left:0;width:0"></i></span><span class="pc">0%</span></div>
-        </div>
+        <div class="deplist" id="depList"></div>
+        <div id="latchRow" style="font-size:12px;color:var(--sub);text-align:center;margin-top:7px"></div>
+        <div id="playSlotsNote" style="font-size:12px;text-align:center;margin-top:6px"></div>
       </div>
 
       <div class="warnbox">
@@ -630,10 +683,92 @@ pre#log .sys{color:#c9a5ff}
 /* =============================================================================
  * PIANO_GLOVE 固件调试台 v2 —— 分页式
  * 协议: 115200 8N1, ASCII 文本命令以 \r\n 结尾, 回复按行返回, 行首 OK/ERR
- * 槽位: 0拇指侧压 1拇指下压 2食指 3中指 4无名指 5小指 → 舵机 ID 1~6
+ * 槽位: 0/1 拇指两轴 + 2食指 3中指 4无名指 5小指 → 舵机 ID 1~6
+ *
+ * ★★ 拇指那两根轴不是「两个可独立演奏的自由度」★★
+ *   按下轴 press = 真的把拇指压到琴键上 —— **参与演奏**
+ *   侧摆轴 latch = 只把拇指摆到能压到键的位置 —— **不参与演奏**，
+ *                 使能到位后就停在那儿，演奏全程不动。
+ * 哪根轴是哪根：出厂默认 slot0=按压、slot1=侧摆；实机不对就在第 4 步一键对调。
+ * ⚠️ 对调只交换**角色**，绝不交换舵机 ID —— 校准是按槽位存的，
+ *    换 ID 会让 A 槽位的校准数据发给 B 舵机（比"不演奏"更难查）。
  * ========================================================================== */
 
-const SLOTS = ["拇指侧压","拇指下压","食指","中指","无名指","小指"];
+/* 槽位名不要手写两份：**由角色推导**。
+   之前写死成"拇指侧压/拇指下压"，改一处漏一处，读数、图例、日志全是老口径。 */
+const FINGER_BASE = ["拇指", "拇指", "食指", "中指", "无名指", "小指"];
+const ROLE_DEFAULT = ["press", "latch", "press", "press", "press", "press"];
+
+const ROLES = (function(){
+  try{
+    const v = String(localStorage.getItem("pg_roles") || "").split(",");
+    if(v.length === 6 && v.every(x => x === "press" || x === "latch")
+       && v.filter(x => x === "latch").length <= 1) return v;
+  }catch(e){}
+  return ROLE_DEFAULT.slice();
+})();
+
+const isLatch = s => ROLES[s] === "latch";
+const labelOf = s => (s < 2) ? (FINGER_BASE[s] + (isLatch(s) ? "侧摆" : "按压")) : FINGER_BASE[s];
+
+let SLOTS      = [];      // 6 个槽位的显示名（由 ROLES 推出来）
+let PLAY_SLOTS = [];      // 参与演奏的槽位（默认 [0,2,3,4,5]）
+let LATCH_SLOT = -1;      // 侧摆槽位（不参与演奏），默认 1
+function rederiveRoles(){
+  SLOTS      = [0,1,2,3,4,5].map(labelOf);
+  PLAY_SLOTS = [0,1,2,3,4,5].filter(s => ROLES[s] !== "latch");
+  LATCH_SLOT = ROLES.indexOf("latch");
+}
+rederiveRoles();
+function saveRoles(){ try{ localStorage.setItem("pg_roles", ROLES.join(",")); }catch(e){} }
+
+/* 角色标记。放正文里的纯文字版（表格/日志）用 roleText，带颜色的用 roleTag。 */
+const roleText = s => (s < 2) ? (isLatch(s) ? "侧摆·不演奏" : "按压·演奏") : "按压·演奏";
+function roleTag(s){
+  return '<span class="chip ' + (isLatch(s) ? "" : "ok") + '" style="font-size:11px">' + roleText(s) + "</span>";
+}
+
+/* 对调拇指两轴的角色。**只动角色，不动 ID，也不动校准。**
+   为什么允许用户一键翻：舵机上贴的"按下/侧摆"是装配时按舵机臂方向标的，
+   和拇指真实往哪动是两回事。实机一眼就能看出来，别逼用户去改固件。 */
+function swapThumbRoles(){
+  const a = ROLES[0]; ROLES[0] = ROLES[1]; ROLES[1] = a;
+  saveRoles(); rederiveRoles();
+  return ROLES.slice();
+}
+
+/* ---------- 拇指侧摆的「使能位」----------
+   这个位置是**试出来的**，不是算出来的：每个人的手形、连杆长度、
+   拇指起始姿势都不一样，所以它存在本地，由用户在第 3C 步调好并记住。
+   它只在演奏开始的那一刻发一次 MOVE，之后就陪着不动了。 */
+/* 存成 "<槽位>:<位置>"，**不是光存位置**。
+   位置是"某根轴量程里的一个点"，量程是跟着槽位走的 —— 一旦用户把两轴角色对调，
+   侧摆变成了另一根舵机，旧位置在新量程里就是另一个含义（轻则摆不到位，重则顶死）。
+   所以取用时必须核对槽位，对不上就当没有。 */
+const LATCH_KEY = "pg_latch_pos", LATCH_ON_KEY = "pg_latch_on";
+function latchPos(){
+  if(LATCH_SLOT < 0) return null;
+  try{
+    const raw = String(localStorage.getItem(LATCH_KEY) || "").split(":");
+    if(raw.length !== 2) return null;
+    if(parseInt(raw[0], 10) !== LATCH_SLOT) return null;      // 侧摆换人了 → 旧值作废
+    const v = parseInt(raw[1], 10);
+    if(Number.isFinite(v) && v >= 0 && v <= 4095) return v;
+  }catch(e){}
+  return null;
+}
+function setLatchPos(v){
+  try{
+    v === null ? localStorage.removeItem(LATCH_KEY)
+               : localStorage.setItem(LATCH_KEY, LATCH_SLOT + ":" + v);
+  }catch(e){}
+}
+function latchAutoOn(){
+  try{ return localStorage.getItem(LATCH_ON_KEY) !== "0"; }catch(e){ return true; }
+}
+function setLatchAuto(on){
+  try{ localStorage.setItem(LATCH_ON_KEY, on ? "1" : "0"); }catch(e){}
+}
 const FKEYS = ["thumbSide","thumbPress","index","middle","ring","pinky"];
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
@@ -1296,7 +1431,9 @@ const S = {
   calSamples:{},
   midi:null, plan:null, notes:null,
   playing:false, cursor:0, raf:null, t0:0, fired:0, startedAt:0, lastRateAt:0, lastRateCount:0,
-  pollTimer:null
+  pollTimer:null,
+  latchApplied:false,     // 本次演奏有没有真的把侧摆摆过去（停止时决定要不要送回位）
+  latchTouched:false      // 用户动过使能位滑块没有（没动过就跟随已记住的值）
 };
 const isSim = () => T.mode === "sim";
 
@@ -1316,6 +1453,15 @@ function refreshChips(){
   $("#cCal").className = "chip " + (S.info.calibrated === "1" ? "ok" : "");
   $("#cArm").textContent = S.info.armed === "1" ? "已使能" : "未使能";
   $("#cArm").className = "chip " + (S.info.armed === "1" ? "ok" : "");
+
+  /* 参与演奏的手指数：拇指只有"按压"那根轴算，侧摆只负责到位。
+     这个数就是「这首曲子最多能有几个音同时响」的硬上限，摆在顶栏上一眼可见。 */
+  const fp = $("#cFingers");
+  if(fp){
+    fp.textContent = "演奏 " + PLAY_SLOTS.length + " 指";
+    fp.title = "参与演奏：" + PLAY_SLOTS.map(s => SLOTS[s]).join("、")
+             + (LATCH_SLOT >= 0 ? "　·　" + SLOTS[LATCH_SLOT] + " 只做使能、不参与演奏" : "");
+  }
 
   const doneAssign = S.wizard.assigned.length;
   setBadge("#bAssign", doneAssign >= 6 ? "" : String(doneAssign) + "/6");
@@ -1345,6 +1491,7 @@ function updateGates(){
   need(conn && calOk, "#latGate",  "#latBody");
   need(conn && calOk, "#rtGate",   "#rtBody");
   need(conn && calOk, "#playGate", "#playBody");
+  need(conn && calOk, "#latchGate", "#latchBody");
 }
 
 /* ======================= 分页路由 ======================= */
@@ -1708,6 +1855,7 @@ async function refreshSlots(silent){
   $("#statusMsg").className = "msg " + (on === 6 ? "ok" : "err");
   $("#statusMsg").textContent = on === 6 ? "6 个舵机全部在线 ✔" : "只有 " + on + "/6 在线，请检查接线和标签";
   renderSlots(); renderTest(); refreshChips();
+  renderLatch();                 // 使能位的区间来自 STATUS_ALL 的 min/max，必须跟着刷
   return out;
 }
 
@@ -1721,12 +1869,13 @@ function renderSlots(){
     const on = d.online === "1";
     const travel = (+d.max > +d.min) ? (+d.max - +d.min) : 0;
     tb.insertAdjacentHTML("beforeend",
-      '<tr class="' + (on ? "on" : "") + '"><td>' + s + "</td><td>" + esc(d.name || SLOTS[s]) + "</td><td>" + esc(d.id) +
+      '<tr class="' + (on ? "on" : "") + '"><td>' + s + "</td><td>" + esc(SLOTS[s]) + "</td>" +
+      "<td>" + roleTag(s) + "</td><td>" + esc(d.id) +
       '</td><td><span class="chip ' + (on ? "ok" : "bad") + '">' + (on ? "在线" : "离线") + "</span></td>" +
       "<td>" + esc(d.min) + "</td><td>" + esc(d.standby) + "</td><td>" + esc(d.max) + "</td>" +
       "<td>" + travel + "</td><td>" + esc(d.press || "-") + "</td></tr>");
     bars.insertAdjacentHTML("beforeend",
-      '<div class="dep"><span class="nm">' + s + " " + esc(d.name || SLOTS[s]) +
+      '<div class="dep"><span class="nm">' + s + " " + esc(SLOTS[s]) +
       '</span><span class="bar"><i style="left:' + pct(d.min) + "%;width:" + Math.max(0, pct(d.max) - pct(d.min)) +
       '%"></i><b style="left:' + pct(d.standby) + '%"></b><u style="left:' + pct(d.max) + '%"></u></span>' +
       '<span class="pc">' + travel + "</span></div>");
@@ -1841,16 +1990,162 @@ function renderCalTable(snap){
   }
 }
 
+/* ======================= 3C. 拇指侧摆「使能位」 =======================
+   使能位 = 每次开始演奏前，把拇指摆到的那个位置。
+   它和"按下多少"是完全不同的两件事：
+     按压轴 按 0%~100% —— 那是在演奏
+     侧摆轴 只走一次，到位后整个演奏过程一动不动 —— 那是在"对准"
+   位置没法算出来（手形、连杆、拇指起始姿势各不相同），所以是**试出来并记住**的。
+   存 localStorage：固件不用改，板子没插着也能先设好。 */
+function latchRange(){
+  if(LATCH_SLOT < 0) return null;
+  const c = S.slots[LATCH_SLOT] || {};
+  const a = +c.min, b = +c.max;
+  if(!Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
+  return { lo: Math.min(a, b), hi: Math.max(a, b) };
+}
+function latchPctToPos(pct){
+  const r = latchRange(); if(!r) return null;
+  const p = Math.max(0, Math.min(100, pct));
+  return Math.round(r.lo + (r.hi - r.lo) * p / 100);
+}
+function latchPosToPct(pos){
+  const r = latchRange(); if(!r || pos === null) return null;
+  return Math.round((pos - r.lo) / (r.hi - r.lo) * 100);
+}
+function latchSay(kind, html){
+  const m = $("#latchMsg"); if(!m) return;
+  m.className = "msg " + (kind || ""); m.innerHTML = html;
+}
+function latchSliderPct(){
+  const el = $("#latchPct");
+  return el ? Math.max(0, Math.min(100, parseInt(el.value, 10) || 0)) : 50;
+}
+function setLatchSlider(pct){
+  const el = $("#latchPct"); if(!el) return;
+  el.value = String(Math.max(0, Math.min(100, Math.round(pct))));
+  syncLatchLabel();
+}
+function syncLatchLabel(){
+  const el = $("#latchPctL"); if(!el) return;
+  const pos = latchPctToPos(latchSliderPct());
+  el.textContent = latchSliderPct() + "%" + (pos === null ? "" : " · " + pos);
+}
+
+/* 驱动侧摆轴。MOVE 在本板固件里有越界闸，位置一定会落在校准区间内。 */
+async function latchDrive(pos){
+  if(LATCH_SLOT < 0){ latchSay("err", "当前没有侧摆轴（两根轴都是按压？去第 4 步确认）。"); return false; }
+  if(pos === null || !Number.isFinite(pos)){ latchSay("err", "还没拿到可用区间 —— 先去上面保存校准结果。"); return false; }
+  if(S.info.armed !== "1"){
+    const r = await T.send("ARM", 3000);
+    if(!r.some(l => l.startsWith("OK"))){
+      latchSay("err", "驱动被拒绝：手套还没使能。请先保存校准，或去第 4 步点「使能」。");
+      return false;
+    }
+    await refreshInfo();
+  }
+  const id = slotIdOf(LATCH_SLOT);
+  const lines = await T.send("MOVE " + id + " " + pos + " 0 0 ARM", 3000);
+  const ok = lines.some(l => l.startsWith("OK"));
+  if(!ok) latchSay("err", "驱动失败：" + esc(lines.join(" / ")));
+  return ok;
+}
+
+function renderLatch(){
+  if(LATCH_SLOT < 0){
+    const h = $("#latchHint"); if(h) h.className = "msg warn", h.textContent = "没有侧摆轴 —— 两根轴都被当成按压了。";
+    return;
+  }
+  const r = latchRange();
+  const p = latchPos();
+  const saved = latchPosToPct(p);
+  /* 滑块默认落在记住的位置上；没记住过就 50% 起 */
+  const cur = parseInt($("#latchPct").value, 10);
+  if(saved !== null && !S.latchTouched) setLatchSlider(saved);
+  else if(!S.latchTouched) setLatchSlider(cur || 50);
+  syncLatchLabel();
+
+  const h = $("#latchHint");
+  h.className = "msg" + (r ? "" : " err");
+  h.innerHTML = r
+    ? "侧摆轴是 <b>" + (LATCH_SLOT + 1) + " 号（" + esc(SLOTS[LATCH_SLOT]) + "）</b>，" +
+      "可用区间 " + r.lo + " ~ " + r.hi + "（来自校准）。" +
+      (p === null ? "　<b>还没记住使能位。</b>" : "　已记住的使能位：" + p + "（" + saved + "%）。")
+    : "拿不到这个槽位的校准区间 —— 先去上面「保存校准结果」。";
+  const cb = $("#latchAuto"); if(cb) cb.checked = latchAutoOn();
+  const go = $("#btnLatchGo"); if(go) go.disabled = (p === null);
+  updateLatchRow();
+}
+function latchNudge(d){
+  S.latchTouched = true;
+  setLatchSlider(latchSliderPct() + d);
+  const pos = latchPctToPos(latchSliderPct());
+  latchSay("", "走到 " + latchSliderPct() + "%（舵机 " + pos + "）");
+  latchDrive(pos);
+}
+$("#latchPct").oninput = () => { S.latchTouched = true; syncLatchLabel(); };
+$("#btnLatchDown").onclick = () => latchNudge(-2);
+$("#btnLatchUp").onclick   = () => latchNudge(+2);
+$("#btnLatchMove").onclick = async () => {
+  const pos = latchPctToPos(latchSliderPct());
+  if(await latchDrive(pos))
+    latchSay("ok", "已走到 " + latchSliderPct() + "%（舵机 " + pos + "）。看拇指：刚好压在琴键上方就点「记住这个位置」。");
+};
+$("#btnLatchRead").onclick = async () => {
+  if(LATCH_SLOT < 0) return;
+  const id = slotIdOf(LATCH_SLOT);
+  const lines = await T.send("STATUS " + id, 3000);
+  const line = lines.find(l => l.includes("pos="));
+  if(!line){ latchSay("err", "读不到位置：" + esc(lines.join(" / "))); return; }
+  const pos = parseInt(kv(line).pos, 10);
+  const pct = latchPosToPct(pos);
+  if(pct === null){ latchSay("err", "读到 " + pos + "，但它不在校准区间里 —— 校准可能已经作废，重做一次校准。"); return; }
+  S.latchTouched = true;
+  setLatchSlider(pct);
+  latchSay("ok", "读到舵机当前位置 <b>" + pos + "</b>（" + pct + "%）。满意就点「记住这个位置」。");
+};
+$("#btnLatchSave").onclick = () => {
+  const pos = latchPctToPos(latchSliderPct());
+  if(pos === null){ latchSay("err", "没有可用区间。"); return; }
+  setLatchPos(pos);
+  latchSay("ok", "已记住使能位 <b>" + pos + "</b>（" + latchSliderPct() + "%）。" +
+    (latchAutoOn() ? "以后每次开始演奏前会自动摆到这里。" : "现在「自动到位」没勾，演奏前不会自动摆过去。"));
+  updateLatchRow(); logLine("侧摆使能位 = " + pos, "sys");
+};
+$("#btnLatchGo").onclick = async () => {
+  const p = latchPos();
+  if(p === null) return;
+  const pct = latchPosToPct(p);
+  if(pct !== null){ S.latchTouched = true; setLatchSlider(pct); }
+  if(await latchDrive(p)) latchSay("ok", "已回到使能位 " + p + "。");
+};
+$("#btnLatchClear").onclick = () => {
+  setLatchPos(null);
+  latchSay("warn", "已清除。演奏前不再自动摆位。");
+  updateLatchRow();
+};
+$("#latchAuto").onchange = () => {
+  setLatchAuto($("#latchAuto").checked);
+  latchSay("warn", $("#latchAuto").checked ? "已打开：每次开始演奏前自动摆到位。"
+                                            : "已关闭：演奏前不会自动摆，手指按你上一次停下的位置来。");
+  updateLatchRow();
+};
+
 /* ======================= 4. 试动作 ======================= */
 function renderTest(){
   const tb = $("#testBody2"); if(!tb) return;
   tb.innerHTML = "";
   for(let s=0;s<6;s++){
     tb.insertAdjacentHTML("beforeend",
-      "<tr><td>" + (s+1) + "</td><td>" + SLOTS[s] + "</td>" +
+      '<tr class="' + (isLatch(s) ? "latchrow" : "") + '"><td>' + (s+1) + "</td><td>" + SLOTS[s] + "</td>" +
+      "<td>" + roleTag(s) + "</td>" +
       '<td><button data-press="' + s + '">按一下</button></td>' +
       '<td><select data-dir="' + s + '"><option value="max">往外推 (max)</option><option value="min">往里收 (min)</option></select></td></tr>');
   }
+  /* 「按一下」在侧摆轴上就是"摆过去一下"，方向名对不上，提示一下别让用户困惑 */
+  tb.querySelectorAll("[data-press]").forEach(b => {
+    if(isLatch(+b.dataset.press)) b.title = "这一根是侧摆轴：按一下 = 往侧向摆一下，不参与演奏";
+  });
   tb.querySelectorAll("[data-press]").forEach(b => b.onclick = async () => {
     const s = +b.dataset.press;
     b.disabled = true; b.textContent = "按下…";
@@ -1867,6 +2162,30 @@ function renderTest(){
     };
   });
 }
+/* 角色变了要刷新的地方，集中在一个函数里 —— 免得漏掉某处还显示老口径。
+   名字变、参与演奏的手指集合变（6 根 → 5 根），所以演奏计划必须重算。 */
+function refreshRoleUI(){
+  const rn = $("#roleNow");
+  if(rn) rn.innerHTML = "现在：1 号 = <b>" + SLOTS[0] + "</b>，2 号 = <b>" + SLOTS[1] + "</b>";
+  const ll = $("#latchSlotLabel");
+  if(ll) ll.textContent = "侧摆轴" + (LATCH_SLOT >= 0 ? "（" + (LATCH_SLOT + 1) + " 号）" : "（无）");
+  renderDepList();
+  renderRollLegend();
+  renderLatch();
+  refreshChips();
+  if(S.midi) analyze();
+}
+$("#btnSwapThumb").onclick = async () => {
+  swapThumbRoles();
+  await refreshSlots(true);        // 槽位表带 firmware 的名字，刷新一下
+  refreshRoleUI();
+  const m = $("#armMsg");
+  m.className = "msg warn";
+  m.innerHTML = "已对调：1 号 = <b>" + SLOTS[0] + "</b>，2 号 = <b>" + SLOTS[1] + "</b>。" +
+    "校准<b>不用</b>重做（角色不绑定舵机编号），接着去第 3 步 3C 设一下侧摆的使能位。";
+  logLine("拇指两轴角色对调 → " + ROLES.join(","), "sys");
+};
+
 $("#btnArm").onclick = async () => {
   const r = await T.send("ARM", 3000);
   const ok = r.some(l => l.startsWith("OK"));
@@ -1882,7 +2201,7 @@ $("#btnStandby") && ($("#btnStandby").onclick = async () => { await T.send("STAN
 
 /* ---------- 4B 响应延迟实测 ----------
    命令往返 = 写入串口 → 收到第一行回复。这个数字决定演奏能跑多快。
-   6 根手指 × 6 Hz × (按下+抬起) = 72 条/秒。 */
+   5 根手指 × 6 Hz × (按下+抬起) = 60 条/秒。 */
 function _median(a){
   if(!a.length) return null;
   const b = a.slice().sort((x,y) => x - y), n = b.length;
@@ -2345,7 +2664,7 @@ function strokeMs(){
 }
 
 /* ---------- 5.2 音符 → 手指动作 规划 ---------- */
-/* 手套只有 6 个自由度, 而钢琴曲常有几十个音同时响。
+/* 手套只有 5 根能按琴键的手指, 而钢琴曲常有几十个音同时响。
    目标: 保住节奏和速度感, 允许丢音, 绝不允许卡住。
 
    ★★ 所有物理约束一律写在**真实毫秒**域，再换算回曲谱时间。★★
@@ -2364,7 +2683,7 @@ function buildPlan(notes, mode, speed){
   let dropped = 0;
   const used = new Array(6).fill(0);
 
-  /* 音高对应模式：把**本曲的实际音域**均分给 6 个槽位，低音落拇指侧、高音落小指侧。
+  /* 音高对应模式：把**本曲的实际音域**均分给参与演奏的槽位，低音落拇指侧、高音落小指侧。
      这里有两个坑，都是实测才露出来的（《小星星》六个音本该一根手指一个，实际只占满 4 根）：
        1. 不能兜底音域。曾经写 Math.max(hi, 72)，本是怕单音曲子除零，
           结果《小星星》只跨 9 个半音却被撑到 12，六个音全挤在低音区，小指全程闲着。
@@ -2374,14 +2693,22 @@ function buildPlan(notes, mode, speed){
   const hi = Math.max(...notes.map(n => n.note));
   const span = Math.max(1, hi - lo);
 
+  /* ★ 候选集合 = 参与演奏的槽位（PLAY_SLOTS），不是「6 根」。
+     侧摆轴不参与演奏，把它算进候选就等于凭空多出一根按琴键的手指：
+     "最多 6 个音同时响"是假的，而且它会被派去按压琴键。 */
+  const ps = PLAY_SLOTS.slice();
+
   let lastSlot = -1;
   for(const n of notes){
     let slot = -1;
     if(mode === "pitch"){
-      const want = Math.max(0, Math.min(5, Math.round((n.note - lo) / span * 5)));
+      /* 音域映射的分母也改成 ps.length —— 5 根手指就把音域分 5 段 */
+      const want = ps[Math.max(0, Math.min(ps.length - 1,
+                   Math.round((n.note - lo) / span * (ps.length - 1))))];
       slot = pickFree(busyUntil, n.t, want);
     }else{
-      slot = pickFree(busyUntil, n.t, (lastSlot + 1) % 6);
+      const i = ps.indexOf(lastSlot);
+      slot = pickFree(busyUntil, n.t, ps[(i + 1) % ps.length]);
     }
     if(slot < 0){
       dropped++;
@@ -2420,14 +2747,18 @@ function buildPlan(notes, mode, speed){
     while(events[i].t - events[j].t > 1000) j++;
     peak = Math.max(peak, i - j + 1);
   }
-  return {events, dropped, used, peakRate:peak, droppedNotes, stroke, k};
+  return {events, dropped, used, peakRate:peak, droppedNotes, stroke, k, playSlots:ps.slice()};
 }
+/* 找一根"现在空着的手"。prefer 优先，不行就左右各跳一格找 ——
+   **只在不参与演奏的槽位之外找**（侧摆永远不接活）。 */
 function pickFree(busyUntil, t, prefer){
-  if(busyUntil[prefer] <= t) return prefer;
+  const ps = PLAY_SLOTS;
+  if(ps.includes(prefer) && busyUntil[prefer] <= t) return prefer;
   for(let d=1; d<6; d++){
-    const a = (prefer + d) % 6, b = (prefer - d + 6) % 6;
-    if(busyUntil[a] <= t) return a;
-    if(busyUntil[b] <= t) return b;
+    for(const s of [(prefer + d) % 6, (prefer - d + 6) % 6]){
+      if(!ps.includes(s)) continue;
+      if(busyUntil[s] <= t) return s;
+    }
   }
   return -1;
 }
@@ -2444,7 +2775,7 @@ fileInput.onchange = () => { if(fileInput.files[0]) loadMidiFile(fileInput.files
 // 源文件在 host/samples/two-tigers.mid。这里内嵌一份，好处是完全离线可用、
 // 新手点一下就能听到/感受到效果，不用先去找一个 MIDI 文件。
 //
-// 选它的原因：旋律只用到 C D E F G A 六个音，正好等于手套的 6 根手指 ——
+// 选它的原因：旋律只用到 C D E F G A 六个音，一音一根手指就能看清是"哪根在动" ——
 // 用「音高对应」分配时，一个音固定一根手指，按下哪个音是哪根手指一眼看清。
 const SAMPLE_MIDI_B64 =
   "TVRoZAAAAAYAAAABAeBNVHJrAAABVAD/UQMHoSAA/wMZ5Lik5Y+q6ICB6JmOIChUd28gVGlnZXJzKQD/WAQEAhgIAJA8ZIMAgDwAYJA+ZIMAgD4AYJBAZIMAgEAAYJA8ZIMAgDwAYJA8ZIMAgDwAYJA+ZIMAgD4AYJBAZIMAgEAAYJA8ZIMAgDwAYJBAZIMAgEAAYJBBZIMAgEEAYJBDZIYAgEMAgUCQQGSDAIBAAGCQQWSDAIBBAGCQQ2SGAIBDAIFAkENkgUCAQwAwkEVkgUCARQAwkENkgUCAQwAwkEFkgUCAQQAwkEBkgwCAQABgkDxkgwCAPABgkENkgUCAQwAwkEVkgUCARQAwkENkgUCAQwAwkEFkgUCAQQAwkEBkgwCAQABgkDxkgwCAPABgkD5kgwCAPgBgkENkgwCAQwBgkDxkhgCAPACBQJA+ZIMAgD4AYJBDZIMAgEMAYJA8ZIYAgDwAgUD/LwA=";
@@ -2642,6 +2973,8 @@ function analyze(){
   /* 分析完立刻画一张总览 —— 不用等到按播放，
      用户就能先看清「这首曲子手套要做什么、哪些音它按不了」。 */
   refreshRoll(0);
+  renderDepList();       // 参与演奏的手指集合可能刚变过（角色对调），条也要重铺
+  renderRollLegend();
   updateLoadHint();      // 换曲子/换筛选后，负载提示要跟着重算
   updateDropStat();      // 丢音数也要重算 —— 它是「补齐」开关有没有用的唯一线索
 }
@@ -2689,6 +3022,44 @@ $("#fStroke").oninput = () => {
 };
 $("#fStrokeLabel").textContent = strokeMs() + "ms";
 
+/* 深度条：一行一根。侧摆那一行不显示"深度"—— 它没有深度可言，
+   显示的是**使能位**（一个开始演奏前定好、之后不变的位置）。 */
+function renderDepList(){
+  const el = $("#depList"); if(!el) return;
+  el.innerHTML = "";
+  for(let s=0;s<6;s++){
+    const latch = isLatch(s);
+    el.insertAdjacentHTML("beforeend",
+      '<div class="dep' + (latch ? " latch" : "") + '" data-slot="' + s + '">' +
+      '<span class="nm">' + esc(SLOTS[s]) + "</span>" +
+      '<span class="bar"><i style="left:0;width:0"></i></span>' +
+      '<span class="pc">' + (latch ? "使能位" : "0%") + "</span></div>");
+  }
+  updateLatchRow();
+  const n = $("#playSlotsNote");
+  if(n) n.innerHTML = "参与演奏的是 <b>" + PLAY_SLOTS.length + " 根</b>：" +
+    PLAY_SLOTS.map(s => esc(SLOTS[s])).join("、") +
+    (LATCH_SLOT >= 0 ? "　·　" + esc(SLOTS[LATCH_SLOT]) + " 不参与演奏，只负责开始前把拇指摆到使能位"
+                     : "");
+}
+function updateLatchRow(){
+  const el = $("#latchRow"); if(!el) return;
+  if(LATCH_SLOT < 0){ el.textContent = ""; return; }
+  const p   = latchPos();
+  const pct = latchPosToPct(p);
+  el.innerHTML = esc(SLOTS[LATCH_SLOT]) + "：" +
+    (p === null ? "<b>还没设使能位</b> —— 去第 3 步 3C 设一下"
+                : "使能位 " + (pct === null ? p : pct + "%") + "（舵机 " + p + "）· "
+                  + (latchAutoOn() ? "演奏前自动到位" : "不自动到位")) +
+    "　·　不参与演奏";
+  const row = $$("#p-play .dep").find(x => +x.dataset.slot === LATCH_SLOT);
+  if(row){
+    const pc = row.querySelector(".pc"), bar = row.querySelector(".bar i");
+    if(pct === null){ pc.textContent = "使能位 —"; bar.style.width = "0%"; }
+    else { pc.textContent = "使能位 " + pct + "%"; bar.style.left = "0"; bar.style.width = pct + "%"; }
+  }
+}
+
 /* ---------- 5.4 播放引擎 ---------- */
 const SLOT_SVG = ["f-thumb","f-thumb","f-index","f-middle","f-ring","f-pinky"];
 
@@ -2713,7 +3084,8 @@ function slotPos(slot, depth){
 }
 function setDepths(arr){
   arr.forEach((d, s) => {
-    const el = $$("#p-play .dep")[s];
+    if(isLatch(s)) return;          // 侧摆不参与演奏，它的条显示使能位，不跟着事件走
+    const el = $$("#p-play .dep").find(x => +x.dataset.slot === s);
     if(el){
       el.querySelector(".bar i").style.width = Math.round(d * 100) + "%";
       el.querySelector(".pc").textContent = Math.round(d * 100) + "%";
@@ -2746,7 +3118,28 @@ function stopPlay(safe){
   $("#playRate").textContent = "—";
   silence();                 // 停手也要停声，别让音还挂在响
   drawRoll(0);               // 播放头回起点
+  /* 侧摆"松"回原位。急停那条路不用管 —— SAFE 之后舵机全部断电，拇指自己就松了。 */
+  if(!safe) latchEngage(false);
   if(safe && T.connected){ T.fire("SAFE"); setTimeout(refreshInfo, 400); }
+}
+
+/* 拇指侧摆的**使能**：开始演奏前摆到使能位（"对准琴键"），结束后送回松开位。
+   整场演奏就这两条命令 —— 它不是一根手指，不参与任何一个音的按下。 */
+async function latchEngage(on){
+  if(LATCH_SLOT < 0) return;
+  const id = slotIdOf(LATCH_SLOT);
+  if(on){
+    const p = latchPos();
+    if(!latchAutoOn() || p === null) return;
+    const r = await T.send("MOVE " + id + " " + p + " 0 0 ARM", 2500);
+    S.latchApplied = r.some(l => l.startsWith("OK"));
+    if(S.latchApplied) logLine("侧摆使能到位 " + p + "（" + SLOTS[LATCH_SLOT] + "，整场不再动）", "sys");
+  }else{
+    if(!S.latchApplied) return;
+    S.latchApplied = false;
+    const sb = parseInt((S.slots[LATCH_SLOT] || {}).standby, 10);
+    if(Number.isFinite(sb)) await T.send("MOVE " + id + " " + sb + " 0 0 ARM", 2500);
+  }
 }
 
 $("#btnStop").onclick = () => { stopPlay(true); $("#playTime").textContent = "0.0s"; };
@@ -2769,6 +3162,12 @@ $("#btnPlay").onclick = async () => {
     }
     await refreshInfo();
   }
+
+  /* 先把拇指"对准"：侧摆轴走到使能位，然后整场不动。
+     留一小段稳定时间再开第一拍，否则开头的音和摆位挤在一起，看着像抽了一下。 */
+  const hadLatch = latchPos() !== null && latchAutoOn();
+  await latchEngage(true);
+  if(hadLatch) await sleep(200);
 
   const speed = curSpeed();
   const ev = S.plan.events;
@@ -3056,9 +3455,11 @@ function updateDropStat(){
     + "把「手指行程时间」调小可以少丢一些，但调小于实际行程会变成抖动。";
 }
 
+/* 下半张只给**参与演奏**的槽位排轨 —— 侧摆整场都不动，给它留一行只会让人以为它坏了 */
+const rollRows = () => Math.max(1, PLAY_SLOTS.length);
 function rollGeo(){
-  /* 上半张 = 卷帘，下半张 = 6 条动作轨；左边留一条给槽位名和刻度 */
-  return { x0:56, x1:ROLL.w - 12, yTop:16, yBot:ROLL.h - ROWH * 6 - 24 };
+  /* 上半张 = 卷帘，下半张 = 参与演奏的槽位各一条动作轨；左边留一条给槽位名和刻度 */
+  return { x0:56, x1:ROLL.w - 12, yTop:16, yBot:ROLL.h - ROWH * rollRows() - 24 };
 }
 function rollTotal(){
   const ev = S.plan ? S.plan.events : null;
@@ -3116,7 +3517,7 @@ function drawRollStatic(){
   g.fillStyle = "#9aa4b2"; g.font = "10px sans-serif"; g.textBaseline = "alphabetic";
   for(let t = Math.ceil(ROLL.t0 / stepMs) * stepMs; t < ROLL.t0 + ROLL.span; t += stepMs){
     const x = Math.round(X(t)) + .5;
-    g.beginPath(); g.moveTo(x, L.yTop); g.lineTo(x, L.yBot + ROWH * 6); g.stroke();
+    g.beginPath(); g.moveTo(x, L.yTop); g.lineTo(x, L.yBot + ROWH * rollRows()); g.stroke();
     g.fillText((t / 1000).toFixed(t % 1000 ? 1 : 0) + "s", x + 2, L.yTop - 4);
   }
   /* 丢掉的音：灰影。只画在上半张 —— 它没有对应的动作。 */
@@ -3133,28 +3534,30 @@ function drawRollStatic(){
     g.fillStyle = SLOT_COLOR[e.slot];
     g.fillRect(x, Y(e.note) - 4, Math.max(2, Math.min(w, L.x1 - x)), 8);
   });
-  /* 下半张：6 条动作轨 */
+  /* 下半张：参与演奏的槽位各一条轨（侧摆不在里面，它整场不动） */
   g.fillStyle = "#f7f9fb";
-  g.fillRect(L.x0, L.yBot, W, ROWH * 6);
+  g.fillRect(L.x0, L.yBot, W, ROWH * rollRows());
   ons.forEach(e => {
+    const r = PLAY_SLOTS.indexOf(e.slot);
+    if(r < 0) return;
     const x = X(e.t), w = Math.max(2, e.durMs / ROLL.span * W);
     if(x + w < L.x0 || x > L.x1) return;
     g.fillStyle = SLOT_COLOR[e.slot];
-    g.fillRect(x, L.yBot + e.slot * ROWH + 3, Math.max(2, Math.min(w, L.x1 - x)), ROWH - 6);
+    g.fillRect(x, L.yBot + r * ROWH + 3, Math.max(2, Math.min(w, L.x1 - x)), ROWH - 6);
   });
   /* 轨名 + 分隔线 */
   g.font = "10px sans-serif"; g.textBaseline = "middle";
-  for(let s = 0; s < 6; s++){
-    const y = L.yBot + s * ROWH;
-    g.strokeStyle = s ? "#e2e6eb" : "#cfd6df";
+  for(let r = 0; r < rollRows(); r++){
+    const y = L.yBot + r * ROWH;
+    g.strokeStyle = r ? "#e2e6eb" : "#cfd6df";
     g.beginPath(); g.moveTo(L.x0, Math.round(y) + .5); g.lineTo(L.x1, Math.round(y) + .5); g.stroke();
     g.fillStyle = "#6b7480";
-    g.fillText(SLOTS[s], 6, y + ROWH / 2);
+    g.fillText(SLOTS[PLAY_SLOTS[r]], 6, y + ROWH / 2);
   }
   /* 两块的交界 + 左侧时间轴 */
   g.strokeStyle = "#cfd6df";
   g.beginPath(); g.moveTo(L.x0, Math.round(L.yBot) + .5); g.lineTo(L.x1, Math.round(L.yBot) + .5); g.stroke();
-  g.beginPath(); g.moveTo(L.x0 + .5, L.yTop); g.lineTo(L.x0 + .5, L.yBot + ROWH * 6); g.stroke();
+  g.beginPath(); g.moveTo(L.x0 + .5, L.yTop); g.lineTo(L.x0 + .5, L.yBot + ROWH * rollRows()); g.stroke();
 
   ROLL.sig = rollSig();
 }
@@ -3190,16 +3593,21 @@ function refreshRoll(headMs){
 }
 $("#rollMode").onchange = () => refreshRoll(S.playing ? (performance.now() - S.t0) * curSpeed() : 0);
 
-/* 图例：颜色 ↔ 手指 */
-(function(){
+/* 图例：颜色 ↔ 手指。**只列参与演奏的那些** —— 图里没有侧摆的轨，
+   列出来会让人以为"怎么少了一条"。 */
+function renderRollLegend(){
   const el = $("#rollLegend"); if(!el) return;
-  el.innerHTML = SLOTS.map((s, i) =>
+  el.innerHTML = PLAY_SLOTS.map(s =>
       '<span style="display:inline-flex;align-items:center;gap:4px">' +
-      '<i style="width:10px;height:10px;border-radius:3px;background:' + SLOT_COLOR[i] + ';display:inline-block"></i>' +
-      s + '</span>').join("") +
+      '<i style="width:10px;height:10px;border-radius:3px;background:' + SLOT_COLOR[s] + ';display:inline-block"></i>' +
+      esc(SLOTS[s]) + '</span>').join("") +
     '<span style="display:inline-flex;align-items:center;gap:4px">' +
-    '<i style="width:10px;height:10px;border-radius:3px;background:#d7dde5;display:inline-block"></i>丢掉的音</span>';
-})();
+    '<i style="width:10px;height:10px;border-radius:3px;background:#d7dde5;display:inline-block"></i>丢掉的音</span>' +
+    (LATCH_SLOT >= 0
+      ? '<span style="color:#9aa4b2">' + esc(SLOTS[LATCH_SLOT]) + '（侧摆）不参与演奏，整场不动</span>'
+      : "");
+}
+renderRollLegend();
 
 /* ======================= 6. 日志 / 终端 ======================= */
 $("#btnRaw").onclick = () => {
@@ -3218,6 +3626,11 @@ $("#btnCopyLog").onclick  = () => navigator.clipboard && navigator.clipboard.wri
 
 /* ======================= 启动 ======================= */
 renderSlots(); renderTest(); renderWizard(); refreshChips();
+/* refreshRoleUI() 里含 renderDepList / renderRollLegend / renderLatch ——
+   启动时漏了它，症状是第 4 步那个白框「现在：1 号 = …，2 号 = …」一直是空的，
+   用户得先点一次「两根轴对调」才看得到自己当前是哪只手。 */
+refreshRoleUI();
+updateGates();
 goto(location.hash.slice(1) || "connect");
 
 if(SIM_ENABLED){

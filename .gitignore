@@ -66,6 +66,10 @@ data/captures/
 # ---------- 测试产物（make_midi.py / ref_parse.py / e2e.js 生成）----------
 host/tests/shots/
 host/tests/ref.json
+# ⚠️ 变异测试（mutate_play.js）会把源码临时改坏，还原备份就落在源码旁边。
+#    这一条必须在：`git add -A` 会把 .mutbak 当成新文件吃进去，
+#    而它装的是**改坏之前**的源码 —— 进仓库就是一份假的"源码备份"。
+*.mutbak
 
 # ---------- 硬件设计软件 ----------
 *.bak

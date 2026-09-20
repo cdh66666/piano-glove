@@ -56,8 +56,11 @@ const PROBE = async (job) => {
   const sp = curSpeed();
   const k  = sp;
 
+  /* 只统计**参与演奏**的槽位：侧摆不接活，它的那一条永远是 0，
+     列出来会让人以为"这根手指坏了"。 */
   const onsBySlot = Array.from({ length: 6 }, () => []);
   p.events.forEach(e => { if(e.on) onsBySlot[e.slot].push(e); });
+  const play = (p.playSlots || PLAY_SLOTS).slice();
 
   /* 同一根手指：相邻两次「按下」之间隔多久（真实时间 = 曲谱 / 速度） */
   const rep = [];
@@ -73,10 +76,12 @@ const PROBE = async (job) => {
   const holdsReal  = onEv.map(e => e.holdReal).sort((a, b) => a - b);
 
   /* 动作档位分布：真实时间下每根手指各按了多少次、平均隔多久 */
-  const perSlot = onsBySlot.map((l, s) => {
+  const perSlot = play.map(s => {
+    const l = onsBySlot[s];
     let span = 0;
     for(let i = 1; i < l.length; i++) span += l[i].t - l[i - 1].t;
-    return { slot: s, n: l.length, avgGapReal: l.length > 1 ? span / (l.length - 1) / k : null };
+    return { slot: s, name: SLOTS[s], n: l.length,
+             avgGapReal: l.length > 1 ? span / (l.length - 1) / k : null };
   });
 
   return {
@@ -94,6 +99,7 @@ const PROBE = async (job) => {
     holdReal: { min: holdsReal[0], median: q(holdsReal, 0.5), max: holdsReal[holdsReal.length - 1] },
     holdScore: { min: holdsScore[0], median: q(holdsScore, 0.5), max: holdsScore[holdsScore.length - 1] },
     perSlot,
+    latch: LATCH_SLOT >= 0 ? { slot: LATCH_SLOT, name: SLOTS[LATCH_SLOT], used: onsBySlot[LATCH_SLOT].length } : null,
     /* 「按不到底」的音有多少个：真实按住时长 < 行程时间，舵机根本走不完 */
     tooShort: holdsReal.filter(h => h < p.stroke - 0.5).length
   };
@@ -128,9 +134,11 @@ const PROBE = async (job) => {
     console.log("  同手指相邻按下 真实：最小 " + Math.round(r.repeatReal.min) +
                 "ms / p05 " + Math.round(r.repeatReal.p05) +
                 "ms / 中位 " + Math.round(r.repeatReal.median) + "ms");
-    console.log("  各手指： " + r.perSlot.map(s =>
-      "槽" + s.slot + "=" + s.n + "次" + (s.avgGapReal ? "(均隔" + Math.round(s.avgGapReal) + "ms)" : "")
+    console.log("  参与演奏的手指： " + r.perSlot.map(s =>
+      s.name + "=" + s.n + "次" + (s.avgGapReal ? "(均隔" + Math.round(s.avgGapReal) + "ms)" : "")
     ).join("  "));
+    if(r.latch) console.log("  侧摆轴（" + r.latch.name + "）：分到 " + r.latch.used +
+                            " 个音 —— 它只负责开始前把拇指摆到位，必须是 0");
   }
 
   /* 行程时间扫描：告诉用户这个旋钮该拧到哪 */

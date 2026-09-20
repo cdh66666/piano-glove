@@ -439,10 +439,11 @@ function metaKinds(buf){
   check("解析出的音符数与 catalog.json 一致", mismatch.length === 0,
     mismatch.length ? mismatch.map((r, i) => r.got).join(",") : "10/10 一致");
 
-  /* 音高对应模式：音域窄的曲子也要把 6 个槽位用满。
+  /* 音高对应模式：音域窄的曲子也要把**参与演奏的槽位**用满。
      这条是**回归测试** —— 曾经 hi 兜底到 72、want 用 floor(ratio*6)，
-     《小星星》的 C D E F G A 只占满 4 根手指（E/F 挤在食指、小指全程闲着），
-     而这首曲子当初被选进来的理由恰恰是「6 个音 = 6 根手指」。 */
+     《小星星》的 C D E F G A 只占满 4 根手指（E/F 挤在食指、小指全程闲着）。
+     ★ 分母从 6 改成 PLAY_SLOTS.length：拇指侧摆不参与演奏，
+       "6 个音 = 6 根手指"这个说法本身已经不成立了（现在是 6 个音 / 5 指）。 */
   const star = await page.evaluate(() => {
     const sel = document.querySelector("#songLib");
     sel.value = "0";
@@ -452,11 +453,16 @@ function metaKinds(buf){
       analyze();
       const map = {};
       S.plan.events.filter(e => e.on).forEach(e => { map[e.note] = e.slot; });
-      res({ used: S.plan.used, map });
+      res({ used: S.plan.used, map, play: PLAY_SLOTS.slice(), latch: LATCH_SLOT });
     }, 300));
   });
-  check("音高对应：6 个音的曲子用满 6 根手指",
-    star.used.length === 6 && star.used.every(v => v > 0), JSON.stringify(star.used));
+  check("音高对应：窄音域的曲子用满全部参与演奏的手指（" + star.play.length + " 根）",
+    star.play.every(s => star.used[s] > 0) &&
+    star.used.filter(v => v > 0).length === star.play.length,
+    JSON.stringify(star.used) + " play=" + JSON.stringify(star.play));
+  check("侧摆槽位拿不到任何音符（它不参与演奏）",
+    star.latch >= 0 ? star.used[star.latch] === 0 : true,
+    "侧摆槽位 " + star.latch + " 分到 " + (star.used[star.latch] || 0) + " 个音");
   const pitches = Object.keys(star.map).map(Number).sort((a, b) => a - b);
   check("音高对应：音越高、手指越靠小指侧",
     pitches.every((n, i) => i === 0 || star.map[n] >= star.map[pitches[i - 1]]),
@@ -511,10 +517,18 @@ function metaKinds(buf){
      一个「按下 + 抬起」的对子有可能落在同一帧的追赶循环里，
      帧末渲染出来的就是全 0（实测撞到过：6 条全 0%）。
      所以在一段时间里连续采样，取每条的峰值。 */
-  let barPeak = [0, 0, 0, 0, 0, 0];
+  /* ⚠️ 采样要**按 data-slot 取**，不能按下标取：
+     侧摆那一行也在 deplist 里（显示的是"使能位"，不是深度），
+     按下标取会把它当成一根手指，深度恒 0 → 断言平白变红（已经踩过一次）。 */
+  const playIdx = await page.evaluate(() => PLAY_SLOTS.slice());
+  let barPeak = new Array(playIdx.length).fill(0);
   for(let i = 0; i < 14; i++){
-    const cur = await page.$$eval("#p-play .dep .bar i", els => els.map(e => parseFloat(e.style.width) || 0));
-    barPeak = barPeak.map((v, k) => Math.max(v, cur[k] || 0));
+    const cur = await page.$$eval("#p-play .dep", els => els.map(e => {
+      const bar = e.querySelector(".bar i");
+      return { slot: +e.dataset.slot, w: bar ? (parseFloat(bar.style.width) || 0) : 0 };
+    }));
+    const bySlot = {}; cur.forEach(o => { bySlot[o.slot] = o.w; });
+    barPeak = barPeak.map((v, k) => Math.max(v, bySlot[playIdx[k]] || 0));
     await page.waitForTimeout(80);
   }
   check("手指深度条有变化", barPeak.some(v => v > 0), barPeak.map(v => v + "%").join(" "));
@@ -775,16 +789,29 @@ function metaKinds(buf){
   check("分析完就画出总览（不用等按播放）", st0.painted > 20000 && st0.counts.some(v => v > 0),
     JSON.stringify(st0));
 
-  const legend = (await txt("#rollLegend")).replace(/\s+/g, " ");
-  check("图例列全 6 根手指 + 丢音",
-    ["拇指侧压","拇指下压","食指","中指","无名指","小指"].every(s => legend.includes(s)) &&
-    legend.includes("丢掉的音"), legend.slice(0, 80));
+  /* 图例只列**参与演奏**的手指，并明确写出侧摆不参与 ——
+     图里没有它的轨，列出来会让人以为"怎么少了一条"。 */
+  const legInfo = await page.evaluate(() => ({
+    text: (document.querySelector("#rollLegend") || {}).textContent.replace(/\s+/g, " "),
+    play: PLAY_SLOTS.map(s => SLOTS[s]),
+    latch: LATCH_SLOT >= 0 ? SLOTS[LATCH_SLOT] : null
+  }));
+  check("图例列全参与演奏的手指 + 丢音",
+    legInfo.play.every(s => legInfo.text.includes(s)) &&
+    legInfo.text.includes("丢掉的音"), legInfo.text.slice(0, 90));
+  check("图例点明侧摆不参与演奏",
+    !legInfo.latch || legInfo.text.includes(legInfo.latch + "（侧摆）不参与演奏"),
+    legInfo.text.slice(-40));
 
   const usedSlots = await page.evaluate(() =>
     (S.plan.used || []).map((v, i) => v > 0 ? i : -1).filter(i => i >= 0));
   check("用到的每根手指都画出了块",
     usedSlots.length >= 5 && usedSlots.every(i => st0.counts[i] > 0),
     "槽位 " + JSON.stringify(usedSlots) + " 像素 " + JSON.stringify(st0.counts));
+  check("侧摆那一行的颜色一个像素都没有（整场不动）",
+    !(await page.evaluate(() => S.plan.used[LATCH_SLOT] || 0)) &&
+    (!st0.counts[await page.evaluate(() => LATCH_SLOT)]),
+    "latch 像素 " + st0.counts[await page.evaluate(() => LATCH_SLOT)]);
 
   /* 跟随模式：窗口应随播放头移动（静态层按 2 秒网格吸附，避免每帧重画） */
   const follow = await page.evaluate(() => {
@@ -956,7 +983,7 @@ function metaKinds(buf){
   await shot("11-speed-levels");
 
   /* 丢音灰影。注意：**正常素材一根手指都不丢**（test.mid 是 85 音符 / 6 秒，
-     均摊到 6 根手指完全够用，dropped=0），所以这里分两步：
+     均摊到 5 根手指完全够用，dropped=0），所以这里分两步：
      先人为注入一批丢音，验证「有丢音时会画灰影」；还原后再确认「没丢音时干净」。
      注入前后都要 refreshRoll，验完立刻把原 plan 放回去。 */
   const drop = await page.evaluate(() => {
@@ -986,6 +1013,134 @@ function metaKinds(buf){
     JSON.stringify(drop));
   check("没有丢音时图上不留灰影", drop.after === 0 && drop.dropped === 0 && drop.listed === 0,
     "dropped=" + drop.dropped + " grey=" + drop.after);
+
+  /* ============ 5f. 拇指两轴：角色 + 侧摆使能位 ============
+     用户的原始描述：「按下关节才是控制侧摆的，侧摆才是按下的」——
+     即"哪根舵机负责按压"和标签是反的，而且**侧摆不参与演奏**，
+     它只负责开始前把拇指摆到能压到琴键的位置。
+     这一节把这条规则钉死，并且保证它对调之后不会串味。 */
+  console.log("\n=== 5f. 拇指两轴：角色 + 侧摆使能位 ===");
+
+  const role0 = await page.evaluate(() => ({
+    slots: SLOTS.slice(), play: PLAY_SLOTS.slice(), latch: LATCH_SLOT,
+    chip: document.querySelector("#cFingers").textContent,
+    chipTitle: document.querySelector("#cFingers").title
+  }));
+  check("默认：1 号=拇指按压（参与演奏）、2 号=拇指侧摆（不参与）",
+    role0.slots[0] === "拇指按压" && role0.slots[1] === "拇指侧摆" && role0.latch === 1,
+    JSON.stringify(role0.slots) + " latch=" + role0.latch);
+  check("参与演奏的槽位 = 拇指按压 + 四指（共 5 根）",
+    JSON.stringify(role0.play) === JSON.stringify([0,2,3,4,5]), JSON.stringify(role0.play));
+  check("顶栏写明参与演奏的手指数，且注明侧摆不演奏",
+    role0.chip.includes("5") && role0.chipTitle.includes("拇指侧摆"), role0.chip);
+
+  /* 第 4 步那个「现在：1 号 = …，2 号 = …」的白框**一开始就该有内容** ——
+     用户不该为了看"我这只手上哪根是按压"先去点一次「两根轴对调」。
+     踩过：refreshRoleUI() 只在 btnSwapThumb.onclick 里调过、启动时漏了，
+     症状就是那个框空着（截图里才看出来），而功能本身全对、断言也全绿。 */
+  const roleNow0 = (await page.textContent("#roleNow") || "").trim();
+  check("「现在：1 号 = …，2 号 = …」一开始就有内容（不用先点对调）",
+    roleNow0.includes("1 号 = " + role0.slots[0]) && roleNow0.includes("2 号 = " + role0.slots[1]),
+    roleNow0);
+
+  /* 3C：使能位的取值范围必须来自校准区间 */
+  const latchUi = await page.evaluate(() => {
+    const r = latchRange();
+    if(!r) return { range: null };
+    setLatchSlider(30);
+    const p = latchPctToPos(30);
+    return { range: r, pos: p, inRange: p >= r.lo && p <= r.hi, pct: latchPosToPct(p) };
+  });
+  check("使能位滑块的范围 = 该校准区间，且取值落在区间内",
+    !!latchUi.range && latchUi.range.hi > latchUi.range.lo && latchUi.inRange,
+    JSON.stringify(latchUi));
+
+  await click('#tabbar button[data-p="cal"]');
+  await page.waitForTimeout(250);
+  check("3C 使能位卡片在校准后可见", await page.isVisible("#latchBody"));
+  await page.evaluate(() => setLatchSlider(30));
+  await click("#btnLatchSave");
+  await page.waitForTimeout(250);
+  const savedLatch = await page.evaluate(() => ({
+    pos: latchPos(), auto: latchAutoOn(), raw: localStorage.getItem("pg_latch_pos"),
+    row: document.querySelector("#latchRow").textContent
+  }));
+  check("「记住这个位置」真的存下来了",
+    savedLatch.pos === latchUi.pos && savedLatch.auto === true,
+    JSON.stringify(savedLatch));
+  check("存的是「槽位:位置」，不是光一个位置（对调角色后不会串到另一根轴上）",
+    String(savedLatch.raw).split(":").length === 2 && +String(savedLatch.raw).split(":")[0] === 1,
+    savedLatch.raw);
+  check("演奏页那一行显示使能位，并写明不参与演奏",
+    savedLatch.row.includes("使能位") && savedLatch.row.includes("不参与演奏"),
+    savedLatch.row.slice(0, 90));
+
+  /* 演奏时：侧摆**只发一条**命令（摆到使能位），整场不再动；
+     暂停/结束后送回松开位。 */
+  await click('#tabbar button[data-p="play"]');
+  await page.waitForTimeout(250);
+  const latchPlay = await page.evaluate(async () => {
+    const seen = [];
+    const orig = T.mock.handle.bind(T.mock);
+    T.mock.handle = c => { seen.push(String(c)); return orig(c); };
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const sel = document.querySelector("#songLib");
+    sel.value = "0"; sel.dispatchEvent(new Event("change"));
+    await wait(400);
+    document.querySelector("#loop").checked = false;
+    const latchId = slotIdOf(LATCH_SLOT);
+    const want    = latchPos();
+    const standby = parseInt((S.slots[LATCH_SLOT] || {}).standby, 10);
+    const touch   = new RegExp("^MOVE " + latchId + "\\b");
+    const n0 = seen.length;
+    document.querySelector("#btnPlay").click();
+    await wait(900);
+    const during  = seen.slice(n0).filter(c => touch.test(c));
+    const firedAll = seen.length - n0;
+    const n1 = seen.length;
+    document.querySelector("#btnPlay").click();      // 再点一次 = 暂停
+    await wait(700);
+    const after = seen.slice(n1).filter(c => touch.test(c));
+    T.mock.handle = orig;
+    return { latchId, want, standby, during, after, firedAll };
+  });
+  check("演奏开始时侧摆恰好发一条命令，且是使能位",
+    latchPlay.during.length === 1 && latchPlay.during[0] === "MOVE " + latchPlay.latchId + " " + latchPlay.want + " 0 0 ARM",
+    JSON.stringify(latchPlay.during));
+  check("演奏过程中侧摆不再被碰（它不是一根会按琴键的手指）",
+    latchPlay.firedAll > 4 && latchPlay.during.length === 1,
+    "共发 " + latchPlay.firedAll + " 条，侧摆占 " + latchPlay.during.length);
+  check("暂停后侧摆回到松开位",
+    latchPlay.after.some(c => c.startsWith("MOVE " + latchPlay.latchId + " " + latchPlay.standby)),
+    JSON.stringify(latchPlay.after) + " standby=" + latchPlay.standby);
+
+  /* 角色对调：只换角色，校准不作废，参与演奏的仍是 5 根 */
+  const swap = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const snap = () => ({ slots: SLOTS.slice(), play: PLAY_SLOTS.slice(), latch: LATCH_SLOT,
+                          cal: S.info.calibrated, latchPos: latchPos() });
+    const before = snap();
+    document.querySelector("#btnSwapThumb").click();
+    await wait(600);
+    const after = snap();
+    document.querySelector("#btnSwapThumb").click();
+    await wait(600);
+    return { before, after, back: snap() };
+  });
+  check("对调后：1 号变侧摆、2 号变按压，参与演奏的仍是 5 根",
+    swap.after.slots[0] === "拇指侧摆" && swap.after.slots[1] === "拇指按压" &&
+    JSON.stringify(swap.after.play) === JSON.stringify([1,2,3,4,5]),
+    JSON.stringify(swap.after.slots) + " " + JSON.stringify(swap.after.play));
+  check("对调角色不清校准（校准按槽位存，与角色无关）",
+    swap.after.cal === "1", "cal=" + swap.after.cal);
+  check("对调后使能位不会串到另一根轴上（存的是槽位:位置）",
+    swap.after.latchPos === null && swap.before.latchPos !== null,
+    "前 " + swap.before.latchPos + " → 后 " + swap.after.latchPos);
+  check("再对调一次回到默认安排，使能位也回来",
+    swap.back.slots[0] === "拇指按压" && swap.back.latch === 1 &&
+    JSON.stringify(swap.back.play) === JSON.stringify([0,2,3,4,5]) &&
+    swap.back.latchPos === swap.before.latchPos,
+    JSON.stringify(swap.back));
 
   /* ---------- 6. 日志 ---------- */
   console.log("\n=== 6. 日志页 ===");
