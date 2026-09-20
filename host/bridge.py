@@ -37,7 +37,10 @@ HTTP API（页面同源直接 fetch，不需要 CORS 头）
     POST /api/send      {cmd, timeoutMs?, quietMs?, since?}
                         -> {pre, lines, first, ms, seq}
                         pre = 灌进来到命令发出前的杂线（比如 RATE_DONE 这类异步输出）
-    POST /api/fire      {cmd}           只发不等（整曲演奏时用，不能被固件延迟卡住）
+    POST /api/fire      {cmd} 或 {cmds:[…]}   只发不等（整曲演奏时用，不能被固件延迟卡住）
+                        传 cmds 时**一次 write 全部写下去** —— 演奏时一帧几十条
+                        MOVE，逐条 POST 会被浏览器同源连接数卡住，声音早就响了、
+                        动作还在排队。
     GET  /api/lines?since=N&wait=S      长轮询拿异步输出行
 
 安全
@@ -388,8 +391,15 @@ class Bridge(object):
             return False, "已被用户断开，等一个明确的连接请求"
         self._reload_ports()
         cands = [p for p in self.ports if p["candidate"]]
-        if not cands and self.ports:
-            cands = self.ports[:1]                 # 全被拉黑了也试一个，别彻底放弃
+        if not cands:
+            # 兜底：只试「不是硬拉黑」的口（score > 0）。
+            #
+            # ⚠️ 这里曾经写的是 self.ports[:1] ——「全被拉黑了也试一个，别彻底放弃」。
+            # 听起来很稳妥，实际是个坑：主板自带的 COM1（ACPI\PNP0501，score -1000）
+            # 会被当成手套**连上**（打开它不报错），于是桥就再也不去找真板子了。
+            # 用户插上板子，界面显示"已连接 COM1"，然后什么都动不了 ——
+            # 比"没找到设备"难查一百倍。拉黑就该是真的拉黑。
+            cands = [p for p in self.ports if p.get("score", 0) > 0][:1]
         if not cands:
             return False, "没有发现任何串口 —— 板子插了吗？USB 线是数据线吗？"
         # 自己再排一次，不指望调用方给的是排好的 —— "推荐口优先"是这一步的核心承诺，
@@ -456,6 +466,34 @@ class Bridge(object):
 
     def fire(self, cmd):
         return self._write(cmd)
+
+    def fire_many(self, cmds):
+        """把多条命令拼成**一个** buffer 写下去，返回实际写入的条数。
+
+        为什么必须这么做：演奏时上位机一帧会产生几十条 MOVE。逐条 POST 的话，
+        浏览器对同一 origin 的并发连接上限（6 条）会把请求排成长队，
+        而声音是 Web Audio 当场同步出的 —— 早就响了，动作却要等几百毫秒才轮到
+        串口。这就是用户报的「声音和动作不同步、延迟很严重」的根因。
+        合成一次：N 个 HTTP 往返 → 1 个，串口也从 N 次 syscall → 1 次。
+
+        注意这里**不做**逐条 flush，也不等任何回包 —— 演奏路径要的就是"甩出去"。
+        """
+        ser = self.ser
+        if not self.connected or ser is None:
+            self.last_error = "串口没连上"
+            return 0
+        lines = [str(c).strip() for c in cmds]
+        lines = [c for c in lines if c]
+        if not lines:
+            return 0
+        data = ("\r\n".join(lines) + "\r\n").encode("utf-8")
+        try:
+            with self._wlock:
+                ser.write(data)
+            return len(lines)
+        except Exception as e:
+            self._drop("写失败：" + str(e))
+            return 0
 
     def send(self, cmd, timeout_ms=2500, quiet_ms=140, since=None):
         """发一条命令并收回复。
@@ -638,8 +676,14 @@ def make_handler(bridge):
                                     b.get("since"))
                     return self._json(r)
                 if u.path == "/api/fire":
-                    ok = bridge.fire(str(b.get("cmd", "")))
-                    return self._json({"ok": ok, "error": bridge.last_error})
+                    cmds = b.get("cmds")
+                    if cmds is None:
+                        cmds = [b.get("cmd", "")]
+                    if not isinstance(cmds, (list, tuple)):
+                        cmds = [cmds]
+                    n = bridge.fire_many(cmds)
+                    return self._json({"ok": n > 0, "sent": n,
+                                       "asked": len(cmds), "error": bridge.last_error})
             except Exception as e:
                 return self._json({"ok": False, "error": str(e),
                                    "trace": traceback.format_exc()}, 500)

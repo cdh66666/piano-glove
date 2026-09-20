@@ -480,15 +480,21 @@ pre#log .sys{color:#c9a5ff}
           <span id="fDepthLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
         </div>
         <div class="row">
-          <label><input type="checkbox" id="followVel"> 跟随 MIDI 力度</label>
+          <label title="舵机从待命位走到按到底需要多久。设小了会抖（没走完就被叫回来），设大了丢音变多">手指行程时间</label>
+          <input type="range" id="fStroke" min="30" max="250" step="5" value="90" style="flex:1;min-width:120px">
+          <span id="fStrokeLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">90ms</span>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="followVel" checked> 跟随 MIDI 力度</label>
         </div>
         <p class="hint" style="margin-top:-2px">
-          三个参数各管一件事：<b>播放速度</b>改的是曲子本身的快慢（音符间隔）；
-          <b>手指动作速度</b>改的是舵机一根手指按下去用多久（「最快」= 舵机最大速度）；
-          <b>按压幅度</b>改的是手指按到多深。
-          <b>按压幅度 100% = 用你校准出来的整个行程</b>（松开位 → 按到底），这也是默认值。
-          勾上「跟随 MIDI 力度」后强音按得深、弱音按得浅；不勾则每个音都按满行程 ——
-          手感更实，也更容易看清哪根手指对应哪个音。
+          四个参数各管一件事：<b>播放速度</b>改曲子本身的快慢（音符间隔）；
+          <b>手指动作速度</b>改舵机按下去用多久（「最快」= 舵机最大速度）；
+          <b>按压幅度</b>改按到多深（100% = 用你校准出来的整个行程）；
+          <b>手指行程时间</b>告诉程序「你的舵机走完一次按压要多久」——
+          它决定<b>按住时长</b>和<b>同一根手指多久才能再用</b>。
+          <br>勾上「跟随 MIDI 力度」后强音按得深、弱音按得浅；不勾则每个音都按满行程。
+          振幅底限留在 45%，保证弱音也看得见动作。
         </p>
         <div class="row">
           <button id="btnPlay" class="primary" style="flex:1">▶ 开始演奏</button>
@@ -535,12 +541,15 @@ pre#log .sys{color:#c9a5ff}
           按钮旁边的文字会告诉你现在是什么状态。
         </p>
         <div class="row">
-          <label><input type="checkbox" id="sndAll"> 连被丢掉的音也一起响（听完整曲子，用于对比）</label>
+          <label><input type="checkbox" id="sndAll" checked> 手套按不了的音也用声音补齐</label>
         </div>
+        <div id="dropStat" style="font-size:12px;color:var(--sub);margin:-2px 0 2px"></div>
         <p class="hint" style="margin-top:-2px">
           声音是<b>浏览器现场合成</b>的（三角波 + 一点二次谐波），不需要额外的音频文件。
-          默认只响手套<b>真的按下去</b>的那些音，所以「听到的 = 看到的 = 手套做的」；
-          勾上面那项可以把丢掉的音也补响，用来对比「完整曲子」和「手套演奏」差多少。
+          手套只有 6 根手指，遇到快的曲子必然有音按不了 ——
+          这些音在卷帘图上是<b>灰块</b>，上面这行会告诉你这首曲子有多少个。
+          勾着的话它们<b>只用声音补齐</b>（手指不动），曲子听起来是完整的；
+          取消勾选就只响手套真的按下去的那些音，便于对比两者差多少。
         </p>
 
         <svg viewBox="0 0 210 168" id="handSvg" style="width:100%;max-width:260px;display:block;margin:12px auto 0">
@@ -993,6 +1002,12 @@ class MockFirmware{
        用户正常打开页面永远碰不到它。 */
 const SIM_ENABLED = /(?:^|[?&])sim=1(?:&|$)/.test(location.search);
 
+/* 命令聚合节拍（毫秒）。
+   演奏时一帧可能产生几十条 MOVE，逐条 HTTP POST 会被浏览器同源并发上限（6 条）
+   排成长队 —— 声音当场就响，动作却要等几百毫秒，越到后段落后越多。
+   攒 40ms 再一起发，N 次往返变 1 次；对人眼来说 40ms 的滞后本来就分辨不出。 */
+const FIRE_TICK_MS = 40;
+
 class Transport{
   constructor(){
     this.mode = "none"; this.port = null; this.reader = null; this.buf = "";
@@ -1005,6 +1020,12 @@ class Transport{
     this.portName = null;      // 实际连着的口，给界面显示
     this._polling = false;     // 长轮询在飞
     this._sending = false;     // 有 send 在飞时暂停轮询，免得两边的游标打架
+    /* 命令聚合队列 —— 见 fire() 的长注释 */
+    this._q = [];              // 攒着还没发出去的命令
+    this._qTimer = null;
+    this._lastFlush = 0;
+    this._draining = false;    // ws 直连的串行化标志
+    this.fireStats = {batches:0, cmds:0, maxBatch:0};
     /* 模拟固件的异步输出（RATE_DONE 这种"跑完才吐"的行）直接转成普通收入行 */
     this.mock.onAsync = l => this.emit(l);
     setInterval(()=>this.mock.tick(), 100);
@@ -1109,6 +1130,9 @@ class Transport{
   async disconnect(){
     this.connected = false;
     clearTimeout(this._pollT);
+    /* 断开时把没发出去的命令丢掉 —— 带着它们去连下一个口是错的 */
+    this._q.length = 0;
+    if(this._qTimer){ clearTimeout(this._qTimer); this._qTimer = null; }
     if(this.mode === "bridge"){
       try{ await this.bridgePost("/api/disconnect", {}); }catch(e){}
       this.bridge = null;
@@ -1202,11 +1226,62 @@ class Transport{
       this._write(cmd).catch(e=>{ logLine("写串口失败: " + e.message, "err"); done(); });
     });
   }
-  /* 只发不等 —— 演奏时用, 避免被固件延迟卡住 */
+  /* 只发不等 —— 演奏时用, 避免被固件延迟卡住。
+     但**不是立刻发**：命令先进队列，由 flush() 合并成一批。
+
+     为什么必须聚合（这就是「延迟严重、声音比动作早」的根因）：
+     一帧 frame() 可能产生几十条 MOVE。逐条 fire → 逐条 HTTP POST，
+     而浏览器对同一 origin 的并发连接上限只有 6 条，其余全部排队。
+     声音是 Web Audio 当场同步发声的（毫秒级精确），动作却要等 HTTP 队，
+     于是越到曲子后段动作落后越多。
+     合成一批后：N 次往返 → 1 次，串口也从 N 次写 → 1 次写。 */
   fire(cmd){
     if(this.mode === "sim"){ this.mock.handle(cmd); return; }
-    logLine("→ " + cmd, "pl");
-    this._write(cmd).catch(()=>{});
+    /* 没连上就别攒 —— 攒几万条只会白吃内存，而且一条也发不出去 */
+    if(this.mode !== "bridge" && this.mode !== "ws") return;
+    this._q.push(cmd);
+    /* 演奏期间**不逐条写日志**：整曲 480 条命令就是 480 次 DOM 追加，
+       主线程被日志拖住 → rAF 掉帧 → 动作看着更抖。停止后补一条摘要。 */
+    if(S.playing) S.fireQuiet = (S.fireQuiet || 0) + 1;
+    else logLine("→ " + cmd, "pl");
+    const now = performance.now();
+    if(now - this._lastFlush >= FIRE_TICK_MS) this.flush();          // 距上次够久 → 立即发
+    else if(!this._qTimer) this._qTimer = setTimeout(() => this.flush(), FIRE_TICK_MS);
+  }
+  /* 把队列合并成一次发出。
+     桥侧 /api/fire 收 {cmds:[…]}，一次 write 全部写下去；
+     ws 直连没有批量接口，就自己拼成一段写，并串行化 —— 两个 writer 抢同一个
+     port 会直接抛错，队列也会乱序。 */
+  flush(){
+    if(this._qTimer){ clearTimeout(this._qTimer); this._qTimer = null; }
+    if(!this._q.length) return;
+    this._lastFlush = performance.now();
+    if(this.mode === "bridge"){
+      const q = this._q.splice(0);
+      this._noteBatch(q);
+      this.bridgePost("/api/fire", {cmds:q}).catch(()=>{});
+      return;
+    }
+    if(this.mode === "ws") this._drainWs();
+  }
+  _noteBatch(q){
+    this.fireStats.batches++;
+    this.fireStats.cmds += q.length;
+    if(q.length > this.fireStats.maxBatch) this.fireStats.maxBatch = q.length;
+  }
+  async _drainWs(){
+    if(this._draining) return;
+    this._draining = true;
+    try{
+      while(this._q.length && this.port && this.port.writable){
+        const q = this._q.splice(0);
+        this._noteBatch(q);
+        const w = this.port.writable.getWriter();
+        try{ await w.write(new TextEncoder().encode(q.join("\r\n") + "\r\n")); }
+        finally{ try{ w.releaseLock(); }catch(e){} }
+      }
+    }catch(e){ /* 端口没了就把队列丢掉，别卡死 */ }
+    this._draining = false;
   }
 }
 const T = new Transport();
@@ -2254,11 +2329,36 @@ function parseMidi(buf){
   return {format, ntrk, division, smpte, notes, tracks, duration:dur, bpm, ppq:ticksPerQn, truncated};
 }
 
+/* 最长的按住时长（真实毫秒）。再长的音也不该一直按着：
+   舵机堵转发热、机械磨损，而且听感上早就衰减完了。 */
+const MAX_HOLD_MS = 1200;
+
+/* 舵机走完**单程**（待命位 → 按到底）需要多久，真实毫秒。
+   默认 90ms 来自实机测速：满行程一次完整按压（按下 + 回待命）4.97Hz ≈ 201ms，
+   单程就是它的一半。
+   这个数字直接决定"能不能按到底"：设小了舵机走不完就被叫回来（看着像抖一下），
+   设大了同一根手指被占得久、丢音变多。用户可以按自己那块板子实测改。 */
+function strokeMs(){
+  const el = $("#fStroke");
+  const v = el ? parseInt(el.value, 10) : NaN;
+  return (v >= 20 && v <= 400) ? v : 90;
+}
+
 /* ---------- 5.2 音符 → 手指动作 规划 ---------- */
 /* 手套只有 6 个自由度, 而钢琴曲常有几十个音同时响。
-   目标: 保住节奏和速度感, 允许丢音, 绝不允许卡住。 */
-function buildPlan(notes, mode){
-  const events = [];                 // {t, slot, on, vel, note, durMs}
+   目标: 保住节奏和速度感, 允许丢音, 绝不允许卡住。
+
+   ★★ 所有物理约束一律写在**真实毫秒**域，再换算回曲谱时间。★★
+   这是被用户骂出来的教训：「最快的革命练习曲，每个键都是抖动一下，
+   根本没按下去」。原因是按住时长原来写成 clamp(n.d*0.8, 55, 200) ——
+   那是**曲谱**毫秒。200% 速度下 60ms 的按住只剩 30ms 真实时间，
+   而舵机走完一次行程要 ~90ms：还没按到底就被叫回来了，看到的就是抖一下。
+   同一条数字，换个速度物理含义就完全不同 —— 所以它必须写在真实时间域。
+   曲谱时间 t 与真实时间的关系：真实 = 曲谱 / k，k 就是速度倍率。 */
+function buildPlan(notes, mode, speed){
+  const k = Math.max(0.05, speed || 1);   // 曲谱时间 / k = 真实时间
+  const stroke = strokeMs();              // 真实 ms：走完**单程**（待命 → 按到底）
+  const events = [];                 // {t, slot, on, vel, note, durMs, holdReal}
   const droppedNotes = [];           // 被丢掉的音, 只在卷帘图上画灰影, 不产生动作
   const busyUntil = new Array(6).fill(-1);
   let dropped = 0;
@@ -2291,16 +2391,25 @@ function buildPlan(notes, mode){
       continue;
     }
     lastSlot = slot;
-    /* 按住时长: 太短手指几乎不动、手套没有"弹"的感觉; 太长又来不及接下一个音。
-       取音符时长的 80%, 夹在 55~200ms, 接近真人触键的时长。 */
-    const gap = Math.max(55, Math.min(n.d * 0.8, 200));
-    busyUntil[slot] = n.t + gap;
-    /* 事件里带上 note / durMs：
+    /* 按住时长 = 音符时值（**真实时间**）的 90%，两头各一个物理夹子：
+       - 下界 stroke：比走完单程还短 = 按不到底，就是用户说的"抖一下"；
+       - 上界 MAX_HOLD_MS：再长的音也没必要一直按着，舵机发热和机械寿命都要算。
+       这样长音就真的按得久、短音按得短 —— 而不是所有音都短平快。 */
+    const dReal    = n.d / k;
+    const holdReal = Math.max(stroke, Math.min(dReal * 0.9, MAX_HOLD_MS));
+    const hold     = holdReal * k;         // 换回曲谱时间，事件流按它排序
+    /* 这根手指在这段时间里是**被占用**的：先按住 holdReal，然后还得走回待命位
+       —— 松开同样要花 stroke。原来只按 hold 算占用，等于默认"松开是瞬移"，
+       于是下一个音紧接着又来，按到一半就被反向拉走，连击糊成一团。 */
+    busyUntil[slot] = n.t + (holdReal + stroke) * k;
+    /* 事件里带上 note / durMs / holdReal：
        - note 既给卷帘图定位纵轴，也给 Web Audio 算频率；
-       - durMs 决定这个音衰减多久。
-       声音和动作**共用同一条事件流**，所以听到的 = 看到的 = 手套做的。 */
-    events.push({t:n.t,       slot, on:true,  vel:n.vel / 127, note:n.note, durMs:gap});
-    events.push({t:n.t + gap, slot, on:false, vel:0,           note:n.note, durMs:0});
+       - durMs 是**曲谱**时长，卷帘图按它画宽度；
+       - holdReal 是**真实**毫秒，声音衰减用 —— 已经除掉速度倍率，
+         所以 200% 速度下音不会拖成两倍长糊在一起。
+       声音和动作**共用同一条事件流**，听到的 = 看到的 = 手套做的。 */
+    events.push({t:n.t,        slot, on:true,  vel:n.vel / 127, note:n.note, durMs:hold, holdReal});
+    events.push({t:n.t + hold, slot, on:false, vel:0,           note:n.note, durMs:0,    holdReal:0});
     used[slot]++;
   }
   events.sort((a,b) => a.t - b.t || (a.on ? -1 : 1));
@@ -2311,7 +2420,7 @@ function buildPlan(notes, mode){
     while(events[i].t - events[j].t > 1000) j++;
     peak = Math.max(peak, i - j + 1);
   }
-  return {events, dropped, used, peakRate:peak, droppedNotes};
+  return {events, dropped, used, peakRate:peak, droppedNotes, stroke, k};
 }
 function pickFree(busyUntil, t, prefer){
   if(busyUntil[prefer] <= t) return prefer;
@@ -2509,7 +2618,10 @@ function analyze(){
     S.notes = null; S.plan = null; $("#btnPlay").disabled = true; return;
   }
   const notes = list.map((n,i) => ({...n, i})).sort((a,b) => a.t - b.t);
-  const plan = buildPlan(notes, $("#selMap").value);
+  /* 速度必须传进去：物理约束（按住时长、行程占用）都是真实毫秒，
+     而事件时间是曲谱毫秒，两者靠 k 换算。速度一变就得重算 plan ——
+     否则"按到底"的判断会停留在旧速度上（这正是原来抖动的原因）。 */
+  const plan = buildPlan(notes, $("#selMap").value, curSpeed());
   S.notes = notes; S.plan = plan;
 
   const dur = notes.reduce((mx,n) => Math.max(mx, n.t + n.d), 0) / 1000;
@@ -2531,6 +2643,7 @@ function analyze(){
      用户就能先看清「这首曲子手套要做什么、哪些音它按不了」。 */
   refreshRoll(0);
   updateLoadHint();      // 换曲子/换筛选后，负载提示要跟着重算
+  updateDropStat();      // 丢音数也要重算 —— 它是「补齐」开关有没有用的唯一线索
 }
 const st = (k,v) => "<div><span>" + k + "</span><b>" + v + "</b></div>";
 const fmtTime = ms => {
@@ -2555,6 +2668,26 @@ $("#fSpeed").oninput = () => {
    这就是用户要的那句"要用我校准的最大幅度来啊"。 */
 function fingerDepth(){ return (parseInt($("#fDepth").value, 10) || 100) / 100; }
 $("#fDepth").oninput = () => { $("#fDepthLabel").textContent = Math.round(fingerDepth() * 100) + "%"; };
+
+/* MIDI 力度 → 按压深度（0~1）。
+   底 45% 起步，再线性推到全行程：
+   - 下限留底：力度 0.2 的音若只按 20%，手指几乎不动、看着像"没反应"，
+     用户会以为坏了；
+   - 上限必须是 1.0：力度 1.0 的音要按到底 —— 用户明确要求
+     "用我校准的最大幅度"。
+   抽成函数是为了让自测能直接断言两端，而不是靠采样 DOM 猜。 */
+function ampOf(vel){
+  if($("#followVel") && !$("#followVel").checked) return 1;
+  return 0.45 + 0.55 * Math.max(0, Math.min(1, vel || 0));
+}
+
+/* 行程时间一改，「按住多久」「同一根手指多久能再用」全变 —— 必须重算 plan，
+   否则界面上的丢音数、卷帘图和实际发出的动作会对不上。 */
+$("#fStroke").oninput = () => {
+  $("#fStrokeLabel").textContent = strokeMs() + "ms";
+  if(S.midi) analyze();
+};
+$("#fStrokeLabel").textContent = strokeMs() + "ms";
 
 /* ---------- 5.4 播放引擎 ---------- */
 const SLOT_SVG = ["f-thumb","f-thumb","f-index","f-middle","f-ring","f-pinky"];
@@ -2600,6 +2733,14 @@ function stopPlay(safe){
   S.playing = false;
   if(S.raf) cancelAnimationFrame(S.raf);
   S.raf = null;
+  /* 演奏期间命令不逐条写日志（480 次 DOM 追加足以让 rAF 掉帧），
+     这里补一条摘要 —— 顺带把"批量到底有没有起作用"摆到台面上。 */
+  if(S.fireQuiet){
+    const fs = T.fireStats;
+    logLine("演奏期间发出 " + S.fireQuiet + " 条动作命令 → 合并成 " + fs.batches
+            + " 批（单批最多 " + fs.maxBatch + " 条）", "sys");
+    S.fireQuiet = 0;
+  }
   $("#btnPlay").innerHTML = "▶ 开始演奏";
   setDepths([0,0,0,0,0,0]);
   $("#playRate").textContent = "—";
@@ -2633,7 +2774,9 @@ $("#btnPlay").onclick = async () => {
   const ev = S.plan.events;
   S.playing = true; S.cursor = 0; S.fired = 0;
   S.dCursor = 0; S.sndFired = 0;          // 丢音游标 / 起音计数（自测要用）
+  S.fireQuiet = 0;                        // 演奏期间被折叠进批次的命令数（不写日志）
   S.lastRateAt = performance.now(); S.lastRateCount = 0;
+  T.fireStats = {batches:0, cmds:0, maxBatch:0};   // 本次演奏的批量发送统计
   S.t0 = performance.now(); S.startedAt = performance.now();
   $("#btnPlay").innerHTML = "⏸ 暂停";
 
@@ -2654,13 +2797,15 @@ $("#btnPlay").onclick = async () => {
       // 也就是用户要的"用我校准的最大幅度"。
       // 曾经这里只有 Math.max(0.35, e.vel)：力度 0.7 的音就只按到 70%，
       // 听/感觉起来就是"幅度怎么这么小"。
-      const amp = fingerDepth(), useVel = $("#followVel").checked;
-      const d = e.on ? (useVel ? Math.max(0.35, e.vel) : 1) * amp : 0;
+      const d = e.on ? ampOf(e.vel) * fingerDepth() : 0;   // 力度 → 深度见 ampOf()
       depth[e.slot] = d;
       T.fire("MOVE " + slotIdOf(e.slot) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
       /* 同一个事件流里顺手起音 —— 声音和动作在**同一帧**产生，
-         所以「听到的节拍」和「看到的动作」不会错开。 */
-      if(e.on) tone(e.note, e.durMs, e.vel);
+         所以「听到的节拍」和「看到的动作」不会错开。
+         传 holdReal（真实毫秒）而不是 durMs：durMs 是曲谱时长，
+         不除掉速度倍率的话 200% 下每个音都拖成两倍长、糊成一片 ——
+         那正是用户说的"音乐对不上"。 */
+      if(e.on) tone(e.note, e.holdReal, e.vel);
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */
@@ -2675,7 +2820,9 @@ $("#btnPlay").onclick = async () => {
       const dn = S.plan.droppedNotes;
       while(S.dCursor < dn.length && dn[S.dCursor].t <= t){
         const n = dn[S.dCursor++];
-        tone(n.note, Math.max(55, Math.min(n.d * 0.8, 200)), 0.55);
+        /* 同样换成真实时长 —— 和手套真正按下去的那些音用同一把尺子 */
+        const dReal = Math.max(60, Math.min(n.d / speed * 0.9, MAX_HOLD_MS));
+        tone(n.note, dReal, 0.55);
       }
     }
 
@@ -2782,7 +2929,11 @@ function tone(note, durMs, vel, force){
   const ctx = audioCtx(); if(!ctx) return;
   const t0  = ctx.currentTime + 0.01;
   const amp = Math.max(0.08, Math.min(1, vel || 0.8));
-  const end = t0 + Math.max(0.14, durMs / 1000) + 0.30;
+  /* 衰减尾巴必须短。原来最短 0.14s + 0.30s 尾巴，而 200% 速度的革命练习曲
+     音符间隔本来就不足 140ms —— 每个音都拖 0.44s，全糊在一起。
+     这就是"音乐对不上"的听觉来源（节奏在，但听不清是在弹哪个音）。
+     现在从真实按住时长起算，尾巴收到 0.20s、最短只响 0.075s。 */
+  const end = t0 + Math.max(0.075, durMs / 1000) + 0.20;
 
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t0);
@@ -2869,15 +3020,41 @@ function applyLevelSpeed(s){
   $("#speedLabel").textContent = v + "%";
   updateLoadHint();
 }
+/* 拖动滑块时只更新文字 —— 重算 plan 要遍历整首曲子，拖一次会算上百遍。
+   松手（change）才真正重算：plan 里的物理约束（按住时长、行程占用）
+   全都是按真实毫秒算的，速度一换就必须重来，否则按下时长的判断
+   还停留在旧速度上 —— 这正是"最快的时候每个键都抖一下"的来源。 */
 $("#speed").oninput = () => {
   $("#speedLabel").textContent = $("#speed").value + "%";
   updateLoadHint();
 };
+$("#speed").onchange = () => { if(S.midi) analyze(); };
 $("#btnMaxSpeed").onclick = () => {
   $("#speed").value = $("#speed").max;
   $("#speedLabel").textContent = $("#speed").max + "%";
   updateLoadHint();
+  if(S.midi) analyze();          // 点「拉满」等于换速度，同样要重算
 };
+
+/* 把「这首曲子手套按不了几个音」直接写在界面上，别让用户猜。
+   之前点「补齐被丢掉的音」没感觉，就是因为看不见丢了几个 ——
+   而 L1~L3 的曲子本来就一个不丢，点了当然没变化。 */
+function updateDropStat(){
+  const el = $("#dropStat"); if(!el) return;
+  if(!S.plan){ el.textContent = ""; return; }
+  const n = (S.plan.droppedNotes || []).length;
+  const all = (S.notes || []).length;
+  const st = S.plan.stroke;
+  if(!n){
+    el.style.color = "#1a7f37";
+    el.textContent = "这首曲子 " + all + " 个音，手套一个都不用丢（行程时间按 " + st + "ms 算）。";
+    return;
+  }
+  el.style.color = "#b5730a";
+  el.innerHTML = "这首曲子 " + all + " 个音，其中 <b>" + n + "</b> 个手套按不了（"
+    + (all ? Math.round(n / all * 100) : 0) + "%）。"
+    + "把「手指行程时间」调小可以少丢一些，但调小于实际行程会变成抖动。";
+}
 
 function rollGeo(){
   /* 上半张 = 卷帘，下半张 = 6 条动作轨；左边留一条给槽位名和刻度 */

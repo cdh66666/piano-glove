@@ -186,6 +186,17 @@ def test_autoconnect_order():
     ok4, _ = br3.autoconnect_once()
     check("缓存过期后重扫能认出新插上的板子", ok4 and br3.probe_ok == "COM4", br3.port)
 
+    # ★ 只剩被硬拉黑的口时，兜底也**不能**去连它。
+    # 曾经这里写的是 self.ports[:1]（"全被拉黑了也试一个，别彻底放弃"），
+    # 于是主板自带的 COM1（ACPI\PNP0501）被当成手套连上了，界面还显示"已连接"——
+    # 之后桥再也不去找真板子。比"没找到设备"难查一百倍。
+    # 这里连"COM1 会回 INFO"这种最严的情况也一起验：拉黑就该是真的拉黑。
+    br5, opens5 = make([P("COM1", -1000, False, "主板自带通信口")], {"COM1"})
+    ok5, msg5 = br5.autoconnect_once()
+    check("只剩硬拉黑的口时不兜底连它（宁可老实说没找到）",
+          (not ok5) and (not br5.connected) and opens5 == [],
+          "ok=%s opens=%s msg=%s" % (ok5, opens5, msg5))
+
 
 # ============================================================
 # 3. 真桥 + 假手套 跑一遍 API
@@ -259,6 +270,34 @@ def test_api():
               all(j2["lines"][i]["seq"] < j2["lines"][i + 1]["seq"] for i in range(len(j2["lines"]) - 1)),
               [it["seq"] for it in j2["lines"]])
         cur = j2["seq"]
+
+        # ---- ★ 批量 fire：一次写一批 —— 这是「演奏延迟」的正解 ----
+        # 演奏时上位机一帧能产生几十条 MOVE。逐条 POST 会被浏览器同源并发上限
+        # （6 条）排成长队：声音是 Web Audio 当场同步响的，早就听到了，
+        # 动作却还在 HTTP 队列里等 —— 用户报的「延迟严重、声音和动作不同步」。
+        # 所以桥必须能一次吃下一整批、一次 write 全写下去。
+        batch = ["ECHO b%03d" % i for i in range(40)]
+        t0 = time.time()
+        s, jb = post("/api/fire", {"cmds": batch})
+        dt_batch = (time.time() - t0) * 1000
+        check("fire 收数组：一次写 40 条",
+              jb.get("sent") == 40 and jb.get("asked") == 40, jb)
+
+        t0 = time.time()
+        for c in batch:
+            post("/api/fire", {"cmd": c})
+        dt_single = (time.time() - t0) * 1000
+
+        # 「回 OK」什么都不证明，得数假手套真正收到几条回复行。
+        time.sleep(1.2)
+        s, j4 = get("/api/lines?since=%d&wait=0" % cur)
+        echoed = [it["line"] for it in j4["lines"] if "OK ECHO b" in it["line"]]
+        check("批量 + 逐条两条路径发出去的 80 条命令一条不丢",
+              len(echoed) == 80, "收到 %d 条（40 批内 + 40 逐条）" % len(echoed))
+        check("批量写比逐条写快得多（一帧几十条时的差别就是延迟）",
+              dt_batch < dt_single / 2,
+              "批量 40 条 %.1fms vs 逐条 40 条 %.1fms" % (dt_batch, dt_single))
+        cur = j4["seq"]
 
         # ---- ★ 异步行：RATE_DONE 是过一会儿才吐的，必须也能捞到 ----
         s, j = post("/api/send", {"cmd": "RATE 1", "timeoutMs": 2000})

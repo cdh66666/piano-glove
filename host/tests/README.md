@@ -30,17 +30,29 @@ python ref_parse.py       # 参考实现解析 -> ref.json
 node compare.js           # 两边结果比对
 
 # 2) 串口桥自测（真进程 + 假板子，无需硬件）
-python bridge_check.py    # 输出 35 项 PASS/FAIL
+python bridge_check.py    # 输出 39 项 PASS/FAIL
 
 # 3) 页面端到端自测（内置假固件，无需硬件）
-node e2e.js               # 输出 148 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
+node e2e.js               # 输出 163 项 PASS/FAIL（结尾由脚本自报总数），截图存到 shots/
 
 # 4) 往"桥"那条路上注入退化，确认对应断言真的会变红
 node mutate_bridge.js
 
-# 5) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
+# 5) 往"演奏时序"那条路上注入退化（7 处），确认对应断言真的会变红（约 12 分钟）
+node mutate_play.js
+
+# 6) 演奏时序诊断：把「抖动」变成数字（按住时长、同手指间隔、行程时间扫描）
+node diag_timing.js
+node diag_timing.js revolutionary moonlight     # 只跑指定曲目
+
+# 7) 关键页面视觉抽查（视口截图 + 窄屏横向滚动检查）
 node shots.js
 ```
+
+`diag_timing.js` 是改参数前**必须先跑**的那个：它会告诉你「同一根手指两次按下
+隔了多久」「按住时长够不够舵机走完行程」「行程时间拧到多少会丢掉多少音」。
+「最快的革命练习曲每个键都抖一下」这个 bug 就是它量化出来的 ——
+改参数前实测 200% 下按住只剩 **30ms**，而行程要 90ms。
 
 `CHROME_PATH=/path/to/chrome node e2e.js` 可以指定浏览器。
 `PYTHON=/path/to/python python bridge_check.py` 可以指定解释器（默认跟随 `sys.executable`，
@@ -109,6 +121,8 @@ node   fingering_report.js      # 导出 host/samples/FINGERING.md 自动指法�
 | `bridge_check.py` | 串口桥自测：推荐口打分、自动选口决策顺序、HTTP 接口、长轮询异步行、跨站拦截、断开语义 |
 | `fake_glove.py` | 假手套：TCP 说手套文本协议，供 pyserial 的 `socket://` 接进来 |
 | `mutate_bridge.js` | 变异测试：往"桥"那条路注入 3 处退化，确认对应的 5 条断言都会变红 |
+| `mutate_play.js` | 变异测试：往"演奏时序"注入 7 处退化（命令不聚合 / 按住无下界 / 槽位不算松开 / 幅度不跟力度 / 行程旋钮不接线 / 声音用曲谱时长 / 补齐开关失效），逐条确认对应断言变红 |
+| `diag_timing.js` | **演奏时序诊断**：读页面里真实的 `S.plan`，算出按住时长、同手指相邻按下间隔、各手指负载，并扫描「行程时间 → 丢音数」。改演奏参数前先跑它，别拍脑袋 |
 | `shots.js` | 关键页面视觉抽查 |
 | `bench_move.py` | **实机主力脚本**。验位移 + 测速；带两道安全闸（见上） |
 | `diag_state.py` | 读板子真实状态：`INFO` / `CAL STATUS` / `STATUS_ALL` / `BUSINFO` |

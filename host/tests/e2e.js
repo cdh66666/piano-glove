@@ -518,13 +518,212 @@ function metaKinds(buf){
     await page.waitForTimeout(80);
   }
   check("手指深度条有变化", barPeak.some(v => v > 0), barPeak.map(v => v + "%").join(" "));
-  // 回归：默认「按压幅度 100% + 不跟随力度」时，每个音都要跑满校准行程。
-  // 曾经这里只有 Math.max(0.35, e.vel)：力度 0.7 的音就只按到 70%，
-  // 用户的感觉同样是"幅度怎么这么小，要用我校准的最大幅度来啊"。
-  check("演奏默认用满行程（深度 100%）", barPeak.every(v => v >= 99), barPeak.map(v => v + "%").join(" "));
-  check("演奏页默认：幅度 100% + 不跟随力度",
-    (await page.inputValue("#fDepth")) === "100" && !(await page.isChecked("#followVel")),
+  /* 幅度要**有动态**，但两端都有人管：
+     - 上限必须是满行程：力度 1.0 的音要按到底。曾经这里写过
+       Math.max(0.35, e.vel)，力度 0.7 的音只按到 70%，用户的感觉是
+       "幅度怎么这么小，要用我校准的最大幅度来啊"。
+     - 下限要留底：力度 0.2 的音若只按 20%，手指几乎不动、看着像没反应。
+     所以断言拆成"至少到过 100%" + "从不低于 40%"，而不是"每根都是 100%"
+     —— 后者在「跟随力度」默认打开后就自相矛盾了。 */
+  check("深度落在合理区间（不超过校准行程，也不低于 40% 底限）",
+    barPeak.every(v => v >= 40 && v <= 100.5), barPeak.map(v => v + "%").join(" "));
+  /* ⚠️ 不要断言"每根手指都按到 100%"：那要求曲子里有 vel=1.0 的音，
+     而取样的这首力度统一是 90/127 —— 断言本身就成了错的（踩过一次）。
+     "强音按到底"这条性质由下面 ampOf(1) === 1 直接保证。
+     这里改验更有信息量的事：**深度条上的值必须等于力度映射算出来的值**，
+     证明深度真的由力度决定，而不是各手指拍脑袋给个固定数。 */
+  /* ⚠️ 不要拿"采样峰值"去比"最大力度的映射值"：无头浏览器里 rAF 只有 ~8fps，
+     采样必然覆盖不全，最强的那个音经常没被采到 —— 那条断言会平白无故地红
+     （实测 84% vs 计算 88%，就是这么来的）。
+     改成**值域包含**：采样到的深度必须全部落在「本曲力度映射」的取值范围内。
+
+     ★ 期望值必须**在这里独立算一遍**，绝不能调页面的 `ampOf`。
+     第一版就是调了 `ampOf` —— 结果把 ampOf 改成恒 1 时，
+     实测深度和"期望区间"会**一起**变成 100%，自洽了，断言照样绿
+     （变异测试当场照出来：这条是假绿，抓到变异的是另一条断言）。
+     期望值由被测代码算出来就不叫断言，叫自证。 */
+  const ampRange = await page.evaluate(() => {
+    const vels = S.plan.events.filter(e => e.on).map(e => e.vel);
+    const dp = fingerDepth();
+    const want = v => 0.45 + 0.55 * Math.max(0, Math.min(1, v));   // 独立写一遍
+    return { lo: Math.round(want(Math.min(...vels)) * dp * 100),
+             hi: Math.round(want(Math.max(...vels)) * dp * 100),
+             minVel: Math.min(...vels), maxVel: Math.max(...vels) };
+  });
+  check("采样深度全部落在「力度 → 深度」的值域内（深度真的由力度算出来）",
+    barPeak.every(v => v >= ampRange.lo - 2 && v <= ampRange.hi + 2),
+    `实测 ${barPeak.join("% ")}% ｜ 理论区间 ${ampRange.lo}~${ampRange.hi}%` +
+    `（力度 ${ampRange.minVel.toFixed(3)}~${ampRange.maxVel.toFixed(3)}）`);
+
+  /* 映射两端直接测**页面真正调用的那个函数**（ampOf），不靠采样 DOM 猜 ——
+     采样只能看出峰值，看不出"不同力度确实按得不一样深"。 */
+  const ampMap = await page.evaluate(() => {
+    const el = $("#followVel");
+    const was = el.checked;
+    el.checked = true;
+    const on = { lo: ampOf(0), mid: ampOf(0.5), hi: ampOf(1) };
+    el.checked = false;
+    const off = { lo: ampOf(0), hi: ampOf(1) };
+    el.checked = was;
+    return { on, off };
+  });
+  check("力度映射：强音 = 满行程、弱音 = 45% 底限、中间单调",
+    ampMap.on.hi === 1 && Math.abs(ampMap.on.lo - 0.45) < 1e-9 &&
+    ampMap.on.mid > ampMap.on.lo && ampMap.on.mid < ampMap.on.hi,
+    JSON.stringify(ampMap.on));
+  check("取消「跟随力度」后每个音都走满行程",
+    ampMap.off.lo === 1 && ampMap.off.hi === 1, JSON.stringify(ampMap.off));
+  check("演奏页默认：幅度 100% + 跟随力度（用户要的「幅度要有区别」）",
+    (await page.inputValue("#fDepth")) === "100" && (await page.isChecked("#followVel")),
     "depth=" + (await page.inputValue("#fDepth")) + " followVel=" + (await page.isChecked("#followVel")));
+
+  /* ★★ 时序：物理约束必须写在**真实时间**域 —— 这是本轮修的核心 ★★
+     用户报「最快的革命练习曲每个键都是抖动一下、根本没按下去」。
+     根因：按住时长原来按**曲谱**毫秒算（clamp(n.d*0.8, 55, 200)），
+     200% 速度下 60ms 的按住只剩 30ms 真实时间，而舵机走完一次行程要 ~90ms
+     —— 还没按到底就被叫回来了。
+     所以这里断言的是**与速度无关的性质**：不管速度调到多少，
+     每个音的真实按住时长都不短于行程时间，同一根手指两次按下之间
+     都留得下「按住 + 松开」一个完整周期。 */
+  const timeChk = await page.evaluate(async () => {
+    const out = [];
+    for(const sp of [50, 100, 200, 250]){
+      $("#speed").value = String(sp);
+      analyze();
+      await new Promise(r => setTimeout(r, 40));
+      const st  = strokeMs();
+      const ons = S.plan.events.filter(e => e.on);
+      const bySlot = Array.from({ length: 6 }, () => []);
+      ons.forEach(e => bySlot[e.slot].push(e.t));
+      const k = curSpeed();
+      let minGap = Infinity;
+      bySlot.forEach(l => {
+        for(let i = 1; i < l.length; i++) minGap = Math.min(minGap, (l[i] - l[i - 1]) / k);
+      });
+      const holds = ons.map(e => e.holdReal);
+      out.push({
+        sp, stroke: st,
+        short: ons.filter(e => e.holdReal < st - 0.5).length,
+        minHold: holds.length ? Math.min(...holds) : null,
+        maxHold: holds.length ? Math.max(...holds) : null,
+        minGap: minGap === Infinity ? null : minGap,
+        dropped: (S.plan.droppedNotes || []).length
+      });
+    }
+    $("#speed").value = "100";
+    $("#speedLabel").textContent = "100%";
+    analyze();
+    return out;
+  });
+  check("任何速度下都没有「按不到底」的音（真实按住时长 ≥ 行程时间）",
+    timeChk.every(t => t.short === 0),
+    timeChk.map(t => t.sp + "%→" + t.short + "个").join(" "));
+  /* 「按压时间长度也要加上啊，不是每个音都是短平快的」——
+     按住时长要跟着音符时值走。上面那条只保证了下限，
+     这条保证**长短真的有区别**，而不是所有音都被夹成同一个值。 */
+  check("按住时长跟随音符时值（长音按得久、短音按得短）",
+    timeChk.some(t => t.maxHold > t.minHold * 1.5),
+    timeChk.map(t => t.sp + "%:" + Math.round(t.minHold) + "~" + Math.round(t.maxHold) + "ms").join(" "));
+  check("同一根手指两次按下之间留得下「按住 + 松开」一个完整周期",
+    timeChk.every(t => t.minGap === null || t.minGap >= t.stroke * 2 - 1),
+    timeChk.map(t => t.sp + "%:" + (t.minGap === null ? "—" : Math.round(t.minGap) + "ms")).join(" "));
+
+  /* 行程时间是个真旋钮：调大它，同一根手指被占得久，丢音必须变多。
+     如果调了没反应，说明这个参数根本没接进 plan。 */
+  const strokeSweep = await page.evaluate(async () => {
+    const el = $("#fStroke");
+    const set = async v => {
+      el.value = String(v);
+      el.dispatchEvent(new Event("input"));
+      await new Promise(r => setTimeout(r, 60));
+      return { stroke: strokeMs(), dropped: (S.plan.droppedNotes || []).length };
+    };
+    const a = await set(60), b = await set(240);
+    await set(90);
+    return { a, b };
+  });
+  check("「手指行程时间」真的接进了规划（调大 → 丢音变多）",
+    strokeSweep.b.dropped > strokeSweep.a.dropped && strokeSweep.b.stroke === 240,
+    `60ms→丢${strokeSweep.a.dropped}  240ms→丢${strokeSweep.b.dropped}`);
+
+  check("「手套按不了的音」数量直接写在界面上，不用猜",
+    /\d/.test(await page.textContent("#dropStat")), await page.textContent("#dropStat"));
+  check("「按不了的音也用声音补齐」默认打开",
+    await page.isChecked("#sndAll"));
+
+  /* ★ 用户说「我点开了那个按钮还是没啥变化」。
+     真正的答案是：那首曲子本来一个音都没丢，开关当然没变化 ——
+     而界面上原来完全看不出丢了几个。
+     所以这里两头都验：①丢音数会显示出来；②开关真的改声音，
+     而不是只改一个勾。用革命练习曲（L5，必然丢音）跑两小段来对比。 */
+  const sndAllChk = await page.evaluate(async () => {
+    const sel = document.querySelector("#songLib");
+    sel.value = String(SONG_LIB.findIndex(s => s.slug === "revolutionary"));
+    sel.dispatchEvent(new Event("change"));
+    await new Promise(r => setTimeout(r, 600));
+
+    const st = document.querySelector("#fStroke");
+    const setStroke = async v => {
+      st.value = String(v); st.dispatchEvent(new Event("input"));
+      await new Promise(r => setTimeout(r, 100));
+    };
+    await setStroke(150);                     // 把行程调大，保证一定丢音
+
+    document.querySelector('#tabbar button[data-p="play"]').click();
+    await new Promise(r => setTimeout(r, 150));
+
+    const statText = document.querySelector("#dropStat").textContent;
+    const run = async all => {
+      document.querySelector("#sndAll").checked = all;
+      document.querySelector("#loop").checked = false;
+      document.querySelector("#btnPlay").click();
+      await new Promise(r => setTimeout(r, 1500));
+      const fired = S.sndFired || 0;
+      document.querySelector("#btnStop").click();
+      await new Promise(r => setTimeout(r, 150));
+      return fired;
+    };
+    const on  = await run(true);
+    const off = await run(false);
+    const dropped = (S.plan.droppedNotes || []).length;
+    await setStroke(90);
+    return { dropped, statText, on, off };
+  });
+  check("丢音数写在界面上（用户能看出这个开关有没有用）",
+    sndAllChk.dropped > 0 && /按不了/.test(sndAllChk.statText),
+    sndAllChk.statText);
+  check("「补齐按不了的音」真的多出声（不是只改一个勾）",
+    sndAllChk.on > sndAllChk.off,
+    `丢音 ${sndAllChk.dropped} 个；开着起音 ${sndAllChk.on} 次，关掉 ${sndAllChk.off} 次`);
+
+  /* ★ 声音时长必须是**真实毫秒**，不能是曲谱毫秒。
+     原来传的是 e.durMs（曲谱），200% 速度下每个音都拖成两倍长、糊成一片 ——
+     这就是用户说的"音乐对不上"的听觉来源（节奏在，但听不清在弹哪个音）。
+     做法：把 tone 换成记录器跑一小段，看它收到的时长和 plan 里的
+     holdReal 是否一致。速度不是 100% 时两者必然不等，所以这条能咬人。 */
+  const sndDur = await page.evaluate(async () => {
+    $("#speed").value = "200";
+    $("#speedLabel").textContent = "200%";
+    analyze();
+    await new Promise(r => setTimeout(r, 60));
+    const orig = tone;
+    const seen = [];
+    tone = (note, durMs) => { seen.push(durMs); };
+    document.querySelector("#loop").checked = false;
+    document.querySelector("#btnPlay").click();
+    await new Promise(r => setTimeout(r, 1200));
+    document.querySelector("#btnStop").click();
+    tone = orig;
+    document.querySelector("#sndAll").checked = true;   // 恢复默认，别污染后面的用例
+    await new Promise(r => setTimeout(r, 120));
+    const ons = S.plan.events.filter(e => e.on);
+    return { got: seen.slice(0, 8), want: ons.slice(0, 8).map(e => e.holdReal),
+             score: ons.slice(0, 8).map(e => e.durMs), n: seen.length };
+  });
+  check("声音时长用的是真实毫秒（不是曲谱毫秒，否则快曲会糊成一片）",
+    sndDur.n > 0 && sndDur.got.every((v, i) => Math.abs(v - sndDur.want[i]) < 0.01),
+    `收到 ${JSON.stringify(sndDur.got.slice(0, 3))} / 期望 ${JSON.stringify(sndDur.want.slice(0, 3))}` +
+    `（曲谱时长是 ${JSON.stringify(sndDur.score.slice(0, 3))}）`);
   await shot("08-playing");
 
   await click("#btnStop");
@@ -881,6 +1080,36 @@ function metaKinds(buf){
     const timing = await bp.evaluate(() => T.last);
     check("桥模式下也有往返延迟数据（测速/演奏靠它）",
       timing && typeof timing.first === "number", JSON.stringify(timing));
+
+    /* ★ 命令聚合：演奏时一帧能产生几十条 MOVE，必须合并成一批再发。
+       这是「延迟严重、声音比动作早」的根因修复 —— 逐条 HTTP POST 会被
+       浏览器对同一 origin 的并发上限（6 条）排成长队：声音是 Web Audio
+       当场同步响的，早就听到了，动作却还在 HTTP 队列里等。
+       直接对队列施压：连甩 60 条，看它们被合并成几批。 */
+    const seqBefore = await bp.evaluate(() => T.seq);
+    const agg = await bp.evaluate(async () => {
+      T.fireStats = {batches:0, cmds:0, maxBatch:0};
+      for(let i = 0; i < 60; i++) T.fire("ECHO q" + i);
+      await new Promise(r => setTimeout(r, 250));      // 等节拍把队列排空
+      return {stats: T.fireStats, pending: T._q.length};
+    });
+    check("60 条命令被合并成远少于 60 批（批量发送生效）",
+      agg.stats.cmds === 60 && agg.stats.batches > 0 && agg.stats.batches <= 6,
+      `60 条 → ${agg.stats.batches} 批，单批最多 ${agg.stats.maxBatch} 条`);
+    check("队列最终被排空，不会越攒越多", agg.pending === 0, agg.pending);
+
+    /* 「回 OK」什么都不证明 —— 得数桥那边真的收到了 60 条回复行。
+       否则页面自己把队列清了、命令全丢在本地，上面那条断言照样绿。 */
+    let gotQ = 0;
+    for(let i = 0; i < 10 && gotQ < 60; i++){
+      await bp.waitForTimeout(300);
+      gotQ = await bp.evaluate(async (since) => {
+        const r = await fetch("/api/lines?since=" + since + "&wait=0", {cache:"no-store"});
+        const j = await r.json();
+        return (j.lines || []).filter(it => /OK ECHO q\d/.test(it.line)).length;
+      }, seqBefore);
+    }
+    check("桥侧真的收到了全部 60 条（不是只在页面里合并了）", gotQ >= 60, "收到 " + gotQ + " 条");
 
     // 板子信息、闸门：说明整条链路是通的，不只是"连上了"
     await bp.waitForTimeout(400);
