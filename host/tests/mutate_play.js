@@ -123,6 +123,42 @@ const MUTANTS = [
           '    }',
     repl: '    add("");',
     expect: "页面被别的本地服务器托管（跨来源）时" },
+
+  /* ---- 演奏收尾：全部舵机失能（2026-09-20 加）----
+     用户原话：「还有演奏完之后就要全部舵机失能」。
+     两处：① 收尾压根不发 DISARM（手指还带电顶着、发烫）；
+           ② 顺序反了 —— 先断电再回位，固件会回 motion_not_armed，
+              拇指就停在"对准琴键"的使能位上摘不下来。
+     ⚠️ ② 只让「顺序」这条断言红，不连坐「失能」那条 ——
+     这样两条断言各自都证明了自己在测东西（上一轮拆「声卡延迟 / 起音点」
+     用的也是这个办法）。 */
+  { name: "演奏结束不失能（舵机一直带电顶着）",
+    file: "web_piano_glove.html",
+    find: '  T.fire("DISARM");',
+    repl: '  void 0;   // 变异：收尾不发 DISARM',
+    expect: "★ 演奏奏完后全部舵机失能" },
+
+  { name: "收尾顺序反了（先断电、再回位）",
+    file: "web_piano_glove.html",
+    find: '  await latchEngage(false);                            // 先回位（此时还带电，走得动）；它自己会清掉 latchApplied\n' +
+          '  /* 等侧摆回位这几百毫秒里，用户可能又按了开始（连着弹两首最常见）——\n' +
+          '     那就别断电了，否则刚发出去的那批 MOVE 会被紧跟着的 DISARM 全部作废。 */\n' +
+          '  if(S.playing || !T.connected) return;\n' +
+          '  T.fire("DISARM");',
+    repl: '  /* 变异：先断电、再回位（固件会回 motion_not_armed，拇指卡在使能位） */\n' +
+          '  if(S.playing || !T.connected) return;\n' +
+          '  T.fire("DISARM");\n' +
+          '  await latchEngage(false);',
+    expect: "失能前**先**把拇指侧摆送回松开位" },
+
+  /* 急停那条路是另一个「断电」入口，得单独记这一笔。
+     不记的话：按完 ■ 停止、400ms 内又按 ▶，播放前的判断会跳过 ARM，
+     发的 MOVE 全被回 motion_not_armed —— 页面显示在演奏，手套一动不动。 */
+  { name: "急停后不记「待重新使能」",
+    file: "web_piano_glove.html",
+    find: '      S.needArm = true;\n      setTimeout(refreshInfo, 400);\n    }\n  }else{',
+    repl: '      setTimeout(refreshInfo, 400);\n    }\n  }else{',
+    expect: "④ 急停（■ 停止）也是断电" },
 ];
 
 /* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 12 个都重跑一遍：

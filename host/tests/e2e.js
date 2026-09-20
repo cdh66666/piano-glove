@@ -1305,6 +1305,137 @@ function metaKinds(buf){
     swap.back.latchPos === swap.before.latchPos,
     JSON.stringify(swap.back));
 
+  /* ============ 5g. 演奏收尾：全部舵机失能 ============
+     用户原话：「还有演奏完之后就要全部舵机失能」。
+
+     要验的是**收尾那一刻**发出的东西，所以三条路都得走：
+       ① 曲子自己奏完（自然结束）—— 用户说的正是这个场景；
+       ② 中途手动停（▶ 暂停走的是同一条 stopPlay(false)）；
+       ③ 反向：关掉「奏完失能」时必须保持带电，只把侧摆送回松开位。
+     顺序也要验：**先**回位、**后**断电 —— 倒过来固件会回 motion_not_armed，
+     拇指就停在"对准琴键"的使能位上摘不下来了。
+
+     怎么不干等：用最短的曲子（致爱丽丝 12 秒）再点「拉满」顶到 250%，
+     实测约 5 秒跑完。命令只记「非 MOVE」+ 侧摆那条 MOVE ——
+     整曲有几百条手指 MOVE，全记下来失败信息就没法看了。 */
+  console.log("\n=== 5g. 演奏收尾：全部舵机失能 ===");
+  const finish = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const sel = document.querySelector("#songLib");
+    const autoEl = document.querySelector("#autoOff");
+    const toggle = () => autoEl.dispatchEvent(new Event("change"));
+    const seen = [];
+    const latchId = slotIdOf(LATCH_SLOT);
+    const latchRe = new RegExp("^MOVE " + latchId + "\\b");
+    const standby = parseInt((S.slots[LATCH_SLOT] || {}).standby, 10);
+    const releaseCmd = "MOVE " + latchId + " " + standby + " 0 0 ARM";
+    const orig = T.mock.handle.bind(T.mock);
+    T.mock.handle = c => {
+      const s = String(c);
+      if(!s.startsWith("MOVE") || latchRe.test(s)) seen.push(s);   // 手指那些 MOVE 不记
+      return orig(c);
+    };
+    /* 开始演奏是异步的（要先 ARM、再摆侧摆），所以要等它真的进 playing 再往下走 */
+    const begin = async () => {
+      seen.length = 0;
+      document.querySelector("#btnPlay").click();
+      for(let i = 0; i < 25 && !S.playing; i++) await wait(100);
+      return S.playing;
+    };
+    const wrap = () => ({ cmds: seen.slice(), iDis: seen.indexOf("DISARM"),
+                          iRel: seen.indexOf(releaseCmd) });
+    try{
+      sel.value = String(SONG_LIB.findIndex(s => s.slug === "fur-elise"));
+      sel.dispatchEvent(new Event("change"));
+      await wait(500);
+      document.querySelector("#btnMaxSpeed").click();    // 250%
+      await wait(500);
+      document.querySelector("#loop").checked = false;
+
+      /* ① 自然奏完 */
+      autoEl.checked = true; toggle();
+      const s1 = await begin();
+      let n = 0;
+      while(S.playing && n++ < 300) await wait(100);   // 最多等 30 秒
+      const naturalEnd = !S.playing;
+      await wait(1000);                                // 等收尾串走完：回位 → DISARM → 刷状态
+      const byItself = Object.assign(wrap(), {
+        naturalEnd, started: s1, arm: T.mock.armed,
+        msg: document.querySelector("#planMsg").textContent,
+        log: document.querySelector("#log").innerText.includes("全部舵机已失能")
+      });
+
+      /* ② 手动停（和点 ▶ 暂停同一条路）。
+         ⚠️ 这里故意把「板子回报的 armed」伪造成旧值 —— 断电后到 INFO 回来之前
+         真实就是这个状态。光看 S.info.armed 会以为还使能着，只有 S.needArm 能救回来；
+         不伪造的话，① 结束时那次 refreshInfo 已经把 armed 刷成 0 了，
+         这条断言就变成"因为没使能所以 ARM"，测不到 S.needArm。
+         （begin() 里**不**清空 seen —— 一清就把 ARM 洗掉了，踩过。） */
+      S.info.armed = "1";
+      const staleArm = S.needArm;
+      const s2 = await begin();
+      await wait(400);
+      stopPlay(false);
+      await wait(1000);
+      const manual = Object.assign(wrap(), { started: s2, arm: T.mock.armed,
+                                            staleArm, needArm: S.needArm });
+
+      /* ③ 关掉「奏完失能」：保持带电 */
+      autoEl.checked = false; toggle();
+      const s3 = await begin();
+      await wait(400);
+      stopPlay(false);
+      await wait(1000);
+      const keepOn = Object.assign(wrap(), { started: s3, arm: T.mock.armed });
+
+      autoEl.checked = true; toggle();          // 还原，别影响后面的断言
+
+      /* ④ 急停（■ 停止）走的是 SAFE，也是"断电" —— 一样要记「待重新使能」。
+         这里卡在 refreshInfo（400ms）**之前**读，读的就是那段空窗。 */
+      document.querySelector("#btnPlay").click();
+      for(let i = 0; i < 25 && !S.playing; i++) await wait(100);
+      await wait(300);
+      document.querySelector("#btnStop").click();
+      await wait(120);
+      const estop = { needArm: S.needArm, playing: S.playing, arm: T.mock.armed };
+      await wait(700);                                  // 让收尾那次 refreshInfo 落地
+      return { byItself, manual, keepOn, estop, releaseCmd };
+    } finally { T.mock.handle = orig; }
+  });
+
+  const finN = finish.byItself;
+  check("① 曲子能自己奏完（自然结束，不是被停掉的）",
+    finN.naturalEnd && finN.started && /演奏结束/.test(finN.msg),
+    "started=" + finN.started + " naturalEnd=" + finN.naturalEnd + " msg=" + finN.msg.slice(0, 40));
+  check("★ 演奏奏完后全部舵机失能（DISARM 真的发出去，板子上 armed=0）",
+    finN.cmds.includes("DISARM") && finN.arm === 0,
+    "armed=" + finN.arm + " 收尾命令 " + JSON.stringify(finN.cmds));
+  check("失能前**先**把拇指侧摆送回松开位（趁还带电才走得动）",
+    finN.iDis >= 0 && finN.iRel >= 0 && finN.iDis > finN.iRel,
+    "回位在 #" + finN.iRel + "、失能在 #" + finN.iDis + " " + JSON.stringify(finN.cmds));
+  check("日志里明写「全部舵机已失能」（不是悄悄断电）",
+    finN.log, "日志中" + (finN.log ? "有" : "没有") + "这句");
+
+  const finM = finish.manual;
+  check("② 中途手动停也失能（和点 ▶ 暂停同一条路）",
+    finM.started && finM.cmds.includes("DISARM") && finM.arm === 0,
+    "armed=" + finM.arm + " " + JSON.stringify(finM.cmds));
+  check("② 断电后本地还显示「已使能」时，下次演奏也会重新 ARM（S.needArm 兜住了查询空窗）",
+    finM.staleArm === true && finM.cmds.includes("ARM") && finM.arm === 0,
+    "断电标记 " + finM.staleArm + " armed=" + finM.arm + " " + JSON.stringify(finM.cmds));
+
+  const finK = finish.keepOn;
+  check("③ 关掉「奏完失能」时保持带电，只把侧摆送回松开位",
+    finK.started && !finK.cmds.includes("DISARM") && finK.arm === 1 &&
+    finK.cmds.includes(finish.releaseCmd),
+    "armed=" + finK.arm + " " + JSON.stringify(finK.cmds));
+
+  const finE = finish.estop;
+  check("④ 急停（■ 停止）也是断电，同样记「待重新使能」（否则 400ms 内再按 ▶ 会一动不动）",
+    finE.needArm === true && finE.playing === false && finE.arm === 0,
+    "断电标记 " + finE.needArm + " playing=" + finE.playing + " armed=" + finE.arm);
+  await shot("08d-disarm");
+
   /* ---------- 6. 日志 ---------- */
   console.log("\n=== 6. 日志页 ===");
   await click('#tabbar button[data-p="log"]');

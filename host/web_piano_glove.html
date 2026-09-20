@@ -560,6 +560,15 @@ pre#log .sys{color:#c9a5ff}
           <button id="btnStop" class="danger">■ 停止</button>
           <label><input type="checkbox" id="loop"> 循环</label>
         </div>
+        <div class="row">
+          <label title="演奏一结束（自然奏完或手动停）就给全部舵机断电：手指自然松开、舵机不再带电发烫，摘手套时硬掰也不会顶伤齿轮。断电前会先把拇指侧摆送回松开位。想连着弹下一首可取消勾选。"><input type="checkbox" id="autoOff" checked> 奏完失能：一结束就给全部舵机断电</label>
+        </div>
+        <p class="hint" style="margin-top:-2px">
+          <b>为什么结束必须断电</b>：演奏完了手指还带电按在琴键上，舵机一直顶着、发烫、互相较劲；
+          而且演奏一结束人就要上手戴/摘手套，<b>带电的舵机被人手硬掰会顶伤齿轮</b>。
+          断电前会先把拇指侧摆送回松开位（趁带电才走得动）。下次点「开始演奏」会自动重新使能，不用回第 4 步。
+          急停（■ 停止）那条路本来就断电。
+        </p>
 
         <div class="bar" style="height:12px"><i id="playFill" style="left:0;width:0"></i></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:5px">
@@ -1486,7 +1495,11 @@ const S = {
   sndAttack:0.5,          // 本次演奏的起音点：声音落在手指行程的百分之多少（0~0.9）
   pollTimer:null,
   latchApplied:false,     // 本次演奏有没有真的把侧摆摆过去（停止时决定要不要送回位）
-  latchTouched:false      // 用户动过使能位滑块没有（没动过就跟随已记住的值）
+  latchTouched:false,     // 用户动过使能位滑块没有（没动过就跟随已记住的值）
+  needArm:false           // 刚被「奏完失能」断过电：下次演奏必须重新 ARM。
+                          // 为什么要这个标记：S.info.armed 是发 INFO 查来的（不是本地记账），
+                          // 断电到下次查询之间它是**旧值**，光看它会以为还使能着 ——
+                          // 那样刚发的 MOVE 会全被固件回 motion_not_armed，手指一动不动。
 };
 const isSim = () => T.mode === "sim";
 
@@ -1708,6 +1721,10 @@ async function refreshInfo(){
   const line = lines.find(l => l.startsWith("OK INFO"));
   if(!line) return;
   S.info = kv(line);
+  /* 板子说自己使能着，就把「待重新使能」这个本地标记撤掉 ——
+     断电标记唯一的用途是补上"查询还没回来"那几百毫秒的盲区，
+     真查到了当然以板子为准。 */
+  if(S.info.armed === "1") S.needArm = false;
   $("#infoKv").innerHTML =
     "<dt>固件</dt><dd><b>" + esc(S.info.fw) + "</b>" +
       (S.info.fw === "PIANO_GLOVE_2" ? ' <span class="chip ok">自研</span>'
@@ -3181,9 +3198,56 @@ function stopPlay(safe){
   $("#playRate").textContent = "—";
   silence();                 // 停手也要停声，别让音还挂在响
   drawRoll(0);               // 播放头回起点
-  /* 侧摆"松"回原位。急停那条路不用管 —— SAFE 之后舵机全部断电，拇指自己就松了。 */
-  if(!safe) latchEngage(false);
-  if(safe && T.connected){ T.fire("SAFE"); setTimeout(refreshInfo, 400); }
+  /* 收尾有两条路，别混：
+     ① 急停（■ 停止）：SAFE —— 停扫速 + 全部断电，最狠的一条，不问别的先断电。
+        侧摆不用管，SAFE 之后舵机已断电，拇指自己就松了。
+     ② 演奏奏完 / 手动停：见 finishPlay() —— 用户要的「演奏完全部舵机失能」在这里。 */
+  if(safe){
+    if(T.connected){
+      T.fire("SAFE");
+      /* 急停同样是"断电" —— 一样要记这一笔。
+         不记的话：用户按完 ■ 停止、400ms 内又按 ▶（试一下急停再接着弹，太常见了），
+         这时 S.info.armed 还是旧值 "1"，播放前的判断会跳过 ARM，
+         接着发的 MOVE 全被固件回 motion_not_armed —— 页面显示在演奏，手套一动不动。 */
+      S.needArm = true;
+      setTimeout(refreshInfo, 400);
+    }
+  }else{
+    finishPlay();
+  }
+}
+
+/* 演奏收尾。用户的原话：「演奏完之后就要全部舵机失能」。
+   所以默认走**断电**这条路（AUTOOFF_KEY，默认开），而不是原来那条
+   「带电保持 + 只把侧摆送回松开位」。
+
+   为什么结束必须断电：
+     ① 演奏完了手指还带电按在琴键上 —— 舵机一直出力顶着、发烫、耗电，
+        几根手指还会互相较劲发出咝咝声；
+     ② 演奏一结束人就要上手戴/摘手套，带电的舵机被人手硬掰会顶伤齿轮。
+   为什么**先**回位、**后**断电：
+     侧摆那条「回松开位」得趁还带电的时候走 —— 固件里 DISARM 之后
+     MOVE 一律回 motion_not_armed，断电再发等于白跑，拇指会停在
+     "对准琴键"的使能位上，手套戴着别扭。手指那五根不用管：曲子末尾的
+     off 事件已经把它们放开了；中途停的话断完电它们也会自己垂下来。
+   为什么不怕「下次还得重新使能」：▶ 开始演奏时若发现没使能会自动 ARM 一次，
+   用户只要按播放就行，不用回第 4 步。 */
+async function finishPlay(){
+  if(!autoOffOn()){ latchEngage(false); return; }      // 关掉就保持带电，只回松开位（连着弹下一首用）
+  await latchEngage(false);                            // 先回位（此时还带电，走得动）；它自己会清掉 latchApplied
+  /* 等侧摆回位这几百毫秒里，用户可能又按了开始（连着弹两首最常见）——
+     那就别断电了，否则刚发出去的那批 MOVE 会被紧跟着的 DISARM 全部作废。 */
+  if(S.playing || !T.connected) return;
+  T.fire("DISARM");
+  S.needArm = true;      // 本地先记账：下次演奏一律重新 ARM（发 INFO 查回来的值要 400ms 后才到）
+  logLine("全部舵机已失能 —— 手指自然松开（关掉「奏完失能」可保持带电）", "sys");
+  setTimeout(refreshInfo, 400);
+}
+
+/* 「奏完失能」开关（默认开）。存浏览器：板子没插着也能先设好。 */
+const AUTOOFF_KEY = "pg_auto_off";
+function autoOffOn(){
+  try{ return localStorage.getItem(AUTOOFF_KEY) !== "0"; }catch(e){ return true; }
 }
 
 /* 拇指侧摆的**使能**：开始演奏前摆到使能位（"对准琴键"），结束后送回松开位。
@@ -3206,6 +3270,32 @@ async function latchEngage(on){
 }
 
 $("#btnStop").onclick = () => { stopPlay(true); $("#playTime").textContent = "0.0s"; };
+
+/* 「奏完失能」开关：首屏就恢复成存下来的值，别让勾选状态只在内存里 */
+$("#autoOff").checked = autoOffOn();
+$("#autoOff").onchange = () => {
+  const on = $("#autoOff").checked;
+  try{ localStorage.setItem(AUTOOFF_KEY, on ? "1" : "0"); }catch(e){}
+  logLine(on ? "「奏完失能」已开启：演奏一结束就给全部舵机断电"
+             : "「奏完失能」已关闭：演奏结束后舵机保持带电（只把侧摆送回松开位）", "sys");
+};
+
+/* 兜底：**演奏中**直接关页面 / 刷新时，手套还带着电在按 —— 也得断一次电。
+   只在 S.playing 时发：平时（比如校准完把手指摆在某处细看）关页面
+   不该被偷偷断电，那是用户特意让舵机保持住的。
+   用 keepalive 的 fetch 而不是 sendBeacon —— beacon 只能发 no-cors 请求，
+   跨来源时自定义 Content-Type 会被直接拒掉；keepalive 的 fetch 走正常
+   CORS，桥那边回了 CORS 头，页面被别的本地服务器托管时也发得出去。 */
+window.addEventListener("pagehide", () => {
+  if(!S.playing || !autoOffOn() || T.mode !== "bridge") return;
+  S.playing = false;
+  try{
+    fetch(T.base + "/api/fire", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({cmds: ["DISARM"]}), keepalive: true
+    }).catch(() => {});
+  }catch(e){}
+});
 $("#btnPlay").onclick = async () => {
   if(S.playing){ stopPlay(false); return; }
   if(!S.plan || !S.plan.events.length) return;
@@ -3216,13 +3306,14 @@ $("#btnPlay").onclick = async () => {
      演奏是唯一会发声的入口，所以解锁放在这里。 */
   unlockAudio();
 
-  if(S.info.armed !== "1"){
+  if(S.info.armed !== "1" || S.needArm){
     const r = await T.send("ARM", 3000);
     if(!r.some(l => l.startsWith("OK"))){
       $("#planMsg").className = "msg err";
       $("#planMsg").textContent = "无法开始：手套还没使能。请先完成第 3 步校准，再回第 4 步点「使能」。";
       return;
     }
+    S.needArm = false;
     await refreshInfo();
   }
 
