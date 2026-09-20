@@ -1308,7 +1308,15 @@ function metaKinds(buf){
       (await bp.$("#portSelect")) === null && (await bp.$("#baud")) === null);
 
     // 桥模式下 send / fire 真的走到 HTTP 上去了
-    const echo = await bp.evaluate(() => T.send("ECHO 桥模式", 3000));
+    /* ⚠️ 发送必须包一层 try。没连上时 T.send 会抛，而这里抛出去会**穿过整个
+       第 8 节**直到顶层 catch —— 后面上百条断言一条都不跑，日志里只剩最前面
+       几条 FAIL。做变异测试时后果尤其坏：变异明明咬中了后面某条断言，
+       脚本却因为"提前崩了"报「没咬住」，看起来像假绿，其实是真绿。
+       所以：连不上就让它在这里红，别让它崩。 */
+    const echo = await bp.evaluate(() => {
+      try{ return T.send("ECHO 桥模式", 3000); }
+      catch(e){ return ["（发不出去：" + String(e.message || e).slice(0, 50) + "）"]; }
+    });
     check("桥模式下 send 真的从串口拿回了回复",
       echo.some(l => l.includes("OK ECHO") && l.includes("桥模式")), echo.join(" | "));
     const timing = await bp.evaluate(() => T.last);
@@ -1383,6 +1391,88 @@ function metaKinds(buf){
 
     check("桥这一段没有 JS 报错", brErrors.length === 0, brErrors.slice(0, 3).join(" ; "));
     await bp.close();
+
+    /* ------------------------------------------------------------------
+       ★ 跨来源打开页面 —— 用户实际踩到的那个坑。
+
+       页面原来只会朝**自己的来源**问 /api/status（写死的相对路径），于是：
+         · 被别的本地服务器托管（内置浏览器预览）→ 问到别人家，404；
+         · 直接双击 .html（file:// 来源）→ 相对路径被解析成
+           file:///C:/api/status，控制台报 CORS 被拦。
+       两种症状是同一句「没找到本地串口服务」，可桥明明在跑 —— 用户截图就是这个。
+
+       现在页面按候选清单朝**绝对地址**问（见 bridgeBases()），桥也回了 CORS 头。
+       这里两种来源各开一页验一遍。
+
+       ⚠️ 必须用 ?bridge= 把地址钉死在本节的桥（8139）上，**不能靠默认清单**：
+          默认清单里有 8123，而用户自己的桥多半就开在那儿 —— 一旦扫到它，
+          测试就会去连真板子、真拧舵机。测试永远不许碰真硬件。
+       ------------------------------------------------------------------ */
+    const crossErr = [], fileErr = [];
+    const cross = await browser.newPage({ viewport: { width: 430, height: 900 } });
+    cross.on("pageerror", e => crossErr.push("pageerror: " + e.message));
+    const CROSS_URL = `http://127.0.0.1:${PORT}/web_piano_glove.html` +
+                      `?bridge=http://127.0.0.1:${BRIDGE_PORT}`;
+    await cross.goto(CROSS_URL, { waitUntil: "load" });
+    let crossOk = true;
+    try{
+      await cross.waitForFunction(() => typeof T !== "undefined" && T.connected,
+                                  null, { timeout: 15000 });
+    }catch(e){ crossOk = false; }
+    check("页面被别的本地服务器托管（跨来源）时，照样自己找到桥并连上", crossOk,
+      crossOk ? "" : await cross.textContent("#connMsg"));
+
+    const crossSt = await cross.evaluate(() => ({ base: T.base, mode: T.mode }));
+    check("走的是绝对地址，不是相对路径（相对路径正是坏掉的写法）",
+      crossSt.base === `http://127.0.0.1:${BRIDGE_PORT}` && crossSt.mode === "bridge",
+      JSON.stringify(crossSt));
+    check("跨来源时不再报「没找到本地串口服务」",
+      !/没找到本地串口服务/.test(await cross.textContent("#scanTitle")),
+      await cross.textContent("#scanTitle"));
+
+    /* POST 是跨来源里最难的一步：带 Content-Type: application/json 会先发
+       OPTIONS 预检，桥不答或答得不对，整条请求就被浏览器掐掉（页面看着像连上了，
+       命令却一条到不了）。所以必须让桥侧真的回一行回来才算数。
+       发送包一层 try —— 没连上时 T.send 会抛，别让它把整个套件带崩：
+       崩了的话变异测试只会看到「跑挂了」，认不出是哪条断言咬住的。 */
+    const safeSend = async (pg, cmd) => {
+      try{ return await pg.evaluate(c => T.send(c, 3000), cmd); }
+      catch(e){ return ["（发不出去：" + String(e.message || e).slice(0, 60) + "）"]; }
+    };
+    const crossEcho = await safeSend(cross, "ECHO 跨来源");
+    check("跨来源页面的命令真的走通了（POST 预检 + 响应都通）",
+      crossEcho.some(l => l.includes("OK ECHO") && l.includes("跨来源")),
+      crossEcho.join(" | "));
+
+    /* file:// 是最常见的打开方式（双击），也是相对路径坏得最彻底的那种 */
+    const FILE_URL = "file:///" + path.join(ROOT, "web_piano_glove.html").replace(/\\/g, "/") +
+                     `?bridge=http://127.0.0.1:${BRIDGE_PORT}`;
+    const filePg = await browser.newPage({ viewport: { width: 430, height: 900 } });
+    filePg.on("pageerror", e => fileErr.push("pageerror: " + e.message));
+    await filePg.goto(FILE_URL, { waitUntil: "load" });
+    let fileOk = true;
+    try{
+      await filePg.waitForFunction(() => typeof T !== "undefined" && T.connected,
+                                   null, { timeout: 15000 });
+    }catch(e){ fileOk = false; }
+    check("直接双击 .html 打开（file:// 来源）也能连上桥", fileOk,
+      fileOk ? "" : await filePg.textContent("#connMsg"));
+    const fileEcho = await safeSend(filePg, "ECHO 双击");
+    check("file:// 来源下的命令也真的走通了",
+      fileEcho.some(l => l.includes("OK ECHO") && l.includes("双击")), fileEcho.join(" | "));
+
+    /* 候选清单本身也钉一下 —— 上面两条都靠 ?bridge= 抄了近路，
+       得证明「没给地址时」它真的会去扫本机那几个端口。 */
+    const bases = await cross.evaluate(() => T.bridgeBases());
+    check("候选清单 = 同源 + 本机 8123~8130 的两种写法",
+      bases[0] === `http://127.0.0.1:${BRIDGE_PORT}` && bases.includes("") &&
+      bases.includes("http://127.0.0.1:8123") && bases.includes("http://localhost:8130"),
+      bases.length + " 个：" + bases.slice(0, 3).join(" ") + " …");
+
+    check("跨来源 / file:// 两页都没有 JS 报错",
+      crossErr.length === 0 && fileErr.length === 0,
+      crossErr.concat(fileErr).slice(0, 2).join(" ; "));
+    await cross.close(); await filePg.close();
   }finally{
     try{ bridge.kill(); }catch(e){}
     try{ fake.kill(); }catch(e){}

@@ -61,6 +61,28 @@ def post(path, body, origin=None, timeout=20):
         return e.code, json.loads(e.read().decode("utf-8"))
 
 
+def raw(method, path, origin=None, acrm=None, acrh=None, timeout=10):
+    """发一个请求，连**状态码 + 响应头 + body** 一起拿回来。
+
+    为什么非得看响应头：跨来源到底能不能用，全在 CORS 头上 ——
+    只看状态码 200 完全不够。浏览器会因为缺少 `Access-Control-Allow-Origin`
+    把响应整个丢掉，页面那头的表现和 403 一模一样（都报"桥没运行"）。
+    所以「跨来源能用」这件事必须验到头上，不能只验"服务端处理了"。
+    """
+    req = urllib.request.Request("http://127.0.0.1:%d%s" % (PORT, path), method=method)
+    if origin:
+        req.add_header("Origin", origin)
+    if acrm:
+        req.add_header("Access-Control-Request-Method", acrm)
+    if acrh:
+        req.add_header("Access-Control-Request-Headers", acrh)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read().decode("utf-8", "replace")
+
+
 def wait_up(timeout=12.0):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -233,6 +255,33 @@ def test_api():
         check("目录穿越被挡", code == 403, code)
         code, j = post("/api/send", {"cmd": "INFO"}, origin="http://evil.example")
         check("别的网站发来的跨站请求被挡", code == 403 and not j.get("ok"), code)
+
+        # ---- CORS：页面未必在桥的来源上（别的本地服务器托管 / file:// 双击）----
+        # 用户实际踩过：页面相对路径 /api/status 打不到桥上，报「没找到本地串口服务」，
+        # 可桥明明在跑。修法就是页面改朝绝对地址问 + 桥回 CORS 头 —— 这里验后面那半。
+        st, hd, _ = raw("GET", "/api/status", origin="http://127.0.0.1:8151")
+        check("跨来源 GET 镜像回请求的 Origin（不是 `*`）",
+              st == 200 and hd.get("Access-Control-Allow-Origin") == "http://127.0.0.1:8151",
+              "%s %s" % (st, hd.get("Access-Control-Allow-Origin")))
+
+        st, hd, _ = raw("GET", "/api/status", origin="null")
+        check("file:// 双击打开的页面（Origin: null）被放行",
+              st == 200 and hd.get("Access-Control-Allow-Origin") == "null",
+              "%s %s" % (st, hd.get("Access-Control-Allow-Origin")))
+
+        st, hd, _ = raw("OPTIONS", "/api/connect", origin="http://127.0.0.1:8151",
+                        acrm="POST", acrh="content-type")
+        check("POST 预检被正确应答（否则跨来源命令一条都发不出去）",
+              st == 204
+              and "POST" in (hd.get("Access-Control-Allow-Methods") or "")
+              and "content-type" in (hd.get("Access-Control-Allow-Headers") or "").lower(),
+              "%s methods=%s headers=%s" % (st, hd.get("Access-Control-Allow-Methods"),
+                                            hd.get("Access-Control-Allow-Headers")))
+
+        st, hd, _ = raw("POST", "/api/send", origin="http://evil.example")
+        check("外站 Origin 仍然 403，而且**连 CORS 头都不给**（别把数据漏出去）",
+              st == 403 and not hd.get("Access-Control-Allow-Origin"),
+              "%s %s" % (st, hd.get("Access-Control-Allow-Origin")))
 
         # ---- send：普通命令 ----
         s, j = post("/api/send", {"cmd": "INFO", "since": 0})

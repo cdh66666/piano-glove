@@ -587,9 +587,15 @@ def make_handler(bridge):
 
             别的网站如果让用户的浏览器去 POST /api/fire，是能真把舵机拧动的。
             所以这里按 Origin 拦一道 —— 没这个头（curl、同源 GET）就放过。
+
+            "null" 也要放行：`file://` 打开的页面就是这个来源（直接双击 .html）。
+            代价是沙箱 iframe 也能拿到 null —— 对这个本机调试台可以接受，
+            真要不放心就把页面放到桥的地址上打开，别用 file://。
             """
             org = self.headers.get("Origin")
             if not org:
+                return True
+            if org == "null":
                 return True
             try:
                 host = urlparse(org).hostname
@@ -597,12 +603,41 @@ def make_handler(bridge):
                 return False
             return host in ("127.0.0.1", "localhost", "[::1]", "::1")
 
+        def _cors(self):
+            """回跨来源头，让「不是桥托管的」页面也能跟桥说话。
+
+            背景：页面原来用相对路径 /api/status，于是只有「从桥的地址打开」
+            才找得到桥 —— 被别的本地服务器托管时它 404，直接双击 .html 时
+            更离谱，相对路径被解析成 file:///C:/api/status。
+            现在页面改成按候选清单朝 http://127.0.0.1:<port> 绝对地址问，
+            所以桥必须回 CORS 头，否则浏览器把响应丢掉（页面照样报「桥没运行」）。
+
+            只把这一个请求的 Origin 原样镜像回去（不是 `*`），而且**只在本机来源上才回** ——
+            配合 _origin_ok 的白名单：外网站点仍旧 403，且连 CORS 头都拿不到，
+            浏览器那边整条请求直接作废。
+            """
+            org = self.headers.get("Origin")
+            if org and self._origin_ok():
+                self.send_header("Access-Control-Allow-Origin", org)
+                self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Max-Age", "600")
+
+        def do_OPTIONS(self):
+            """预检：页面 POST JSON 之前浏览器会先问一句，答不上就整条被拦。"""
+            self.send_response(204 if self._origin_ok() else 403)
+            self._cors()
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
         def _json(self, obj, code=200):
             body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            self._cors()
             self.end_headers()
             self.wfile.write(body)
 
@@ -712,6 +747,7 @@ def make_handler(bridge):
                                                       "application/octet-stream"))
             self.send_header("Content-Length", str(size))
             self.send_header("Cache-Control", "no-store")   # 改完页面刷新就能看到
+            self._cors()
             self.end_headers()
             with open(fp, "rb") as f:
                 while True:

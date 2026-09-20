@@ -88,9 +88,31 @@ const MUTANTS = [
     /* 注意这条期望的是**新加的**那条逐个音比对的断言。
        不能指望「起音数 == 声音游标按下数」去咬它 —— 补偿没了，那个等式照样成立。 */
     expect: "音画对齐：声音确实提前提交了" },
+
+  /* ---- 跨来源找桥（2026-09-20 加）----
+     用户实际踩的坑：页面被别的本地服务器托管、或直接双击 .html 打开时，
+     相对路径 /api/status 打不到桥上，页面报「没找到本地串口服务」，
+     可桥明明在跑（用户截图就是这个）。
+     变异退回到「只朝本页来源找桥」= 原来的代码。
+
+     ⚠️ 这一处**必须只砍非本页来源的候选**，同源那条要留着。
+     第一版写的是「把整个候选循环置空」，结果同源也连不上了 ——
+     第 8 节前面几条先红、`T.send` 抛异常穿过整节、脚本在跑到本条断言之前就崩了，
+     于是显示「没咬住」。那不是假绿，是**变异点太粗 + 测试会崩**两件事叠在一起。
+     砍成下面这样：同源照常连上，只有跨来源 / file:// 会掉。 */
+  { name: "只朝本页来源找桥（跨来源 / file:// 就不认了）",
+    file: "web_piano_glove.html",
+    find: '    const q = new URLSearchParams(location.search).get("bridge");\n' +
+          '    if(q) add(String(q).replace(/\\/+$/, ""));                    // 手工指定优先\n' +
+          '    if(location.protocol === "http:" || location.protocol === "https:") add("");  // file:// 下同源没意义\n' +
+          '    for(const h of ["127.0.0.1", "localhost"]){\n' +
+          '      for(let p = 8123; p <= 8130; p++) add("http://" + h + ":" + p);\n' +
+          '    }',
+    repl: '    add("");',
+    expect: "页面被别的本地服务器托管（跨来源）时" },
 ];
 
-/* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 7 个都重跑一遍：
+/* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 12 个都重跑一遍：
      node mutate_play.js 幅度 */
 const ONLY = process.argv[2] || "";
 
@@ -177,6 +199,16 @@ function runE2E(){
               (ONLY ? "（只跑含「" + ONLY + "」的 " + run.length + " 处）" : ""));
   healLeftovers([...new Set(MUTANTS.map(m => path.join(HOST, m.file)))]);
   verifyClean();
+  /* ★ 被外层超时 / Ctrl-C 打断时也要还原。
+     光靠 finally 挡不住 SIGTERM —— 默认行为是直接终止进程，finally 根本跑不到。
+     真踩过两次：一次是 holdReal 的下界被留成 Math.min、一次是
+     `if(false && …)` 静默关掉了「补齐按不了的音」开关，都在工作区里躺了一整轮
+     才被 e2e 抓出来。所以信号也挂上还原。
+     （Windows 上未捕获的 TerminateProcess 仍旧挡不住，那种情况靠启动时的
+       healLeftovers + verifyClean 兜底。） */
+  const files = [...new Set(MUTANTS.map(m => path.join(HOST, m.file)))];
+  const bail = sig => { healLeftovers(files); console.log("\n!! 收到 " + sig + "，已还原源码后退出"); process.exit(130); };
+  for(const sig of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) process.on(sig, () => bail(sig));
   for(const m of run){
     const f = load(path.join(HOST, m.file));
     if(!f.text.includes(m.find)){
@@ -200,7 +232,13 @@ function runE2E(){
     console.log("    期望变红的断言：" + m.expect);
     if(!hit){
       bad++;
-      console.log("    实际 FAIL：" + (fails.length ? fails.slice(0, 3).join(" | ") : "（一条都没红）"));
+      /* 多列几条，并且**明确说是不是只列了前几条** —— 只给 3 条时很容易误判成
+         "这条断言根本没跑"（本轮就误判过一次：其实是变异点太粗，
+         前面的断言先红、脚本中途崩了，期望那条压根没执行到）。 */
+      console.log("    实际 FAIL（共 " + fails.length + " 条，下面是最多 8 条）：" +
+                  (fails.length ? "\n      " + fails.slice(0, 8).join("\n      ") : "（一条都没红）"));
+      if(!/全部通过|测试脚本崩溃/.test(out))
+        console.log("    ⚠️ e2e 好像没跑到结尾 —— 检查是不是中途崩了（期望的断言可能压根没执行）。");
     }
   }
   try{ fs.unlinkSync(LOG); }catch(e){}

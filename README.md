@@ -20,7 +20,7 @@
 >   于是**侧边栏浏览器 / 内嵌 WebView 也能连板子**（它们没有 `navigator.serial`，原来必然连不上）。
 >   串口**自动选、自动连**：按芯片型号打分 → 逐个问 `INFO` → 谁答连谁，拔了再插自己回来；
 >   界面上没有"选模式"这一步，也没有模拟模式
-> - 调试台分页式；**页面端到端自测 186 项 + 串口桥自测 39 项全绿**（脚本自报总数，
+> - 调试台分页式；**页面端到端自测 194 项 + 串口桥自测 43 项全绿**（脚本自报总数，
 >   桥那几条新断言全部做过变异测试 —— 往代码里注入退化，确认对应的断言真的会红），
 >   MIDI 解析器经独立实现交叉验证
 > - **实机复验通过（2026-09-18 用户实测）**：试动作满幅度、不再撞限位；完整曲目演奏节奏正确
@@ -108,8 +108,8 @@ piano-glove/
 │   │   ├── FINGERING.md        自动指法表（跑页面里那份 buildPlan 导出）
 │   │   └── two-tigers.mid      《两只老虎》，调试台内置示例用
 │   ├── tests/                  ★ 自测与实机验证
-│   │   ├── e2e.js              页面端到端自测（186 项）
-│   │   ├── bridge_check.py     串口桥自测（39 项，真进程 + 假板子）
+│   │   ├── e2e.js              页面端到端自测（194 项）
+│   │   ├── bridge_check.py     串口桥自测（43 项，真进程 + 假板子）
 │   │   ├── fake_glove.py       假手套：TCP 说手套协议，供 pyserial 的 socket:// 接
 │   │   ├── mutate_bridge.js    变异测试：往桥那几条路上注入退化，确认断言会红
 │   │   ├── mutate_play.js      变异测试：演奏时序 10 处退化，逐条确认断言会红
@@ -166,8 +166,8 @@ python bridge.py --port 8123 --url COM4    # 想写死某个口也行
 ```bash
 cd host/tests
 python make_midi.py && python ref_parse.py && node compare.js   # MIDI 解析器交叉验证
-node e2e.js                            # 页面端到端，186 项检查
-python bridge_check.py                 # 串口桥自测，39 项（真进程 + 假板子）
+node e2e.js                            # 页面端到端，194 项检查
+python bridge_check.py                 # 串口桥自测，43 项（真进程 + 假板子）
 node mutate_bridge.js                  # 往这两条路上注入退化，确认断言真的会红
 ```
 
@@ -214,8 +214,8 @@ python glove_fw.py raw "CAL STATUS"        # 发任意命令
 | 调试台上位机（分页式） | ✅ 完成，串口由本机 bridge 代开，任意浏览器可用 |
 | MIDI 解析 / 分配 / 演奏引擎 | ✅ 完成，自测通过 |
 | **本地串口桥**（`host/bridge.py`） | ✅ 自动选推荐口 + 自动连接 + 热插拔重连 |
-| 页面端到端自测（`host/tests/e2e.js`） | ✅ **186 项全绿**，解析器交叉验证 0 差异 |
-| 串口桥自测（`host/tests/bridge_check.py`） | ✅ **39 项全绿**（真桥进程 + 假板子） |
+| 页面端到端自测（`host/tests/e2e.js`） | ✅ **194 项全绿**，解析器交叉验证 0 差异 |
+| 串口桥自测（`host/tests/bridge_check.py`） | ✅ **43 项全绿**（真桥进程 + 假板子） |
 | 桥那条路的变异测试（`mutate_bridge.js`） | ✅ 3 处注入退化 → 5 条断言变红 |
 | **自研固件 `PIANO_GLOVE_2`** | ✅ v2.1.2 已烧录，编译 RAM 6.7% / Flash 22.2% |
 | **固件吞吐** | ✅ 稳态 ≈ **1421 条/秒**（原厂 9.9 条/秒） |

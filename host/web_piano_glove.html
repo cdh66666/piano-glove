@@ -205,7 +205,9 @@ pre#log .sys{color:#c9a5ff}
       网页自己开不了串口 —— 只有电脑版 Chrome/Edge 的 Web Serial 才行，
       侧边栏浏览器、内置浏览器、微信里打开的网页**都没有**这个能力。
       所以串口由 Python 侧的 <code>bridge.py</code> 代开。<br>
-      解决办法：双击 <code>host/start-debug.bat</code>，用它的地址打开本页。
+      本页会自己去找桥（本页来源，以及 <code>127.0.0.1 / localhost: 8123~8130</code>），
+      所以**用哪个地址打开都行**；找不到只有一个原因：桥没跑起来。<br>
+      解决办法：双击 <code>host/start-debug.bat</code>，它会起桥并打开本页。
       <div class="row" style="margin-top:9px">
         <button id="btnUseWebSerial" class="ghost">改用浏览器内置串口直连</button>
       </div>
@@ -1156,6 +1158,8 @@ class Transport{
     /* 桥相关 */
     this.bridge = null;        // 最近一次 /api/status 的结果
     this.bridgeSeen = false;   // 有没有连上过本地桥
+    this.base = "";            // 桥的地址前缀（""=本页来源）；见 bridgeBases()
+    this.baseKnown = false;    // 上面这个前缀是不是已经确认过了
     this.seq = 0;              // 已消费到第几行（长轮询游标）
     this.portName = null;      // 实际连着的口，给界面显示
     this._polling = false;     // 长轮询在飞
@@ -1174,21 +1178,56 @@ class Transport{
   emit(line){ this.listeners.slice().forEach(f=>f(line)); }
 
   /* ---------- 本地桥 ---------- */
-  /* 判断「有没有桥」不能靠 fetch 抛不抛异常：被别的静态服务器托管时，
-     /api/status 会返回那个服务器的 404 页面，fetch 是**成功**的。
+  /* 桥在哪儿？不能假设「就在本页的来源上」。
+     页面可能被别的本地服务器托管（内置浏览器预览、别的 dev server），
+     也可能被直接双击打开 —— 那是 file:// 来源，相对路径会被解析成
+     file:///C:/api/status，必然失败（实测就是这么坏的）。
+     所以按候选清单挨个问，谁先答 bridge=1 就认谁，之后所有请求都带上这个前缀。
+     顺序：?bridge= 手工指定 → 同源 → 8123..8130（127.0.0.1 和 localhost 两种写法）。 */
+  bridgeBases(){
+    const out = [];
+    const add = u => { if(!out.includes(u)) out.push(u); };
+    const q = new URLSearchParams(location.search).get("bridge");
+    if(q) add(String(q).replace(/\/+$/, ""));                    // 手工指定优先
+    if(location.protocol === "http:" || location.protocol === "https:") add("");  // file:// 下同源没意义
+    for(const h of ["127.0.0.1", "localhost"]){
+      for(let p = 8123; p <= 8130; p++) add("http://" + h + ":" + p);
+    }
+    return out;
+  }
+  /* 问一个地址有没有桥。判断「有没有」不能靠 fetch 抛不抛异常：
+     被别的静态服务器托管时 /api/status 会返回它的 404 页面，fetch 是**成功**的。
      所以必须验 body 里有没有 bridge 标记。 */
-  async detectBridge(){
+  async _askBridge(base){
     try{
-      const r = await fetch("/api/status", {cache:"no-store"});
+      const r = await fetch(base + "/api/status", {cache:"no-store"});
       if(!r.ok) return null;
       const j = await r.json();
       if(!j || j.bridge !== 1) return null;
-      this.bridge = j; this.bridgeSeen = true;
       return j;
     }catch(e){ return null; }
   }
+  async detectBridge(){
+    /* 认过一次就直连，别每次都把候选清单扫一遍；
+       但这条要是落空，说明桥换端口了 —— 重新扫。 */
+    if(this.baseKnown){
+      const st = await this._askBridge(this.base);
+      if(st){ this._noteBridge(st); return st; }
+      this.baseKnown = false;
+    }
+    for(const base of this.bridgeBases()){
+      const st = await this._askBridge(base);
+      if(!st) continue;
+      this.base = base; this.baseKnown = true;
+      this._noteBridge(st);
+      if(base) logLine("桥不在本页的来源上 —— 找到了 " + base + "，之后都跟它说话。", "sys");
+      return st;
+    }
+    return null;
+  }
+  _noteBridge(st){ this.bridge = st; this.bridgeSeen = true; }
   async bridgePost(path, body){
-    const r = await fetch(path, {method:"POST", cache:"no-store",
+    const r = await fetch(this.base + path, {method:"POST", cache:"no-store",
       headers:{"Content-Type":"application/json"}, body:JSON.stringify(body || {})});
     return await r.json();
   }
@@ -1221,7 +1260,7 @@ class Transport{
       if(this._sending){ this._pollT = setTimeout(tick, 120); return; }
       this._polling = true;
       try{
-        const r = await fetch("/api/lines?since=" + this.seq + "&wait=1", {cache:"no-store"});
+        const r = await fetch(this.base + "/api/lines?since=" + this.seq + "&wait=1", {cache:"no-store"});
         const j = await r.json();
         if(j && j.lines){
           j.lines.forEach(it => { this.seq = it.seq; this.emit(it.line); logRecv(it.line); });
@@ -1585,12 +1624,19 @@ function startBridgeWatch(){
   }, 1500);
 }
 function showBridgeDown(){
-  scanUI("bad", "没找到本地串口服务", "这个页面不是由 host/start-debug.bat 打开的。");
+  const tried = T.bridgeBases().filter(Boolean);
+  scanUI("bad", "没找到本地串口服务",
+    "本页来源 + 127.0.0.1 / localhost 的 8123~8130，一共 " + (tried.length + 1) +
+    " 个地址都问过了，没有回应。");
   $("#bridgeDown").style.display = "";
   $("#portWrap").style.display = "none";
   $("#connMsg").className = "msg err";
-  $("#connMsg").textContent = "读不到串口。双击 host/start-debug.bat，用它的地址打开本页。";
-  logLine("没有检测到本地串口桥（/api/status 没有回应）。如果是直接双击 .html 打开的，换成 start-debug.bat。", "err");
+  $("#connMsg").innerHTML = "读不到串口。先把桥跑起来：双击 <code>host/start-debug.bat</code>" +
+    "（它会自己开好页面）。或者 " +
+    '<a href="' + esc(tried[0] || "http://127.0.0.1:8123") + '/web_piano_glove.html">' +
+    "用桥的地址打开本页</a>。";
+  logLine("没有检测到本地串口桥（/api/status 没有回应）。试过：" + tried.join("、") +
+          " —— 桥是不是没跑？双击 host/start-debug.bat。", "err");
 }
 
 $("#btnConn").onclick = async () => {
