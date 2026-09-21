@@ -342,4 +342,64 @@ int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
   return got;
 }
 
+// ---------------- 型号 / 位置量程 ----------------
+//
+// 为什么必须读回来而不是按型号名写死：
+// 用户手上有两套舵机（STS3032 和 SC09），分辨率差 4 倍。
+// 写死 4095 的话，SC09 插上去每个位置只剩真实值的 1/4 —— 表现为
+// "舵机只肯动一点点就顶在限位上"，而看到的报错却是正常的 OK。
+// 读 REG_MAX_ANGLE 是最直接的判据：出厂值就是该系列的满量程。
+Profile g_profile;
+
+const char *familyName(Family f) {
+  switch (f) {
+    case Family::STS: return "STS";
+    case Family::SCS: return "SCS";
+    default:          return "UNKNOWN";
+  }
+}
+
+const Profile &profile() { return g_profile; }
+void           setProfile(const Profile &p) { g_profile = p; }
+
+bool probeProfile(uint8_t id, Profile &out) {
+  uint8_t d[2];
+
+  // 型号号（3..4）—— 只打出来给人看，判断不用它：
+  // 飞特各型号的型号号没有公开对照表，靠它猜不如直接看量程。
+  if (!readRegs(id, REG_MODEL_L, 2, d)) return false;
+  const uint16_t model = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
+
+  if (!readRegs(id, REG_MIN_ANGLE_L, 2, d)) return false;
+  const uint16_t minAng = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
+
+  if (!readRegs(id, REG_MAX_ANGLE_L, 2, d)) return false;
+  const uint16_t maxAng = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
+
+  Profile p;
+  p.model  = model;
+  p.minAng = minAng;
+  p.maxAng = maxAng;
+  p.probed = true;
+
+  /* 量程上限就是分辨率的答案：STS 出厂 4095，SCS 出厂 1023。
+     灰区放在 2048 —— 万一有人把 Max Angle Limit 改小了，
+     12 位的舵机也不会被误判成 10 位（宁可判宽也不要判窄：
+     判成 4095 而实际是 1023 时，最多是限位松一点；
+     反过来会让整段行程被砍掉 3/4，直接不能用）。 */
+  if (maxAng > 2048)       { p.family = Family::STS; p.range = 4095; }
+  else if (maxAng >= 128)  { p.family = Family::SCS; p.range = 1023; }
+  else                     return false;   // 读到 0 之类 = 这张表不适用，保持原值
+
+  out = p;
+  return true;
+}
+
+int posTol() {
+  // 25 计数在 4095 量程上约 2.2°。等比缩到当前量程上 ——
+  // 至少 3 计数，免得量程特别小时容差变成 0、永远判不到"到位"。
+  const int t = (int)g_profile.range / 164;
+  return t < 3 ? 3 : t;
+}
+
 }  // namespace scs

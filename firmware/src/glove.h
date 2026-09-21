@@ -115,4 +115,11 @@ void     setPressProfile(uint16_t speed, uint8_t acc);
 void    load();
 void    save();
 
+// 型号 / 位置量程的持久化。
+// 开机探测成功时是探测值说了算；探测**失败**时靠这里存的兜底 ——
+// 否则用户手动 `PROFILE SC09` 之后一断电重启又被打回 4095，
+// 症状是"明明设好了，重启就坏"。手动设置也是一种事实，该记住。
+void    loadProfile();
+void    saveProfile();
+
 }  // namespace glove

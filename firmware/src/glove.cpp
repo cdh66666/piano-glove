@@ -74,7 +74,15 @@ uint8_t  g_demoStep     = 0;
 
 Preferences prefs;
 
-inline uint16_t clampPos(int v) { return (uint16_t)(v < 0 ? 0 : (v > 4095 ? 4095 : v)); }
+// 位置上下限一律按**当前量程**夹，不写死 4095 —— 换了 SC09（0~1023）之后
+// 写死的 4095 会把越界值原样发给舵机，舵机回错误包，看着却是"命令发出去了"。
+inline uint16_t clampPos(int v) {
+  const int r = (int)scs::profile().range;
+  return (uint16_t)(v < 0 ? 0 : (v > r ? r : v));
+}
+
+// 量程中点：还没校准时手指的默认静止位（STS 2048 / SCS 511）
+inline uint16_t midPos() { return (uint16_t)(scs::profile().range / 2); }
 
 void keyOf(char *out, size_t n, int s, const char *suffix) {
   snprintf(out, n, "s%d%s", s, suffix);
@@ -171,7 +179,7 @@ void rateTick() {
   for (int i = 0; i < n; ++i) {
     if (pos[i] == 0xFFFF) { all = false; continue; }   // 这一轮没读到，当作未到位
     const int d = (int)pos[i] - (int)tgt[i];
-    if (d > scs::POS_TOL || d < -scs::POS_TOL) all = false;
+    if (d > scs::posTol() || d < -scs::posTol()) all = false;
   }
 
   const uint32_t el = micros() - g_ratePhaseT0;
@@ -264,6 +272,9 @@ uint8_t snapStandby() {
 
 void begin() {
   load();
+  /* 型号 / 量程：先读回上次的结论，setup() 里的实测探测随后会再覆盖一次。
+     放在这里而不是 load() 里，是因为 load() 定义在后面、且它只读槽位表。 */
+  loadProfile();
   // 修一次存量校准：2.1.1 及更早的自动校准把静止位写成了量程中点，
   // 导致按压幅度只有校准行程的一半。这里对齐到松开端，用户不必重做校准。
   const uint8_t fixed = snapStandby();          // 内部会持久化
@@ -440,7 +451,7 @@ void calClear() {
   for (int s = 0; s < SLOT_COUNT; ++s) {
     g_slot[s].lo      = 0;
     g_slot[s].hi      = 0;
-    g_slot[s].standby = 2048;
+    g_slot[s].standby = midPos();
     g_slot[s].valid   = false;
   }
   g_calibrated = false;
@@ -650,7 +661,7 @@ void load() {
     keyOf(k, sizeof(k), s, "lo");
     g_slot[s].lo = prefs.getUShort(k, 0);
     keyOf(k, sizeof(k), s, "st");
-    g_slot[s].standby = prefs.getUShort(k, 2048);
+    g_slot[s].standby = prefs.getUShort(k, midPos());
     keyOf(k, sizeof(k), s, "hi");
     g_slot[s].hi = prefs.getUShort(k, 0);
     keyOf(k, sizeof(k), s, "vd");
@@ -660,6 +671,22 @@ void load() {
     g_slot[s].online = false;
     g_slot[s].last   = -1;
   }
+}
+
+void loadProfile() {
+  const uint8_t fam = prefs.getUChar("pfam", (uint8_t)scs::Family::STS);
+  scs::Profile p;
+  p.family = (fam == (uint8_t)scs::Family::SCS) ? scs::Family::SCS : scs::Family::STS;
+  p.range  = prefs.getUShort("prng", (p.family == scs::Family::SCS) ? 1023 : 4095);
+  if (p.range < 128) p.range = (p.family == scs::Family::SCS) ? 1023 : 4095;   // 坏数据兜底
+  p.probed = false;                 // 读回来的只是"上次的结论"，不是这次的实测
+  scs::setProfile(p);
+}
+
+void saveProfile() {
+  const scs::Profile &p = scs::profile();
+  prefs.putUChar("pfam", (uint8_t)p.family);
+  prefs.putUShort("prng", p.range);
 }
 
 void save() {

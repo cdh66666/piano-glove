@@ -103,8 +103,41 @@ bool    readRegs(uint8_t id, uint8_t addr, uint8_t len, uint8_t *out,
 bool    writeRegs(uint8_t id, uint8_t addr, const uint8_t *data, uint8_t len);
 bool    readFeedback(uint8_t id, Feedback &fb, uint16_t timeoutMs = RESP_TIMEOUT_MS);
 
-// 位置到位判定容差（舵机计数，4096 计数 = 360°，所以 25 计数 ≈ 2.2°）
-constexpr int POS_TOL = 25;
+// ---------------- 舵机型号 / 位置量程（读回来自己判，不写死）----------------
+//
+// 飞特两大协议族的位置分辨率差 4 倍，同一份代码不能写死 4095：
+//   SMS/STS（STS3032 等）   12 位，0~4095，转角 360°
+//   SCSCL （SC09 / SC15）  10 位，0~1023，转角 300°
+// 位置量程会一路影响：校准区间、MOVE 的安全闸、到位判定容差、
+// 甚至"手指走了多远"的百分比。写死 4095 的话，换一套 SC09 插上去，
+// 每个位置都只有真实值的 1/4，表现为"舵机只肯动一点点就顶在限位上"。
+//
+// 所以启动探测时把 REG_MAX_ANGLE 读回来，据此定 —— 不靠型号名字符串猜。
+enum class Family : uint8_t { UNKNOWN, STS, SCS };
+const char *familyName(Family f);
+
+struct Profile {
+  /* 默认按 STS（12 位）—— 手上这套就是 STS3032。
+     但 probed=0 会把"这只是假设、还没从舵机上读回来过"明确标出来，
+     INFO 里一眼能分辨，不用去猜。 */
+  Family   family = Family::STS;
+  uint16_t range  = 4095;   // 位置满量程端点
+  uint16_t model  = 0;      // 型号号（REG_MODEL_L 读回），仅供人看
+  uint16_t minAng = 0;      // Min Angle Limit
+  uint16_t maxAng = 0;      // Max Angle Limit
+  bool     probed = false;  // 是否真的从舵机上读回来过（false = 还没探测）
+};
+const Profile &profile();
+void           setProfile(const Profile &p);
+
+// 读某个在线舵机的型号与量程，判出 profile 并写入。
+// 失败返回 false（不动原有值）—— 比如换了不带 EEPROM 的兼容舵机。
+bool probeProfile(uint8_t id, Profile &out);
+
+// 位置到位判定容差（舵机计数）。**按量程等比缩放**：
+// STS 上 25 计数 ≈ 2.2°；SCS 量程只有 1/4，容差也得跟着缩，
+// 否则"到位"会宽松到 8.8°，按下去看着根本没到底。
+int posTol();
 
 // 下发目标位置：写 ACC(41) 起 7 字节（ACC + 位置 + 运行时间 + 速度）。
 // speed = 0 表示用舵机自身的最大速度。

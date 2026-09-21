@@ -16,7 +16,10 @@
 #include "scs_bus.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.1.2"     // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
+#define FW_VER "2.2.2"
+// 2.2.0: 型号 / 位置量程改成**从舵机读回来**（STS3032 + SC09 双适配）；
+//        新增 POSALL 一帧读回全部槽位位置（演奏闭环的心跳）。
+// 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
                            //        + MOVE 越界安全闸（防"转到不该去的地方卡住"）
                            //        + CAL ALIGN 修正存量校准
                            // 2.1.1: 修「编号时 remapId 把已编好的槽位一起改掉」+ sendRecv 的 pkt[32] 栈溢出
@@ -165,11 +168,37 @@ static void printCalLine(int s) {
 
 // ---------------------------------------------------------------- 命令实现
 
+/* 从某个在线舵机把型号 / 位置量程读回来。
+ *
+ * 为什么上电就得做：位置量程决定校准区间、MOVE 的安全闸、到位判定容差。
+ * 用户手上有两套舵机（STS3032 = 12 位 0~4095，SC09 = 10 位 0~1023），
+ * 写死 4095 的话 SC09 插上去整段行程只剩 1/4，表现是"只肯动一点点就顶死"，
+ * 而且舵机回的错还得靠错误位才看得出来。
+ *
+ * 探测失败时**保持原值**并把假设明确打出来 —— 探测失败比探测错误好：
+ * 至少用户知道现在用的是哪个假设，而不是被一个静默的错量程坑住。 */
+static void probeAndReport(uint8_t id) {
+  scs::Profile p;
+  if (scs::probeProfile(id, p)) {
+    scs::setProfile(p);
+    glove::saveProfile();          // 探测结果落盘：下次就算探测失败也有对的兜底
+    sayf("PROFILE_AUTO id=%u family=%s range=%u pos_tol=%d model=%u min_angle=%u max_angle=%u",
+         (unsigned)id, scs::familyName(p.family), (unsigned)p.range, scs::posTol(),
+         (unsigned)p.model, (unsigned)p.minAng, (unsigned)p.maxAng);
+  } else {
+    const scs::Profile &cur = scs::profile();
+    sayf("PROFILE_AUTO id=%u failed=1 keep=%s range=%u pos_tol=%d",
+         (unsigned)id, scs::familyName(cur.family), (unsigned)cur.range, scs::posTol());
+  }
+}
+
 static void cmdInfo() {
-  sayf("OK INFO fw=%s profile=STS3032 range=4095 ap=PIANO_GLOVE_A50528 ip=192.168.4.1 "
+  const scs::Profile &pf = scs::profile();
+  sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=PIANO_GLOVE_A50528 ip=192.168.4.1 "
        "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=10 "
        "enroll_phase=%s online=%d sweep=%d ver=%s",
-       FW_ID, glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
+       FW_ID, scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0,
+       glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
        g_enroll ? 1 : 0, (unsigned)g_enrollNext, g_enrollPhase,
        bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER);
 }
@@ -181,8 +210,9 @@ static void cmdStatusAll() {
     if (fb.ok) glove::slot(s).last = fb.pos;
     printSlotLine(s, fb.ok ? &fb : nullptr);
   }
-  okf("STATUS_ALL profile=STS3032 armed=%d online=%d", glove::armed() ? 1 : 0,
-      bitcount(glove::onlineMask()));
+  okf("STATUS_ALL profile=%s range=%u armed=%d online=%d",
+      scs::familyName(scs::profile().family), (unsigned)scs::profile().range,
+      glove::armed() ? 1 : 0, bitcount(glove::onlineMask()));
 }
 
 static void cmdAuto() {
@@ -193,9 +223,15 @@ static void cmdAuto() {
   for (uint8_t id = 1; id <= 6; ++id) {
     present[id] = scs::ping(id);
     if (present[id]) ids[nid++] = id;
+    /* type 不再写死 "STS"：那是在没探测之前就替舵机认了名。
+       到底是哪一族要等读回来才算，见下面的 probeAndReport。 */
     sayf("AUTO_ID id=%u pings=%d identity=%d type=%s", (unsigned)id, present[id] ? 1 : 0,
-         present[id] ? 1 : -1, present[id] ? "STS" : "none");
+         present[id] ? 1 : -1, present[id] ? "servo" : "none");
   }
+  /* AUTO 是"接上一批新舵机"的入口，换套舵机（STS3032 ↔ SC09）正是走这条路，
+     所以型号/量程必须在这里同步一次，不能指望用户记得手动敲 PROFILE。 */
+  if (nid) probeAndReport(ids[0]);
+
   char idList[48] = "none", missList[48] = "";
   if (nid) {
     int k = 0;
@@ -207,10 +243,13 @@ static void cmdAuto() {
       if (!present[id]) k += snprintf(missList + k, sizeof(missList) - k, "%s%u", k ? "," : "", (unsigned)id);
     if (!k) snprintf(missList, sizeof(missList), "none");
   }
-  sayf("AUTO_PROFILE name=STS3032 found=%d ids=%s missing=%s unstable=none", nid, idList, missList);
-  sayf("AUTO_RESULT profile=STS3032 found=%d ready=%d action=%s", nid, (nid == 6) ? 1 : 0,
+  sayf("AUTO_PROFILE name=%s found=%d ids=%s missing=%s unstable=none",
+       scs::familyName(scs::profile().family), nid, idList, missList);
+  sayf("AUTO_RESULT profile=%s found=%d ready=%d action=%s",
+       scs::familyName(scs::profile().family), nid, (nid == 6) ? 1 : 0,
        (nid == 6) ? "none" : "check_power_wiring_unique_ids_or_protocol");
-  okf("AUTO profile=STS3032 ready=%d range=4095", (nid == 6) ? 1 : 0);
+  okf("AUTO profile=%s ready=%d range=%u", scs::familyName(scs::profile().family),
+      (nid == 6) ? 1 : 0, (unsigned)scs::profile().range);
 }
 
 static void cmdCal(const int n, char **t) {
@@ -460,8 +499,9 @@ static void cmdLine(char *raw) {
   if (strcmp(v, "INFO") == 0)     { cmdInfo(); return; }
   if (strcmp(v, "HELP") == 0) {
     okf("HELP commands=%s",
-        "INFO PROFILE PING SCAN STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE "
-        "STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET AUTO ENROLL ECHO BUSINFO HELP");
+        "INFO PROFILE PING SCAN STATUS STATUS_ALL POSALL MAP SETDIR SETID CAL TORQUE ARM "
+        "DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET AUTO ENROLL ECHO "
+        "BUSINFO HELP");
     return;
   }
   if (strcmp(v, "BUSINFO") == 0) {
@@ -480,8 +520,40 @@ static void cmdLine(char *raw) {
     return;
   }
   if (strcmp(v, "PROFILE") == 0) {
-    if (n >= 2 && strcasecmp(t[1], "STS3032") == 0) okf("PROFILE name=STS3032 range=4095");
-    else errf("PROFILE must_be_SC09_or_STS3032");
+    /* PROFILE             查当前用的是什么
+     * PROFILE AUTO        拿第一个在线舵机去读型号/量程（默认行为）
+     * PROFILE STS3032     手动钉成 12 位（自动判错时的救生索）
+     * PROFILE SC09 / SCS  手动钉成 10 位
+     *
+     * 为什么必须留手动入口：量程判错的后果是"整套位置都错 4 倍"，
+     * 而自动判据依赖舵机 EEPROM 里的 Max Angle Limit 是出厂值。
+     * 万一有人改过它，用户得有办法自己掰回来，而不是只能等固件升级。 */
+    if (n < 2 || strcasecmp(t[1], "AUTO") == 0) {
+      /* 同样不依赖 onlineMask —— 见 setup() 里那段注释 */
+      uint8_t pid = 0;
+      for (int s = 0; s < glove::SLOT_COUNT && !pid; ++s) {
+        const uint8_t sid = glove::slot(s).id;
+        if (sid >= 1 && sid <= 253 && scs::ping(sid)) pid = sid;
+      }
+      if (pid) probeAndReport(pid);
+      else     sayf("PROFILE_AUTO skipped=no_servo_answered");
+    } else if (strcasecmp(t[1], "STS3032") == 0) {
+      scs::Profile p = scs::profile();
+      p.family = scs::Family::STS; p.range = 4095; p.probed = false;
+      scs::setProfile(p);
+      glove::saveProfile();        // 手动钉的也要记住，见 glove.h 的说明
+    } else if (strcasecmp(t[1], "SC09") == 0 || strcasecmp(t[1], "SCS") == 0) {
+      scs::Profile p = scs::profile();
+      p.family = scs::Family::SCS; p.range = 1023; p.probed = false;
+      scs::setProfile(p);
+      glove::saveProfile();
+    } else {
+      errf("PROFILE usage_AUTO_or_STS3032_or_SC09");
+      return;
+    }
+    const scs::Profile &pf = scs::profile();
+    okf("PROFILE name=%s range=%u probed=%d pos_tol=%d",
+        scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0, scs::posTol());
     return;
   }
   if (strcmp(v, "PRESET") == 0) {
@@ -494,7 +566,7 @@ static void cmdLine(char *raw) {
     return;
   }
   if (strcmp(v, "SCAN") == 0) {
-    sayf("SCAN_BEGIN profile=STS3032 max=20");
+    sayf("SCAN_BEGIN profile=%s max=20", scs::familyName(scs::profile().family));
     uint8_t found[24];
     const int c = scs::scan(20, found, 24);
     for (int i = 0; i < c; ++i) sayf("FOUND id=%u", (unsigned)found[i]);
@@ -503,6 +575,42 @@ static void cmdLine(char *raw) {
   }
   if (strcmp(v, "AUTO") == 0)     { cmdAuto(); return; }
   if (strcmp(v, "STATUS_ALL") == 0) { cmdStatusAll(); return; }
+  if (strcmp(v, "POSALL") == 0) {
+    /* 一帧读回所有在线槽位的当前位置 —— 演奏闭环的心跳。
+     *
+     * 为什么不做成逐槽位 readFeedback：那是 6 次往返（≈10 ms），
+     * 按 20~30 Hz 轮询会把总线和串口全占满，演奏命令反而挤不进去。
+     * syncReadPos 一帧问、n 条回包，1 Mbps 下总共不到 1 ms。
+     *
+     * 输出固定按**槽位下标**给 6 个数（读不到写 -1）。
+     * 不做成"只列在线槽位"：那样子串里第 i 个数对应哪个槽位会随在线情况漂，
+     * 而演奏闭环正是按下标索引的 —— 一漂就把命令发到别的指头上了。 */
+    uint8_t  ids[glove::SLOT_COUNT];
+    int      slotOf[glove::SLOT_COUNT];
+    int      n = 0;
+    for (int s = 0; s < glove::SLOT_COUNT; ++s) {
+      if (!(glove::onlineMask() & (1 << s))) continue;
+      ids[n]    = glove::slot(s).id;
+      slotOf[n] = s;
+      ++n;
+    }
+    if (n == 0) { okf("POSALL -1 -1 -1 -1 -1 -1 online=0"); return; }
+
+    uint16_t pos[glove::SLOT_COUNT];
+    scs::syncReadPos(ids, n, pos, 8);
+
+    char buf[80];
+    int  k = 0;
+    for (int s = 0; s < glove::SLOT_COUNT; ++s) {
+      int16_t pv = -1;                                  // 读不到 = 0xFFFF → int16 就是 -1
+      for (int i = 0; i < n; ++i) if (slotOf[i] == s) { pv = (int16_t)pos[i]; break; }
+      if (pv >= 0) glove::slot(s).last = pv;
+      if (k >= 0 && k < (int)sizeof(buf) - 1)
+        k += snprintf(buf + k, sizeof(buf) - (size_t)k, "%s%d", k ? " " : "", (int)pv);
+    }
+    okf("POSALL %s", buf);
+    return;
+  }
 
   // ---- 舵机级 ----
   if (strcmp(v, "PING") == 0) {
@@ -520,10 +628,10 @@ static void cmdLine(char *raw) {
       errf("STATUS id=%d offline=1", id);
       return;
     }
-    okf("STATUS id=%d profile=STS3032 pos=%d speed=%d load=%d voltage_raw=%u temperature=%u "
+    okf("STATUS id=%d profile=%s pos=%d speed=%d load=%d voltage_raw=%u temperature=%u "
         "current=%d moving=%u mode=0",
-        id, (int)fb.pos, (int)fb.speed, (int)fb.load, (unsigned)fb.voltage, (unsigned)fb.temp,
-        (int)fb.current, (unsigned)fb.moving);
+        id, scs::familyName(scs::profile().family), (int)fb.pos, (int)fb.speed, (int)fb.load,
+        (unsigned)fb.voltage, (unsigned)fb.temp, (int)fb.current, (unsigned)fb.moving);
     return;
   }
   if (strcmp(v, "MAP") == 0) {
@@ -762,10 +870,26 @@ void setup() {
   delay(60);
   Serial.println();
   sayf("READY FW=%s ver=%s boot_motion=0 torque=off", FW_ID, FW_VER);
-  sayf("READY PROFILE=STS3032 range=4095 bus_baud=%u rx=%d tx=%d resp_timeout_ms=%u",
+  sayf("READY bus_baud=%u rx=%d tx=%d resp_timeout_ms=%u",
        (unsigned)scs::BUS_BAUD, scs::RX_PIN, scs::TX_PIN, (unsigned)scs::RESP_TIMEOUT_MS);
   scs::begin();
   glove::begin();
+
+  /* 上电就把型号 / 位置量程探出来 —— 后面每一处校准、限位、到位判定都依赖它。
+     必须排在 glove::begin() 之后：那一步才会去问在线掩码。 */
+  {
+    /* ⚠️ 不能看 onlineMask()：begin() 刚跑完，后台轮询还没转过一圈，
+       此刻它一定是 0 —— 实测就因此整段探测没发生，INFO 里 probed=0。
+       直接挨个 ping 才靠得住：一条 ping ≈1 ms，最坏 6 条也不到 10 ms。 */
+    uint8_t pid = 0;
+    for (int s = 0; s < glove::SLOT_COUNT && !pid; ++s) {
+      const uint8_t sid = glove::slot(s).id;
+      if (sid >= 1 && sid <= 253 && scs::ping(sid)) pid = sid;
+    }
+    if (pid) probeAndReport(pid);
+    else     sayf("PROFILE_AUTO skipped=no_servo_answered keep=%s range=%u",
+                  scs::familyName(scs::profile().family), (unsigned)scs::profile().range);
+  }
   sayf("READY BUS echo=%d echo_bytes=%u uart_rx_buf=%u (echo=1 说明 TX/RX 并联，属正常)",
        scs::stats().echo ? 1 : 0, (unsigned)scs::stats().echoBytes,
        (unsigned)UART_RX_BUF);
