@@ -220,10 +220,10 @@ pre#log .sys{color:#c9a5ff}
 
   <div class="card">
     <h2>板子信息</h2>
-    <p class="desc">确认板子里跑的是 <code>PIANO_GLOVE_2</code>（自研）或 <code>PIANO_GLOVE_1</code>（原厂）固件，且舵机档位是 <code>STS3032</code>。</p>
+    <p class="desc">确认板子里跑的是 <code>PIANO_GLOVE_2</code>（自研）或 <code>PIANO_GLOVE_1</code>（原厂）固件，以及总线上的舵机是哪一档（<code>STS3032</code> 量程 4095 / <code>SC09</code> 量程 1023）。点「自动识别」让板子直接问舵机自己是谁 —— 换了另一套舵机不用手改。</p>
     <div class="row">
       <button id="btnInfo" class="primary">读取信息</button>
-      <button id="btnProfile">设为 STS3032 档</button>
+      <button id="btnProfile">🔍 自动识别档位</button>
     </div>
     <dl class="kv" id="infoKv"><dt>尚未读取</dt><dd></dd></dl>
   </div>
@@ -539,21 +539,22 @@ pre#log .sys{color:#c9a5ff}
           <span id="fDepthLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">100%</span>
         </div>
         <div class="row">
-          <label title="舵机从待命位走到按到底需要多久。设小了会抖（没走完就被叫回来），设大了丢音变多">手指行程时间</label>
-          <input type="range" id="fStroke" min="30" max="250" step="5" value="90" style="flex:1;min-width:120px">
-          <span id="fStrokeLabel" style="width:56px;text-align:right;font-variant-numeric:tabular-nums">90ms</span>
+          <label title="舵机从待命位走到按到底需要多久。这个数由程序用舵机的位置反馈**自己测**——总线舵机有反馈，没必要让你猜。">手指行程时间</label>
+          <span id="fStrokeLabel" style="flex:1;min-width:90px;font-variant-numeric:tabular-nums;color:var(--sub)">未测</span>
+          <button id="btnStroke" class="ghost" style="padding:4px 10px">📏 自测</button>
         </div>
         <div class="row">
           <label><input type="checkbox" id="followVel" checked> 跟随 MIDI 力度</label>
         </div>
         <p class="hint" style="margin-top:-2px">
-          四个参数各管一件事：<b>播放速度</b>改曲子本身的快慢（音符间隔）；
+          <b>播放速度</b>改曲子本身的快慢（音符间隔）；
           <b>手指动作速度</b>改舵机按下去用多久（「最快」= 舵机最大速度）；
-          <b>按压幅度</b>改按到多深（100% = 用你校准出来的整个行程）；
-          <b>手指行程时间</b>告诉程序「你的舵机走完一次按压要多久」——
-          它决定<b>按住时长</b>和<b>同一根手指多久才能再用</b>。
-          <br>勾上「跟随 MIDI 力度」后强音按得深、弱音按得浅；不勾则每个音都按满行程。
-          振幅底限留在 45%，保证弱音也看得见动作。
+          <b>按压幅度</b>改按到多深（100% = 用你校准出来的整个行程）。
+          <br><b>手指行程时间不用填</b> —— 点「📏 自测」，程序会让手指真的跑几趟，
+          用位置反馈量出「走完一次按压要多久」，再拿它去排<b>按住时长</b>和
+          <b>同一根手指多久才能再用</b>。测出来的数会存住，下次打开还在。
+          <br>勾上「跟随 MIDI 力度」后<b>按压深度=力度</b>（弱音 20% ~ 强音 100%），
+          不勾则每个音都按满「按压幅度」。
         </p>
         <div class="row">
           <button id="btnPlay" class="primary" style="flex:1">▶ 开始演奏</button>
@@ -561,8 +562,18 @@ pre#log .sys{color:#c9a5ff}
           <label><input type="checkbox" id="loop"> 循环</label>
         </div>
         <div class="row">
+          <label title="演奏时按 25Hz 读回舵机的真实位置；发一个音之前先确认这根手指上一次的动作真的做完了，没做完就丢掉这个音。关掉就退回老的『照谱猛发』。"><input type="checkbox" id="closedLoop" checked> 闭环演奏：等舵机做完这一步，再动下一步</label>
+        </div>
+        <div class="row">
           <label title="演奏一结束（自然奏完或手动停）就给全部舵机断电：手指自然松开、舵机不再带电发烫，摘手套时硬掰也不会顶伤齿轮。断电前会先把拇指侧摆送回松开位。想连着弹下一首可取消勾选。"><input type="checkbox" id="autoOff" checked> 奏完失能：一结束就给全部舵机断电</label>
         </div>
+        <p class="hint" style="margin-top:-2px">
+          <b>闭环演奏</b>：总线舵机是有反馈的 —— 演奏中程序一直在读每根手指**实际在哪**。
+          发一个音之前先看这根手指上一次的动作做完了没有，没做完就丢掉这个音
+          （<b>丢音保节奏</b>：与其抢拍糊成一片，不如少一个音、节奏稳住）。
+          丢了的音会记在状态行上，收尾也会报一个总数。取消勾选就是老的"照谱猛发"，
+          想当场对比两种手感的差别时用得上。
+        </p>
         <p class="hint" style="margin-top:-2px">
           <b>为什么结束必须断电</b>：演奏完了手指还带电按在琴键上，舵机一直顶着、发烫、互相较劲；
           而且演奏一结束人就要上手戴/摘手套，<b>带电的舵机被人手硬掰会顶伤齿轮</b>。
@@ -833,6 +844,10 @@ class MockFirmware{
        （这个坑踩过：[2,2,3,4,5,6] 那次，模拟全绿、实机坏掉） */
     this.slotId = [1, 2, 3, 4, 5, 6];
     this.rateTimer = null;      // RATE_DONE 的异步定时器
+    /* 让指定槽位"赖着不走"：POSALL 报的位置还停在待命位。
+       自测用它造出「上一次动作没做完」的场景 —— 模拟里 MOVE 是瞬时的，
+       不这样造，闭环永远不会丢音，也就等于没测。 */
+    this.lagSlots = [];
     /* ⚠️ 这里**绝不能**把 this.onAsync 置成 null。
        onAsync 是 Transport 在构造时接上的「异步出口」，全应用只有这一根线，
        接一次就一直有效；而 wizardReset() 会调 T.mock.reset(true)。
@@ -840,6 +855,9 @@ class MockFirmware{
        现象是测速页一直转圈、最后超时报错。（这个坑踩过：4C 六项全挂） */
   }
   rng(){ return this.profile === "SC09" ? 1023 : 4095; }
+  /* 「到位」容差 —— 必须和真固件 scs::posTol() 同一条公式（量程/164，下限 3）。
+     模拟要是自己拍一个数，闭环的判据就成了"模拟一套、实机另一套"。 */
+  tol(){ return Math.max(3, Math.floor(this.rng() / 164)); }
   present(id){ return this.bus.includes(id); }
   /* 这个舵机 ID 挂在哪个槽位上（-1 = 没有任何槽位认领它） */
   slotOf(id){ return this.slotId.indexOf(+id); }
@@ -852,21 +870,49 @@ class MockFirmware{
   }
   moveTo(id, pos){
     const s = id - 1, c = this.cal[s];
-    if(c){ c.last = pos; if(this.autoActive){ c.samples++; c.min = Math.min(c.min,pos); c.max = Math.max(c.max,pos); } }
+    if(!c) return;
+    /* 「慢半拍」的伺服（只有自测会用 simLag() 打开它）：
+       每条新命令才追上**上一条**命令的位置。真舵机一个半程要 ~90ms，
+       被催着发下一条时就是这个样子 —— 闭环的丢音路径必须靠它才测得出来，
+       因为模拟里正常的 MOVE 是瞬时的（一按就到，永远"做了"）。 */
+    if((this.lagSlots || []).includes(s)){
+      if(c.pending !== undefined) c.report = c.pending;
+      c.pending = pos;
+      if(c.report === undefined) c.report = c.standby;
+    }else{
+      c.report = pos; c.pending = undefined;
+    }
+    c.last = pos;
+    if(this.autoActive){ c.samples++; c.min = Math.min(c.min,pos); c.max = Math.max(c.max,pos); }
+  }
+  /* 自测专用：把指定槽位变成"慢半拍"的伺服。
+     ⚠️ 界面上没有任何入口 —— 页面正常打开永远碰不到它。 */
+  simLag(slots){
+    this.lagSlots = slots || [];
+    for(let s = 0; s < 6; s++){ delete this.cal[s].report; delete this.cal[s].pending; }
   }
   handle(cmd){
     const parts = String(cmd).trim().split(/\s+/);
     const v = (parts[0]||"").toUpperCase();
     const a = parts.slice(1);
-    if(v === "HELP") return ["OK HELP INFO PROFILE AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET ECHO BUSINFO"];
+    if(v === "HELP") return ["OK HELP INFO PROFILE POSALL AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET ECHO BUSINFO"];
     if(v === "INFO") return ["OK INFO fw=PIANO_GLOVE_2 profile=" + this.profile + " range=" + this.rng() +
-      " ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated + " armed=" + this.armed +
-      " auto_active=" + this.autoActive + " enroll_active=0 enroll_next=1 enroll_temp=10 enroll_phase=OFF"];
+      " pos_tol=" + this.tol() + " probed=1 ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated +
+      " armed=" + this.armed + " auto_active=" + this.autoActive +
+      " enroll_active=0 enroll_next=1 enroll_temp=10 enroll_phase=OFF"];
     if(v === "PROFILE"){
       const n = (a[0]||"").toUpperCase();
-      if(n === "SC09" || n === "STS3032"){
-        const changed = this.profile !== n;
-        this.profile = n;
+      /* 不带参数 = 查询。真固件的 PROFILE 就是这样用的（见 cmdProfile）。
+         容差 pos_tol 也一并报 —— 上位机判「舵机到位没有」用的就是它。 */
+      if(n === "") return ["OK PROFILE name=" + this.profile + " range=" + this.rng() +
+                           " probed=1 pos_tol=" + this.tol()];
+      /* AUTO = 问舵机自己是谁（真固件读型号 / 最小角 / 最大角寄存器）。
+         模拟里挂着的这套就是 STS3032；初始 profile 之所以故意是 SC09，
+         是在模拟"板子档位设错了"，AUTO 要能把它纠正回来。 */
+      const want = (n === "AUTO") ? "STS3032" : n;
+      if(want === "SC09" || want === "STS3032"){
+        const changed = this.profile !== want;
+        this.profile = want;
         /* 换档位要按新量程重铺一遍校准数据 —— 否则量程从 1023 变 4095 之后，
            还留着 511 这种"SC09 时代"的中间值，行程会算出离谱的数字。 */
         if(changed){
@@ -874,9 +920,16 @@ class MockFirmware{
           for(let s=0;s<6;s++)
             Object.assign(this.cal[s], {min:mid, standby:mid, max:mid, valid:0, samples:0, last:mid});
         }
-        return ["OK PROFILE name=" + n + " range=" + this.rng()];
+        const out = [];
+        if(n === "AUTO")
+          out.push("PROFILE_AUTO id=1 family=" + (want === "SC09" ? "SCS" : "STS") +
+                   " range=" + this.rng() + " pos_tol=" + this.tol() +
+                   " model=" + (want === "SC09" ? 46 : 521) + " min_angle=0 max_angle=" + this.rng());
+        out.push("OK PROFILE name=" + want + " range=" + this.rng() + " probed=" + (n === "AUTO" ? 1 : 0) +
+                 " pos_tol=" + this.tol());
+        return out;
       }
-      return ["ERR PROFILE must_be_SC09_or_STS3032"];
+      return ["ERR PROFILE must_be_AUTO_SC09_or_STS3032"];
     }
     if(v === "PING"){ const id = parseInt(a[0]||"0",10);
       return [this.present(id) ? "OK PING id=" + id : "ERR PING id=" + id]; }
@@ -1098,6 +1151,20 @@ class MockFirmware{
 
       return ["OK RATE_START slots=0x" + mask.toString(16).toUpperCase().padStart(2, "0") +
               " speed=" + speed + " acc=0 depth=" + depth + " cycles=" + cyc];
+    }
+    if(v === "POSALL"){
+      /* 一帧读回全部槽位的位置 —— 真固件用 syncReadPos 一帧问、6 条回包。
+         一律**按槽位下标**给 6 个数，读不到的写 -1（和真固件同一约定）。 */
+      const out = [];
+      for(let s = 0; s < 6; s++){
+        const id = this.slotId[s], c = this.cal[s];
+        if(!this.present(id) || !c){ out.push(-1); continue; }
+        /* report = 伺服**实际**在的位置（moveTo 维护）；它和 last（最后下发的
+           目标位置）之间的差额，正是闭环要看的那个东西。 */
+        out.push(c.report !== undefined ? c.report
+                                       : (c.last ?? Math.floor(this.rng() / 2)));
+      }
+      return ["OK POSALL " + out.join(" ")];
     }
     if(v === "ENROLL"){
       const sub = (a[0]||"STATUS").toUpperCase();
@@ -1420,6 +1487,37 @@ class Transport{
       this._write(cmd).catch(e=>{ logLine("写串口失败: " + e.message, "err"); done(); });
     });
   }
+  /* 演奏闭环专用：安静地问一次「所有槽位现在在哪儿」。
+     为什么不直接用 send()：
+       · send() 每次都写一行日志 —— 演奏中每秒 25 次会把日志刷爆、拖垮 rAF；
+       · send() 会把 _sending 立起来，长轮询（RATE_DONE / BOOT 这类异步行）全被让路。
+     所以这里自己走一趟，只把 **POSALL 之外的行**还给正常通路（日志 + 异步行消费者），
+     POSALL 自己吃掉。返回：按**槽位下标**的 6 个位置，读不到写 -1；没读到就返回 null。 */
+  async pollPos(){
+    try{
+      if(this.mode === "sim") return this._parsePosAll(this.mock.handle("POSALL"));
+      if(this.mode !== "bridge") return null;
+      const j = await this.bridgePost("/api/send",
+        {cmd:"POSALL", timeoutMs:600, quietMs:8, since:this.seq});
+      if(!j || !j.ok) return null;
+      if(typeof j.seq === "number") this.seq = Math.max(this.seq, j.seq);
+      /* ⚠️ 混在里面的别的行（比如同时飞出去的 OK MOVE）**不能吞** ——
+         吞掉就等于把它们从页面上抹了，而日志和异步行消费者还在等它们。 */
+      (j.pre || []).concat(j.lines || []).forEach(l => {
+        if(/^(OK|ERR) POSALL\b/.test(l)) return;
+        this.emit(l); logRecv(l);
+      });
+      return this._parsePosAll(j.lines || []);
+    }catch(e){ return null; }
+  }
+  _parsePosAll(lines){
+    const arr = Array.isArray(lines) ? lines : [lines];
+    const line = arr.find(l => /^OK POSALL\b/.test(l));
+    if(!line) return null;
+    /* 只取前 6 个数：固件在没读到任何槽位时会补一句 online=0 */
+    const nums = line.replace(/^OK POSALL\s*/, "").trim().split(/\s+/).slice(0, 6).map(Number);
+    return (nums.length === 6 && nums.every(n => Number.isFinite(n))) ? nums : null;
+  }
   /* 只发不等 —— 演奏时用, 避免被固件延迟卡住。
      但**不是立刻发**：命令先进队列，由 flush() 合并成一批。
 
@@ -1496,10 +1594,20 @@ const S = {
   pollTimer:null,
   latchApplied:false,     // 本次演奏有没有真的把侧摆摆过去（停止时决定要不要送回位）
   latchTouched:false,     // 用户动过使能位滑块没有（没动过就跟随已记住的值）
-  needArm:false           // 刚被「奏完失能」断过电：下次演奏必须重新 ARM。
+  needArm:false,          // 刚被「奏完失能」断过电：下次演奏必须重新 ARM。
                           // 为什么要这个标记：S.info.armed 是发 INFO 查来的（不是本地记账），
                           // 断电到下次查询之间它是**旧值**，光看它会以为还使能着 ——
                           // 那样刚发的 MOVE 会全被固件回 motion_not_armed，手指一动不动。
+  /* ---- 演奏闭环（2026-09-21）：用舵机反馈决定「这一下能不能开始」----
+     closed  = 本次演奏走不走闭环（开场定住，中途改开关不该让这一场变脸）
+     pos     = 最近一次 POSALL 读回来的各槽位位置（-1 / undefined = 没读到）
+     posAt   = 上面那次快照的时刻
+     tgt     = 上一次下发给该槽位的**目标位置**
+     tgtAt   = 上面那条命令的下发时刻
+     lostLoop= 本次演奏因「上一动还没做完」丢掉的按下数（收尾要报给用户）
+     posTimer= 演奏期间的位置轮询定时器 */
+  closed:false, pos:[], posAt:0, tgt:[], tgtAt:[], lostLoop:0, posTimer:null,
+  _tolWarned:false        // 「固件容差和页面算的对不上」只提醒一次，别刷屏
 };
 const isSim = () => T.mode === "sim";
 
@@ -1725,24 +1833,56 @@ async function refreshInfo(){
      断电标记唯一的用途是补上"查询还没回来"那几百毫秒的盲区，
      真查到了当然以板子为准。 */
   if(S.info.armed === "1") S.needArm = false;
+  renderInfoKv();
+  refreshChips();
+}
+
+/* 档位显示：STS3032 和 SC09 都是**受支持的**两套舵机，不能再像以前那样
+   把非 STS3032 一律标红「应为 STS3032」—— 那正是"换一套舵机就不认"的来源。
+   现在只在**认不出来**（UNKNOWN / 空）时才报问题。 */
+function renderInfoKv(){
+  const fam = { STS3032: "SMS/STS 族", SC09: "SCSCL 族" }[S.info.profile];
   $("#infoKv").innerHTML =
     "<dt>固件</dt><dd><b>" + esc(S.info.fw) + "</b>" +
       (S.info.fw === "PIANO_GLOVE_2" ? ' <span class="chip ok">自研</span>'
        : S.info.fw === "PIANO_GLOVE_1" ? ' <span class="chip">原厂</span>' : "") + "</dd>" +
     "<dt>舵机档位</dt><dd>" + esc(S.info.profile) +
-      (S.info.profile === "STS3032" ? ' <span class="chip ok">正确</span>' : ' <span class="chip bad">应为 STS3032</span>') + "</dd>" +
-    "<dt>量程</dt><dd>" + esc(S.info.range) + "</dd>" +
+      (fam ? ' <span class="chip ok">' + fam + "</span>"
+           : ' <span class="chip bad">没认出来 · 点「自动识别档位」</span>') + "</dd>" +
+    "<dt>量程</dt><dd>" + esc(S.info.range) +
+      (S.info.pos_tol ? "　·　到位容差 <b>" + esc(S.info.pos_tol) + "</b>" : "") +
+      (S.info.probed === "0" ? ' <span class="chip">未探测，是默认假设</span>' : "") + "</dd>" +
     "<dt>校准 / 使能</dt><dd>" + esc(S.info.calibrated) + " / " + esc(S.info.armed) + "</dd>" +
     "<dt>WiFi</dt><dd>" + esc(S.info.ap) + " · " + esc(S.info.ip) + "</dd>";
-  refreshChips();
 }
-$("#btnInfo").onclick = refreshInfo;
+$("#btnInfo").onclick = async () => { await refreshInfo(); await syncProfile(); };
 $("#btnProfile").onclick = async () => {
-  await T.send("PROFILE STS3032", 3000);
+  const r = await T.send("PROFILE AUTO", 4000);
+  const auto = r.find(l => l.startsWith("PROFILE_AUTO"));
+  const ok   = r.find(l => l.startsWith("OK PROFILE"));
   await refreshInfo();
-  $("#connMsg").className = "msg ok";
-  $("#connMsg").textContent = "档位已设为 STS3032。";
+  if(ok) S.info.pos_tol = (kv(ok).pos_tol || S.info.pos_tol);
+  renderInfoKv();
+  $("#connMsg").className = "msg " + (ok ? "ok" : "err");
+  $("#connMsg").textContent = ok
+    ? "档位自动识别完成：" + (kv(ok).name || "?") + "（量程 " + (kv(ok).range || "?") + "）。"
+    : "自动识别失败 —— 看「日志」页固件回的是什么。";
+  logLine(auto ? ("识别到 " + auto) : "PROFILE AUTO 没回 PROFILE_AUTO 行", auto ? "sys" : "err");
 };
+
+/* 问一次固件「现在是什么档位、量程多少、到位的容差是多少」。
+   容差只有固件说了算 —— 闭环判「到位」用它，页面不自己算一套。 */
+async function syncProfile(){
+  const lines = await T.send("PROFILE", 3000);
+  const line = lines.find(l => l.startsWith("OK PROFILE"));
+  if(!line) return;
+  const p = kv(line);
+  if(p.name)    S.info.profile = p.name;
+  if(p.range)   S.info.range   = p.range;
+  if(p.pos_tol) S.info.pos_tol = p.pos_tol;
+  if(p.probed !== undefined) S.info.probed = p.probed;
+  renderInfoKv();
+}
 
 /* 自动轮询状态（常开：以前这里挂着一个「自动刷新」勾选框，实际没人会去取消它） */
 function startPolling(){
@@ -2730,15 +2870,113 @@ function parseMidi(buf){
 const MAX_HOLD_MS = 1200;
 
 /* 舵机走完**单程**（待命位 → 按到底）需要多久，真实毫秒。
-   默认 90ms 来自实机测速：满行程一次完整按压（按下 + 回待命）4.97Hz ≈ 201ms，
-   单程就是它的一半。
-   这个数字直接决定"能不能按到底"：设小了舵机走不完就被叫回来（看着像抖一下），
-   设大了同一根手指被占得久、丢音变多。用户可以按自己那块板子实测改。 */
+ *
+ * ★ 这个数由程序测出来，不是手填的。★
+ * 总线舵机本来就有位置反馈，让用户去猜一个"设小了会抖、设大了丢音"的数
+ * 是没道理的 —— 用户原话："手指行程时间这个是程序自己测的啊，总线舵机有反馈的啊"。
+ *
+ * 测法见 measureStroke()：跑固件自带的 RATE，它本来就是
+ * 「发目标 → 等到位 → 再发下一个」的闭环，量出的 half_ms 正好就是单程耗时；
+ * 而且让**全部参与演奏的手指一起跑** —— 同步写要等最慢的那根，
+ * 这恰好就是演奏时「5 根同时动」的真实情况。
+ *
+ * 兜底 90ms 来自实机基准：5 根同步满行程 4.97 Hz，单程就是它的一半。
+ * 没测过时用它，并把读数标成"未测"，别让人以为这是测出来的。 */
+const STROKE_KEY = "pg_stroke_ms";
+const STROKE_FALLBACK = 90;
+
 function strokeMs(){
-  const el = $("#fStroke");
-  const v = el ? parseInt(el.value, 10) : NaN;
-  return (v >= 20 && v <= 400) ? v : 90;
+  const v = parseInt(localStorage.getItem(STROKE_KEY) || "", 10);
+  return (v >= 20 && v <= 400) ? v : STROKE_FALLBACK;
 }
+
+/* 写入路径只有一条。抽出来是因为「存进浏览器」和「刷新读数」必须成对 ——
+   只做一半的症状是"读数还是旧的"，看上去像这个数没生效。
+   调用方：①「📏 自测」量完之后；② 回归脚本（它要驱动真实实现，不能自己塞
+   localStorage —— 那样测的是存储格式，不是这条路径）。 */
+function setStrokeMs(v){
+  try{ localStorage.setItem(STROKE_KEY, String(v)); }catch(e){}
+  renderStroke();
+}
+
+/* 参与演奏的槽位掩码，RATE/POSALL 都吃 0x 十六进制形式
+   （直接发十进制 63 会被固件判成非法参数 —— 这个坑踩过）。 */
+function playMaskHex(){
+  let m = 0;
+  for(const s of PLAY_SLOTS) m |= (1 << s);
+  return "0x" + m.toString(16).toUpperCase().padStart(2, "0");
+}
+
+/* ============ 演奏闭环 ============
+   用户的原话：「手指行程时间这个是程序自己测的啊，总线舵机有反馈的啊，
+   不是说曲子一直放、命令一直发，不管有没有完成一个按下抬起，是要有反馈的啊啊啊」。
+
+   所以演奏不再是"照谱猛发"，而是**每一步都先问舵机做到哪儿了**：
+     · 演奏期间以 ~25Hz 发一次 POSALL，一帧读回 6 个槽位的真实位置；
+     · 发某个音的「按下」之前，先看这根手指**上一次的动作做完了没有**
+       （读回来的位置 vs 上次下发的目标位置，差在容差内算到位）；
+     · 没做完就**丢掉这个按下**（用户选的口径：「丢音保节奏」）——
+       丢按下必须连它的松开一起丢，否则这根手指会被永久按住；
+     · 万一舵机顶死了（等再久也到不了目标位置），超过 stuckMs() 就不再等 ——
+       否则一根卡住的手指会让整首曲子从头哑到尾。
+
+   容差来源：**固件报的 pos_tol**（= 量程/164，STS 是 24、SC09 是 6）。
+   页面不自己算一套 —— 两边判"到位"的口径一旦分叉，症状是
+   "页面以为到位了、舵机还在走"，而且极难查。算不出来就退回同一条公式并提醒。 */
+const LOOP_KEY = "pg_closed_loop";
+function closedLoopOn(){
+  try{ return localStorage.getItem(LOOP_KEY) !== "0"; }catch(e){ return true; }
+}
+/* 舵机顶死多久就不再等它：4 倍行程时间 —— 正常一趟早该走完了。 */
+function stuckMs(){ return Math.max(400, strokeMs() * 4); }
+
+function posTolOf(){
+  const fw = parseInt(S.info.pos_tol, 10);
+  /* ⚠️ 必须是**整除**，跟固件 scs::posTol() 的 `range / 164` 一模一样。
+     这里曾经写的是 Math.round：4095/164 = 24.97，页面算 25、固件报 24，
+     差 1 个计数。差 1 看着无所谓，但"容差只该有一处定义"这条规矩的意义
+     就在这儿 —— 今天差 1，哪天改了量程就可能差到把判据反过来。
+     （这个分叉就是 e2e 那条「退回同款公式」的断言抓出来的。） */
+  const calc = Math.max(3, Math.floor(+(S.info.range || 4095) / 164));
+  if(Number.isFinite(fw) && fw > 0){
+    if(fw !== calc && !S._tolWarned){
+      S._tolWarned = true;
+      logLine("⚠ 固件报的到位容差 " + fw + " 和页面按量程算的 " + calc +
+              " 不一致 —— 以固件为准（容差只该有一处定义）", "err");
+    }
+    return fw;
+  }
+  return calc;
+}
+
+/* 这一下能不能开始？看的是**舵机自己报的位置**，不是我们发了多少命令。
+   返回 false = 上一次的动作还没走完 → 这个按下要丢掉。 */
+function slotReady(slot, now){
+  const tgt = S.tgt[slot];
+  if(tgt === undefined || tgt === null) return true;        // 这根还没发过命令 → 不拦
+  const p = S.pos[slot];
+  if(p === undefined || p === null || p < 0) return true;   // 没读到位置 → 宁可按下去，也别整场哑掉
+  if(now - (S.tgtAt[slot] || 0) > stuckMs()) return true;   // 顶死太久，不再等它
+  return Math.abs(p - tgt) <= posTolOf();
+}
+
+/* 演奏期间的位置轮询。为什么是 25Hz 而不是更快：
+   舵机一个半程 ~90ms，40ms 的快照足够判"上一次做完没有"；
+   再快只是徒增串口往返，反而挤占发命令的带宽。 */
+const POS_TICK_MS = 40;
+function startPosPoll(){
+  stopPosPoll();
+  if(!S.closed || T.mode === "none") return;
+  const tick = async () => {
+    if(!S.playing){ S.posTimer = null; return; }
+    const pos = await T.pollPos();
+    if(pos){ S.pos = pos; S.posAt = performance.now(); }
+    if(S.playing) S.posTimer = setTimeout(tick, POS_TICK_MS);
+    else S.posTimer = null;
+  };
+  S.posTimer = setTimeout(tick, 0);
+}
+function stopPosPoll(){ if(S.posTimer){ clearTimeout(S.posTimer); S.posTimer = null; } }
 
 /* ---------- 5.2 音符 → 手指动作 规划 ---------- */
 /* 手套只有 5 根能按琴键的手指, 而钢琴曲常有几十个音同时响。
@@ -2812,8 +3050,14 @@ function buildPlan(notes, mode, speed){
        - holdReal 是**真实**毫秒，声音衰减用 —— 已经除掉速度倍率，
          所以 200% 速度下音不会拖成两倍长糊在一起。
        声音和动作**共用同一条事件流**，听到的 = 看到的 = 手套做的。 */
-    events.push({t:n.t,        slot, on:true,  vel:n.vel / 127, note:n.note, durMs:hold, holdReal});
-    events.push({t:n.t + hold, slot, on:false, vel:0,           note:n.note, durMs:0,    holdReal:0});
+    /* 按下 / 松开这两条要**互相记住**：闭环丢音时按下被丢掉，
+       它的松开也必须一起丢 —— 否则那根手指会被永久按住，一直按到曲子结束
+       （听起来就是"有个音卡住了"，而且松开位它自己永远不动）。 */
+    const evOn  = {t:n.t,        slot, on:true,  vel:n.vel / 127, note:n.note, durMs:hold, holdReal};
+    const evOff = {t:n.t + hold, slot, on:false, vel:0,           note:n.note, durMs:0,    holdReal:0};
+    evOn.mate = evOff; evOff.mate = evOn;
+    events.push(evOn);
+    events.push(evOff);
     used[slot]++;
   }
   events.sort((a,b) => a.t - b.t || (a.on ? -1 : 1));
@@ -3080,27 +3324,103 @@ function fingerDepth(){ return (parseInt($("#fDepth").value, 10) || 100) / 100; 
 $("#fDepth").oninput = () => { $("#fDepthLabel").textContent = Math.round(fingerDepth() * 100) + "%"; };
 
 /* MIDI 力度 → 按压深度（0~1）。
-   底 45% 起步，再线性推到全行程：
-   - 下限留底：力度 0.2 的音若只按 20%，手指几乎不动、看着像"没反应"，
-     用户会以为坏了；
-   - 上限必须是 1.0：力度 1.0 的音要按到底 —— 用户明确要求
-     "用我校准的最大幅度"。
-   抽成函数是为了让自测能直接断言两端，而不是靠采样 DOM 猜。 */
+ *
+ * 用户原话：「按压幅度应该是根据曲子声音强弱定的」。所以这里就是**力度本身**，
+ * 只在下头留一个很小的底（20%），不让最弱的音变成"手指完全不动" ——
+ * 那看着像坏了，而且舵机一动不动时连反馈都没有，闭环会以为它到位了。
+ *
+ * 曾经这里写的是 0.45 + 0.55*vel：弱音也有 45% 行程，强音 100%，
+ * 动态范围被压成 2.2:1 —— 强弱听不出差别，正是用户抱怨的点。
+ * 现在 20%~100%，动态范围 5:1。
+ *
+ * 上限必须严格是 1.0：力度最强的音要走到头，这是"用我校准的最大幅度"。
+ * 抽成函数是为了让自测能直接断言两端，而不是靠采样 DOM 猜。 */
+const AMP_FLOOR = 0.20;
 function ampOf(vel){
   if($("#followVel") && !$("#followVel").checked) return 1;
-  return 0.45 + 0.55 * Math.max(0, Math.min(1, vel || 0));
+  return AMP_FLOOR + (1 - AMP_FLOOR) * Math.max(0, Math.min(1, vel || 0));
 }
 
-/* 行程时间一改，「按住多久」「同一根手指多久能再用」全变 —— 必须重算 plan，
-   否则界面上的丢音数、卷帘图和实际发出的动作会对不上。 */
-$("#fStroke").oninput = () => {
-  $("#fStrokeLabel").textContent = strokeMs() + "ms";
-  /* 行程一变，「起音点 = 行程的百分之多少」换算出来的毫秒数也跟着变，
-     那行读数必须同步 —— 否则用户看到的是旧行程算出来的数。 */
-  if(typeof renderAlign === "function") renderAlign();
-  if(S.midi) analyze();
-};
-$("#fStrokeLabel").textContent = strokeMs() + "ms";
+/* 行程时间的读数：实测值 / 未测（暂用兜底）。两者必须长得不一样，
+   否则用户没法分辨"这是量出来的"还是"程序随口填的"。 */
+function renderStroke(){
+  const el = $("#fStrokeLabel");
+  if(!el) return;
+  const v = parseInt(localStorage.getItem(STROKE_KEY) || "", 10);
+  const ok = v >= 20 && v <= 400;
+  el.textContent = ok ? ("实测 " + v + "ms") : ("未测 · 暂用 " + STROKE_FALLBACK + "ms");
+  el.title = ok
+    ? "用舵机位置反馈量出来的单程耗时。换了舵机、或大改了「按压幅度」/「手指动作速度」，该重量一次。"
+    : "还没测过，暂时按 " + STROKE_FALLBACK + "ms 排。点右边「📏 自测」量一下（要接着板子）。";
+}
+
+/* 自测行程时间：让手指真的跑几趟，用位置反馈量单程耗时。
+ *
+ * 为什么用固件的 RATE 而不是自己发 MOVE 再读位置：
+ * RATE 已经是"发目标 → **等到位** → 再发下一个"的闭环，量出来的就是
+ * 真实可达的单程耗时，而不是"我发包有多快"。这正是我们要的数。
+ * 用当前幅度和速度去测 —— 行程耗时本来就随它们变。 */
+async function measureStroke(){
+  const btn = $("#btnStroke");
+  if(!T.connected && !isSim()){ logLine("还没连上，测不了行程时间", "err"); return; }
+  if(S.info.armed !== "1" || S.needArm){
+    const r = await T.send("ARM", 4000);
+    if(!r.some(l => l.startsWith("OK ARM"))){
+      logLine("测行程时间要先使能：回第 4 步点「使能」再回来", "err");
+      return;
+    }
+    S.needArm = false;
+    await refreshInfo(); refreshChips();
+  }
+  const mask = playMaskHex();
+  if(!mask || PLAY_SLOTS.length === 0){ logLine("没有可测的手指（先完成第 3 步校准）", "err"); return; }
+  const depth = Math.round(fingerDepth() * 100);
+  const speed = fingerSpeed();
+  const cyc   = 3;
+
+  btn.disabled = true; btn.textContent = "⏳ 测…";
+  let doneLine = null;
+  const onLine = l => { if(l.startsWith("RATE_DONE")) doneLine = l; };
+  T.listeners.push(onLine);
+  try{
+    const r = await T.send("RATE " + mask + " " + speed + " 0 " + depth + " " + cyc, 8000);
+    const bad = r.find(l => l.startsWith("ERR"));
+    if(bad){
+      logLine("测不了行程时间：" + bad + (/stroke_too_small/.test(bad)
+        ? "　→ 这个槽位行程太小，回第 3 步重新校准。" : ""), "err");
+      return;
+    }
+    logLine("手指正在跑 " + cyc + " 趟完整行程，手离远一点…", "sys");
+    const t0 = performance.now();
+    const budget = cyc * 2 * 900 + 4000;          // 每个半程最坏 800ms + 余量
+    while(!doneLine && performance.now() - t0 < budget) await sleep(80);
+    if(!doneLine){ logLine("等超时也没收到 RATE_DONE —— 去「日志」页看固件最后回的是什么", "err"); return; }
+
+    const d    = rtParse(doneLine);
+    const half = Math.round(parseFloat(d.half_ms));
+    const lost = parseInt(d.lost || "0", 10);
+    if(!(half >= 20 && half <= 400)){
+      logLine("测出来的数不对劲（" + doneLine + "）—— 没采用，仍按 " + strokeMs() + "ms 排", "err");
+      return;
+    }
+    setStrokeMs(half);
+    /* 行程一变，「按住多久」「同一根手指多久能再用」全变 —— 必须重算 plan，
+       否则界面上显示的丢音数、卷帘图会和实际发出的动作对不上。 */
+    if(S.midi) analyze();
+    if(typeof renderAlign === "function") renderAlign();
+    logLine("行程时间实测：单程 " + half + "ms（行程 " + depth + "% · 速度 "
+      + (speed === 0 ? "最快" : speed) + "）"
+      + (lost ? "　⚠ 有 " + lost + " 个半程等满超时都没到位，这套机械有点跟不上"
+              : "　全部到位"), lost ? "err" : "sys");
+  }catch(e){
+    logLine("测行程时间出错：" + e.message, "err");
+  }finally{
+    T.listeners = T.listeners.filter(f => f !== onLine);
+    btn.disabled = false; btn.textContent = "📏 自测";
+  }
+}
+$("#btnStroke").onclick = measureStroke;
+renderStroke();
 
 /* 深度条：一行一根。侧摆那一行不显示"深度"—— 它没有深度可言，
    显示的是**使能位**（一个开始演奏前定好、之后不变的位置）。 */
@@ -3183,8 +3503,14 @@ function setDepths(arr){
 
 function stopPlay(safe){
   S.playing = false;
+  stopPosPoll();                 // 闭环的位置轮询跟着停，别在曲终了还占着串口
   if(S.raf) cancelAnimationFrame(S.raf);
   S.raf = null;
+  if(S.lostLoop){
+    logLine("闭环丢音 " + S.lostLoop + " 个按下 —— 那几根手指上一次的动作还没做完，" +
+            "等它只会把后面的节奏全拖乱（这就是「丢音保节奏」）", "sys");
+    S.lostLoop = 0;
+  }
   /* 演奏期间命令不逐条写日志（480 次 DOM 追加足以让 rAF 掉帧），
      这里补一条摘要 —— 顺带把"批量到底有没有起作用"摆到台面上。 */
   if(S.fireQuiet){
@@ -3243,6 +3569,17 @@ async function finishPlay(){
   logLine("全部舵机已失能 —— 手指自然松开（关掉「奏完失能」可保持带电）", "sys");
   setTimeout(refreshInfo, 400);
 }
+
+/* 「闭环演奏」开关（默认开）。存浏览器：板子没插着也能先设好。
+   关掉就退回老的"照谱猛发"—— 留着它是为了能当场 A/B：
+   同一首曲子勾与不勾各弹一遍，听感差别（丢音 vs 抢拍）一听就明白。 */
+$("#closedLoop").checked = closedLoopOn();
+$("#closedLoop").onchange = () => {
+  const on = $("#closedLoop").checked;
+  try{ localStorage.setItem(LOOP_KEY, on ? "1" : "0"); }catch(e){}
+  logLine(on ? "「闭环演奏」已开启：每个动作都等舵机报到位再发下一个，跟不上就丢音保节奏"
+             : "「闭环演奏」已关闭：照谱猛发，不等舵机（快曲子会抢拍、连击会糊）", "sys");
+};
 
 /* 「奏完失能」开关（默认开）。存浏览器：板子没插着也能先设好。 */
 const AUTOOFF_KEY = "pg_auto_off";
@@ -3328,6 +3665,13 @@ $("#btnPlay").onclick = async () => {
   S.playing = true; S.cursor = 0; S.fired = 0;
   S.dCursor = 0; S.sndFired = 0;          // 丢音游标 / 起音计数（自测要用）
   S.sndCursor = 0; S.sndLead = audioLeadMs();   // 声音游标 + 音画对齐补偿量（开场定住）
+  /* 闭环：开关开场定住（中途勾/取消不该让这一场变脸），
+     位置与目标记账清空 —— 上一首留下的目标位置会让这一首的第一个音
+     被误判成"上一次还没做完"，白白丢音。 */
+  S.closed = closedLoopOn();
+  S.pos = []; S.posAt = 0; S.tgt = []; S.tgtAt = []; S.lostLoop = 0;
+  for(const e of ev) e.dropped = false;
+  startPosPoll();
   /* 起音点也开场定住 —— 演奏中途滑滑块不该让这一场的声音跳一下。
      它和 sndLead 一起决定「声音落在按下后的第几毫秒」。 */
   S.sndAttack = attackPct();
@@ -3375,9 +3719,21 @@ $("#btnPlay").onclick = async () => {
       // 也就是用户要的"用我校准的最大幅度"。
       // 曾经这里只有 Math.max(0.35, e.vel)：力度 0.7 的音就只按到 70%，
       // 听/感觉起来就是"幅度怎么这么小"。
+      /* ★ 闭环闸门：要动的这根手指，上一次的动作做完了没有？
+         没做完就**丢掉这个按下**（丢音保节奏）。
+         丢按下必须连它的松开一起丢 —— 不然手指会被永久按住。 */
+      if(e.on && S.closed && !slotReady(e.slot, now)){
+        if(e.mate) e.mate.dropped = true;
+        S.lostLoop++;
+        continue;
+      }
+      if(!e.on && e.dropped) continue;    // 它的按下被丢了 → 这个松开也别发
       const d = e.on ? ampOf(e.vel) * fingerDepth() : 0;   // 力度 → 深度见 ampOf()
+      const tgtPos = slotPos(e.slot, d);                   // 先算目标，再记账，最后发
       depth[e.slot] = d;
-      T.fire("MOVE " + slotIdOf(e.slot) + " " + slotPos(e.slot, d) + " " + fingerSpeed() + " 0 ARM");
+      S.tgt[e.slot] = tgtPos;
+      S.tgtAt[e.slot] = now;
+      T.fire("MOVE " + slotIdOf(e.slot) + " " + tgtPos + " " + fingerSpeed() + " 0 ARM");
       S.fired++; sent++;
     }
     /* 超过 40 条说明板子跟不上, 直接跳过这一段, 保住后面的节奏 */
@@ -3408,12 +3764,18 @@ $("#btnPlay").onclick = async () => {
 
     if(now - S.lastRateAt > 900){
       const rate = Math.round((S.fired - S.lastRateCount) / ((now - S.lastRateAt) / 1000));
-      $("#playRate").textContent = "实际 " + rate + " 条命令/秒";
+      $("#playRate").textContent = "实际 " + rate + " 条命令/秒" +
+        (S.lostLoop ? "　闭环丢音 " + S.lostLoop : "");
       S.lastRateAt = now; S.lastRateCount = S.fired;
     }
 
     if(S.cursor >= ev.length && t >= ev[ev.length-1].t + 260){
-      if(loopOn()){ S.cursor = 0; S.dCursor = 0; S.sndCursor = 0; S.t0 = performance.now(); }
+      if(loopOn()){
+        S.cursor = 0; S.dCursor = 0; S.sndCursor = 0; S.t0 = performance.now();
+        /* ⚠️ 丢音标记必须清 —— 事件对象是复用的，带着上一轮的 dropped
+           再跑一遍，那几对按下/松开会被原封不动地再丢一次。 */
+        for(const e of ev) e.dropped = false;
+      }
       else { stopPlay(false); $("#planMsg").className = "msg ok"; $("#planMsg").textContent = "演奏结束。"; return; }
     }
     S.raf = requestAnimationFrame(frame);

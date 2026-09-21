@@ -36,7 +36,7 @@ const MUTANTS = [
 
   { name: "幅度不跟力度（恒满行程）",
     file: "web_piano_glove.html",
-    find: "  return 0.45 + 0.55 * Math.max(0, Math.min(1, vel || 0));",
+    find: "  return AMP_FLOOR + (1 - AMP_FLOOR) * Math.max(0, Math.min(1, vel || 0));",
     repl: "  return 1;",
     /* ⚠️ expect 必须是断言名里**真实存在**的片段。曾经写成"深度真的跟着力度走"，
        而断言名是"深度真的由力度算出来" —— 结果变异明明被抓住了（FAIL 就在输出里），
@@ -45,8 +45,8 @@ const MUTANTS = [
 
   { name: "「手指行程时间」这个旋钮不接进规划",
     file: "web_piano_glove.html",
-    find: "  const v = el ? parseInt(el.value, 10) : NaN;",
-    repl: "  const v = 90; void el;",
+    find: "  return (v >= 20 && v <= 400) ? v : STROKE_FALLBACK;",
+    repl: "  return STROKE_FALLBACK; void v;",
     expect: "行程时间」真的接进了规划" },
 
   { name: "声音时长退回曲谱毫秒（快曲会糊）",
@@ -154,6 +154,37 @@ const MUTANTS = [
   /* 急停那条路是另一个「断电」入口，得单独记这一笔。
      不记的话：按完 ■ 停止、400ms 内又按 ▶，播放前的判断会跳过 ARM，
      发的 MOVE 全被回 motion_not_armed —— 页面显示在演奏，手套一动不动。 */
+  /* ---- 演奏闭环：等舵机做到位（2026-09-21 加）----
+     用户原话：「总线舵机有反馈的啊……不管有没有完成一个按下抬起，是要有反馈的啊啊啊」。
+     四处各砍一条路，每条都对应一条断言：
+       · 闸门整个失效      → 「那个按下真的被丢掉」必须红
+       · 丢按下不丢松开    → 「连它的松开一起丢」必须红（只丢一半 = 手指被永久按住）
+       · 位置轮询没跑起来  → 「真的在读舵机位置」必须红
+       · 顶死保护没了      → 「等太久就不再干等」必须红（卡住的手指会被永久静音） */
+  { name: "闭环闸门失效（照谱猛发，不等舵机）",
+    file: "web_piano_glove.html",
+    find: "      if(e.on && S.closed && !slotReady(e.slot, now)){",
+    repl: "      if(false){",
+    expect: "舵机没做到位时，那个按下真的被丢掉" },
+
+  { name: "丢按下不丢它的松开（手指会被永久按住）",
+    file: "web_piano_glove.html",
+    find: "        if(e.mate) e.mate.dropped = true;",
+    repl: "        void 0;   // 变异：只丢按下，松开照发",
+    expect: "丢按下必须连它的松开一起丢" },
+
+  { name: "位置轮询压根没跑（闭环变成睁眼瞎）",
+    file: "web_piano_glove.html",
+    find: "  S.posTimer = setTimeout(tick, 0);",
+    repl: "  S.posTimer = null;",
+    expect: "闭环演奏期间真的在读舵机位置" },
+
+  { name: "顶死保护没了（一根卡住的手指被永久静音）",
+    file: "web_piano_glove.html",
+    find: "  if(now - (S.tgtAt[slot] || 0) > stuckMs()) return true;   // 顶死太久，不再等它",
+    repl: "  if(false) return true;   // 变异：永远干等",
+    expect: "顶死保护：等太久就不再干等这根手指" },
+
   { name: "急停后不记「待重新使能」",
     file: "web_piano_glove.html",
     find: '      S.needArm = true;\n      setTimeout(refreshInfo, 400);\n    }\n  }else{',
@@ -161,7 +192,7 @@ const MUTANTS = [
     expect: "④ 急停（■ 停止）也是断电" },
 ];
 
-/* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把 12 个都重跑一遍：
+/* 只跑名字里含某个片段的变异 —— 改完一处断言后不必把全部变异都重跑一遍：
      node mutate_play.js 幅度 */
 const ONLY = process.argv[2] || "";
 
@@ -211,7 +242,7 @@ function restoreFromBackup(p){
 /* ★ 开跑前 / 收尾后都验一遍：每一处「本该在」的片段是否都还在。
    残留变异的表现是「变异点找不到」+「源码静默带毒」，光靠 heal 挡不住
    （备份本身也可能就是脏的）。这里直接把磁盘读回来核对，宁可当场停 ——
-   带着一处假改动跑完 181 项、还绿着提交，才是真正的灾难。 */
+   带着一处假改动跑完满满一屏断言、还绿着提交，才是真正的灾难。 */
 function verifyClean(){
   const dirty = [];
   for(const m of MUTANTS){

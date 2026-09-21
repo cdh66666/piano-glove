@@ -148,9 +148,17 @@ function metaKinds(buf){
   await page.waitForTimeout(150);
   check("INFO 已读取", (await txt("#infoKv")).includes("PIANO_GLOVE_2"), (await txt("#infoKv")).slice(0, 60));
   check("初始档位是 SC09（与真板一致）", (await txt("#infoKv")).includes("SC09"));
+  /* ★ 用户的要求是「不管哪套舵机都能适配」（手上除 STS3032 还有一套 SC09）。
+     所以 SC09 是**受支持的档位**，不能像以前那样一律标红「应为 STS3032」——
+     那正是"换一套舵机就不认"的来源。 */
+  check("SC09 是受支持的档位，不判成「错误档位」",
+    !/应为/.test(await txt("#infoKv")), (await txt("#infoKv")).slice(0, 90));
+  check("档位读数带量程与到位容差（闭环判「到位」靠的就是这个数）",
+    /到位容差/.test(await txt("#infoKv")), (await txt("#infoKv")).slice(0, 90));
   await click("#btnProfile");
   await page.waitForTimeout(500);
-  check("切档后为 STS3032", (await txt("#infoKv")).includes("STS3032"));
+  check("「自动识别档位」认出板子上挂的是 STS3032",
+    (await txt("#infoKv")).includes("STS3032"), (await txt("#infoKv")).slice(0, 90));
   await shot("02-connected");
 
   /* ---------- 2. 编号 6 轮 ---------- */
@@ -539,8 +547,8 @@ function metaKinds(buf){
      - 下限要留底：力度 0.2 的音若只按 20%，手指几乎不动、看着像没反应。
      所以断言拆成"至少到过 100%" + "从不低于 40%"，而不是"每根都是 100%"
      —— 后者在「跟随力度」默认打开后就自相矛盾了。 */
-  check("深度落在合理区间（不超过校准行程，也不低于 40% 底限）",
-    barPeak.every(v => v >= 40 && v <= 100.5), barPeak.map(v => v + "%").join(" "));
+  check("深度落在合理区间（不超过校准行程，也不低于力度映射的底限）",
+    barPeak.every(v => v >= 20 && v <= 100.5), barPeak.map(v => v + "%").join(" "));
   /* ⚠️ 不要断言"每根手指都按到 100%"：那要求曲子里有 vel=1.0 的音，
      而取样的这首力度统一是 90/127 —— 断言本身就成了错的（踩过一次）。
      "强音按到底"这条性质由下面 ampOf(1) === 1 直接保证。
@@ -559,7 +567,10 @@ function metaKinds(buf){
   const ampRange = await page.evaluate(() => {
     const vels = S.plan.events.filter(e => e.on).map(e => e.vel);
     const dp = fingerDepth();
-    const want = v => 0.45 + 0.55 * Math.max(0, Math.min(1, v));   // 独立写一遍
+    /* ★ 底限从 0.45 改成 0.20，是用户「按压幅度应该是根据曲子声音强弱定的」
+       的直接后果：原来弱音也有 45% 行程，动态范围被压成 2.2:1，强弱听不出来；
+       现在 20%~100%，5:1。改这里之前先回去读 ampOf() 上头的注释。 */
+    const want = v => 0.20 + 0.80 * Math.max(0, Math.min(1, v));   // 独立写一遍
     return { lo: Math.round(want(Math.min(...vels)) * dp * 100),
              hi: Math.round(want(Math.max(...vels)) * dp * 100),
              minVel: Math.min(...vels), maxVel: Math.max(...vels) };
@@ -581,8 +592,8 @@ function metaKinds(buf){
     el.checked = was;
     return { on, off };
   });
-  check("力度映射：强音 = 满行程、弱音 = 45% 底限、中间单调",
-    ampMap.on.hi === 1 && Math.abs(ampMap.on.lo - 0.45) < 1e-9 &&
+  check("力度映射：强音 = 满行程、弱音 = 20% 底限、中间单调",
+    ampMap.on.hi === 1 && Math.abs(ampMap.on.lo - 0.20) < 1e-9 &&
     ampMap.on.mid > ampMap.on.lo && ampMap.on.mid < ampMap.on.hi,
     JSON.stringify(ampMap.on));
   check("取消「跟随力度」后每个音都走满行程",
@@ -643,12 +654,16 @@ function metaKinds(buf){
     timeChk.map(t => t.sp + "%:" + (t.minGap === null ? "—" : Math.round(t.minGap) + "ms")).join(" "));
 
   /* 行程时间是个真旋钮：调大它，同一根手指被占得久，丢音必须变多。
-     如果调了没反应，说明这个参数根本没接进 plan。 */
+     如果调了没反应，说明这个参数根本没接进 plan。
+
+     ⚠️ 这个数已经**不从输入框来**了 —— 它是「📏 自测」量出来存进浏览器的
+     （用户原话：行程时间是程序自己测的，不该让人手填）。
+     所以这里也走那条**真正的写入路径** setStrokeMs()，而不是自己塞 localStorage：
+     自己塞的话，测的就是"存储格式"而不是"这个参数有没有接进规划"。 */
   const strokeSweep = await page.evaluate(async () => {
-    const el = $("#fStroke");
     const set = async v => {
-      el.value = String(v);
-      el.dispatchEvent(new Event("input"));
+      setStrokeMs(v);
+      analyze();
       await new Promise(r => setTimeout(r, 60));
       return { stroke: strokeMs(), dropped: (S.plan.droppedNotes || []).length };
     };
@@ -676,9 +691,8 @@ function metaKinds(buf){
     sel.dispatchEvent(new Event("change"));
     await new Promise(r => setTimeout(r, 600));
 
-    const st = document.querySelector("#fStroke");
     const setStroke = async v => {
-      st.value = String(v); st.dispatchEvent(new Event("input"));
+      setStrokeMs(v); analyze();
       await new Promise(r => setTimeout(r, 100));
     };
     await setStroke(150);                     // 把行程调大，保证一定丢音
@@ -908,8 +922,7 @@ function metaKinds(buf){
        远大于一帧的量化误差（16.7ms），"起音点有没有被算进去"才测得出来。
        用默认 90ms 时预期提前量是 −40ms，和"完全没减行程"只差 45ms，
        被帧量化吃掉一半就滑进容差里 —— 又是一个假绿。测完还原。 */
-    const stEl = document.querySelector("#fStroke");
-    stEl.value = "200"; stEl.dispatchEvent(new Event("input"));
+    setStrokeMs(200); analyze();
     await new Promise(r => setTimeout(r, 400));
 
     const allEl = document.querySelector("#sndAll");
@@ -945,7 +958,7 @@ function metaKinds(buf){
     const snap = { stroke: S.plan.stroke, attack: S.sndAttack, lead: S.sndLead };
 
     allEl.checked = wasAll;
-    stEl.value = "90"; stEl.dispatchEvent(new Event("input"));   // 还原行程，别影响后面的断言
+    setStrokeMs(90); analyze();   // 还原行程，别影响后面的断言
     await new Promise(r => setTimeout(r, 200));
 
     /* 第 i 次 tone 调用 = 第 i 个 on 事件（声音游标按事件顺序推进，同一个来源） */
@@ -1437,6 +1450,132 @@ function metaKinds(buf){
   await shot("08d-disarm");
 
   /* ---------- 6. 日志 ---------- */
+  /* ---------- 5h. 演奏闭环：等舵机做到位（2026-09-21） ----------
+     用户原话：「手指行程时间这个是程序自己测的啊，总线舵机有反馈的啊，
+     不是说曲子一直放、命令一直发，不管有没有完成一个按下抬起，是要有反馈的啊啊啊」。
+
+     这里验五件事：
+       ① 演奏期间**真的在问位置**（POSALL 轮询跑起来了）；
+       ② 舵机报"上一次还没做完"时，那个按下**真的被丢掉**（丢音保节奏）；
+       ③ 丢按下**连它的松开一起丢** —— 只丢一半的话那根手指会被永久按住；
+       ④ 一根卡住的舵机不会把整首曲子拖哑（别的手指照常演奏，它自己也不会被永久静音）；
+       ⑤ 判"到位"的容差以**固件报的 pos_tol** 为准，页面不自己拍一个。
+
+     ⚠️ 模拟固件里正常的 MOVE 是瞬时的（一按就到），闭环一个音都不会丢 ——
+     要让"没做完"真的发生，必须用 T.mock.simLag() 把某根手指变成"慢半拍"。
+     这个开关只给自测用，界面上没有任何入口。 */
+  console.log("\n=== 5h. 演奏闭环：等舵机做到位 ===");
+  const loopChk = await page.evaluate(async () => {
+    const sel = document.querySelector("#songLib");
+    sel.value = String(SONG_LIB.findIndex(s => s.slug === "revolutionary"));
+    sel.dispatchEvent(new Event("change"));
+    await new Promise(r => setTimeout(r, 600));
+    document.querySelector("#speed").value = "250";
+    document.querySelector("#speed").dispatchEvent(new Event("input"));
+    setStrokeMs(150);
+    analyze();
+    await new Promise(r => setTimeout(r, 150));
+
+    /* 挑**最忙**的那根参与演奏的手指：它才有足够多的按下，丢没丢看得出来 */
+    const cnt = {};
+    S.plan.events.filter(e => e.on).forEach(e => { cnt[e.slot] = (cnt[e.slot] || 0) + 1; });
+    const slot = PLAY_SLOTS.reduce((a, b) => ((cnt[b] || 0) > (cnt[a] || 0) ? b : a), PLAY_SLOTS[0]);
+    const id   = slotIdOf(slot);
+    const sb   = +((S.slots[slot] || {}).standby || 0);
+
+    /* 数本次演奏真的发出去了哪些命令：包一层 T.fire（模拟固件也走这条路） */
+    const origFire = T.fire.bind(T);
+    const seen = [];
+    T.fire = c => { seen.push(c); return origFire(c); };
+    /* 顺便数 POSALL 被问了几次 —— 闭环的前提是"真的在读位置" */
+    const origPoll = T.pollPos.bind(T);
+    let polls = 0;
+    T.pollPos = async () => { polls++; return origPoll(); };
+
+    const run = async lag => {
+      T.mock.simLag(lag);
+      seen.length = 0; polls = 0;
+      document.querySelector("#loop").checked = false;
+      if(S.info.armed !== "1"){ await T.send("ARM", 3000); await refreshInfo(); }
+      document.querySelector("#btnPlay").click();
+      await new Promise(r => setTimeout(r, 3200));
+      const lost = S.lostLoop;                       // 趁还在演奏时读
+      const my   = seen.filter(c => c.startsWith("MOVE " + id + " "));
+      const rel  = my.filter(c => +c.split(/\s+/)[2] === sb).length;
+      document.querySelector("#btnStop").click();
+      await new Promise(r => setTimeout(r, 250));
+      return { polls, lost, prs: my.length - rel, rel,
+               others: seen.filter(c => c.startsWith("MOVE ") &&
+                                        !c.startsWith("MOVE " + id + " ")).length };
+    };
+
+    const off = await run([]);          // 基准：伺服正常
+    const on  = await run([slot]);      // 把这根手指变成"慢半拍"
+
+    /* 判「到位」的闸门：直接喂给它三组状态，看它怎么判。
+       这样验的是**那个函数**，不用靠"演奏时数命令"去间接猜。 */
+    const keep = { pos: S.pos.slice(), tgt: S.tgt.slice(), at: S.tgtAt.slice() };
+    const now  = performance.now();
+    S.tgt[slot] = 3000; S.pos[slot] = 1000; S.tgtAt[slot] = now;
+    const farBehind = slotReady(slot, now);                      // 差得远 → 不许动
+    S.pos[slot] = 3000 - (posTolOf() - 1 > 0 ? posTolOf() - 1 : 0);
+    const withinTol = slotReady(slot, now);                      // 容差之内 → 放行
+    S.pos[slot] = 1000; S.tgtAt[slot] = now - 60000;
+    const timedOut  = slotReady(slot, now);                      // 顶死太久 → 不再干等
+    S.pos = keep.pos; S.tgt = keep.tgt; S.tgtAt = keep.at;
+
+    /* 容差以固件报的为准 */
+    const keepTol = S.info.pos_tol;
+    S.info.pos_tol = "999";
+    const fromFw = posTolOf();
+    delete S.info.pos_tol;
+    const fromCalc = posTolOf();
+    S.info.pos_tol = keepTol;
+
+    T.mock.simLag([]);
+    T.fire = origFire; T.pollPos = origPoll;
+    document.querySelector("#speed").value = "100";
+    document.querySelector("#speed").dispatchEvent(new Event("input"));
+    setStrokeMs(90); analyze();
+    await new Promise(r => setTimeout(r, 200));
+    return { off, on, slot, id, farBehind, withinTol, timedOut, fromFw, fromCalc, cnt: cnt[slot] };
+  });
+  check("闭环演奏期间真的在读舵机位置（POSALL 轮询跑起来了）",
+    loopChk.off.polls >= 15, loopChk.off.polls + " 次位置读数 / 约 3.2s");
+  check("伺服正常时闭环不丢任何音（它不是「无缘无故就丢」）",
+    loopChk.off.lost === 0 && loopChk.off.prs > 0 && loopChk.off.prs === loopChk.off.rel,
+    `按下 ${loopChk.off.prs} / 松开 ${loopChk.off.rel}，丢音 ${loopChk.off.lost}`);
+  check("★ 舵机没做到位时，那个按下真的被丢掉（丢音保节奏）",
+    loopChk.on.lost > 0 && loopChk.on.prs < loopChk.off.prs,
+    `慢手指按下 ${loopChk.on.prs}（正常时 ${loopChk.off.prs}），闭环丢音 ${loopChk.on.lost}`);
+  check("★ 丢按下必须连它的松开一起丢（只丢一半会把那根手指永久按住）",
+    loopChk.on.prs === loopChk.on.rel,
+    `按下 ${loopChk.on.prs} / 松开 ${loopChk.on.rel}`);
+  check("一根卡住的舵机不会拖哑整首曲子（别的手指照常演奏）",
+    loopChk.on.others > 0, "其余手指仍发出 " + loopChk.on.others + " 条动作命令");
+  check("闸门：差得远就拦、容差之内放行",
+    loopChk.farBehind === false && loopChk.withinTol === true,
+    "差得远 → " + loopChk.farBehind + "，容差内 → " + loopChk.withinTol);
+  check("顶死保护：等太久就不再干等这根手指（否则它会被永久静音）",
+    loopChk.timedOut === true, "超时后放行 → " + loopChk.timedOut);
+  check("★ 到位容差以**固件报的 pos_tol** 为准（页面不自己拍一个）",
+    loopChk.fromFw === 999, "固件报 999 时页面用了 " + loopChk.fromFw);
+  check("固件没报容差时才退回「量程 ÷ 164」这条同款公式",
+    loopChk.fromCalc === 24, "退回算出来 " + loopChk.fromCalc);
+
+  const clUi = await page.evaluate(() => {
+    const el = document.querySelector("#closedLoop");
+    const def = el.checked;
+    el.checked = false; el.dispatchEvent(new Event("change"));
+    const off = { ls: localStorage.getItem("pg_closed_loop"), fn: closedLoopOn() };
+    el.checked = true; el.dispatchEvent(new Event("change"));
+    const on = { ls: localStorage.getItem("pg_closed_loop"), fn: closedLoopOn() };
+    return { def, off, on };
+  });
+  check("「闭环演奏」默认打开，且这个选择存得住（不是只改一个内存标志）",
+    clUi.def === true && clUi.off.ls === "0" && clUi.off.fn === false &&
+    clUi.on.ls === "1" && clUi.on.fn === true, JSON.stringify(clUi));
+
   console.log("\n=== 6. 日志页 ===");
   await click('#tabbar button[data-p="log"]');
   await page.waitForTimeout(300);
