@@ -2184,6 +2184,21 @@ async function refreshCal(){
   const snap = {};
   lines.filter(l => l.startsWith("CAL slot")).forEach(l => { const d = kv(l); snap[+d.slot] = d; });
   if(Object.keys(snap).length) renderCalTable(snap);
+  /* ★ 板子里已经有完整的 6 槽数据时，必须让「保存校准结果」可点。
+     原来它只在「本次会话完整跑完一次采样」之后才启用（见 btnCalStart 那条
+     定时器的收尾），于是刷新一下页面，数据明明还在板子里、按钮却是灰的，
+     calibrated 就永远是 0 —— 演奏页被闸门整个锁住，用户看到的只是
+     「演奏没声音」。数据已经在板子上，没有理由不让人保存。 */
+  const allValid = [0,1,2,3,4,5].every(s => snap[s] && String(snap[s].valid) === "1");
+  const btn = $("#btnCalSave"), msg = $("#calMsg");
+  if(allValid && S.info.calibrated !== "1"){
+    if(btn) btn.disabled = false;
+    if(msg && /未开始|已清空/.test(msg.textContent || "")){
+      msg.className = "msg warn";
+      msg.textContent = "板子里已经有完整的校准数据 —— 点「保存校准结果」就能解锁演奏。"
+                      + "（如果刚换过固件、或动过连杆／手指结构，建议重新采一次再保存。）";
+    }
+  }
   return snap;
 }
 function renderCalTable(snap){
@@ -2199,11 +2214,19 @@ function renderCalTable(snap){
     const amp = Math.max(0, mx - mn);
     const pctv = Math.round(amp / rng * 100);
     const tooSmall = amp > 0 && pctv < 25;
+    /* ★ 另一个极端也要标出来：**跨度接近满量程**多半不是"这根手指真能走这么多"，
+       而是行程跨在了编码器 0/4095 的接缝上（静止位在 4094、按下时读数绕回 0 附近），
+       极值法就会算出 min=2 / max=4094 这种 4092 的假行程。
+       危害是双重的：演奏时这根手指会真的走满整圈（拧连杆），
+       而表格里它偏偏显示成最好看的 100%（"幅度怎么这么大"没人会怀疑）。
+       分辨方法：看 standby 是不是贴着量程顶端/底端。 */
+    const tooBig   = pctv > 90;
     tb.insertAdjacentHTML("beforeend",
       "<tr><td>" + s + "</td><td>" + SLOTS[s] + "</td><td>" + esc(samples) + "</td><td>" + mn + "</td><td>" + mx +
       '</td><td><div class="bar" style="height:12px;min-width:60px"><i style="left:0;width:' + pctv + '%"></i></div>' +
-      '<span style="font-size:12px;color:' + (tooSmall ? "var(--red)" : "var(--sub)") + '"> ' + pctv + "%</span>" +
-      (tooSmall ? ' <span class="chip bad">幅度太小</span>' : "") + "</td></tr>");
+      '<span style="font-size:12px;color:' + ((tooSmall || tooBig) ? "var(--red)" : "var(--sub)") + '"> ' + pctv + "%</span>" +
+      (tooSmall ? ' <span class="chip bad">幅度太小</span>' : "") +
+      (tooBig ? ' <span class="chip bad">跨度异常 · 可能跨过编码器接缝，建议重采</span>' : "") + "</td></tr>");
   }
 }
 
@@ -3635,7 +3658,14 @@ window.addEventListener("pagehide", () => {
 });
 $("#btnPlay").onclick = async () => {
   if(S.playing){ stopPlay(false); return; }
-  if(!S.plan || !S.plan.events.length) return;
+  /* ⚠️ 不能静默返回。用户点了按钮却"什么都没发生"，只会以为按钮坏了
+     或者"演奏没声音" —— 曾经就是这样：没载入曲子时这里直接 return，
+     页面上一点反馈都没有。点了就得给一句话说清为什么。 */
+  if(!S.plan || !S.plan.events.length){
+    $("#planMsg").className = "msg err";
+    $("#planMsg").textContent = "还没载入曲子 —— 先在上面「曲库」里挑一首（或导入 MIDI），再点开始演奏。";
+    return;
+  }
 
   /* ★ 必须在第一个 await **之前**解锁音频。
      下面那句 `await T.send("ARM", …)` 一旦执行，用户手势就过期了，
