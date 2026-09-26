@@ -16,7 +16,7 @@
 #include "scs_bus.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.2.2"
+#define FW_VER "2.2.3"
 // 2.2.0: 型号 / 位置量程改成**从舵机读回来**（STS3032 + SC09 双适配）；
 //        新增 POSALL 一帧读回全部槽位位置（演奏闭环的心跳）。
 // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
@@ -268,6 +268,25 @@ static void cmdCal(const int n, char **t) {
     okf("CAL count=%d complete=%d", v, (v == glove::SLOT_COUNT) ? 1 : 0);
     return;
   }
+  if (strcmp(sub, "HIST") == 0) {
+    // 把采样**轨迹**吐出来（直方图），只报非零桶：`bin:count` 空格分隔。
+    // 存在的意义：min/max 里看不出采样被污染，轨迹里一眼就能看出
+    // "主流分布在哪、哪些是孤零零的离群桶"。
+    const int only = (n >= 3) ? atoi(t[2]) : -1;        // -1 = 全部 6 个槽
+    const int bins = glove::autoHistBins();
+    for (int s = 0; s < glove::SLOT_COUNT; ++s) {
+      if (only >= 0 && s != only) continue;
+      Serial.printf("CAL_HIST slot=%d bins=%d bw=%u n=%u", s, bins,
+                    (unsigned)glove::autoHistBw(), (unsigned)glove::autoSamples(s));
+      for (int b = 0; b < bins; ++b) {
+        const uint16_t c = glove::autoHist(s, b);
+        if (c) Serial.printf(" %d:%u", b, (unsigned)c);
+      }
+      Serial.println();
+    }
+    okf("CAL HIST done");
+    return;
+  }
   if (strcmp(sub, "CLEAR") == 0) {
     glove::calClear();
     glove::torqueAll(false);
@@ -334,9 +353,12 @@ static void cmdCal(const int n, char **t) {
     }
     if (strcmp(a, "STATUS") == 0) {
       for (int s = 0; s < glove::SLOT_COUNT; ++s) {
-        sayf("CAL_AUTO slot=%d samples=%u min=%u max=%u last=%d", s,
-             (unsigned)glove::autoSamples(s), (unsigned)glove::autoMin(s),
-             (unsigned)glove::autoMax(s), (int)glove::autoLast(s));
+        sayf("CAL_AUTO slot=%d samples=%u min=%u max=%u last=%d lo=%u hi=%u drop=%u bad=%u wrap=%d",
+             s, (unsigned)glove::autoSamples(s), (unsigned)glove::autoMin(s),
+             (unsigned)glove::autoMax(s), (int)glove::autoLast(s),
+             (unsigned)glove::autoLo(s), (unsigned)glove::autoHi(s),
+             (unsigned)glove::autoDrop(s), (unsigned)glove::autoBad(s),
+             glove::autoWrap(s) ? 1 : 0);
       }
       okf("CAL AUTO STATUS active=%d", glove::autoActive() ? 1 : 0);
       return;
@@ -344,6 +366,16 @@ static void cmdCal(const int n, char **t) {
     if (strcmp(a, "FINISH") == 0) {
       glove::autoFinish();
       glove::torqueAll(false);
+      // 采样结论：每根手指的轨迹算出了什么。
+      // drop 大 = 采样被离群读数污染过（已剔除，不影响结果）；
+      // wrap=1 = 行程真的跨了编码器 0/4095 接缝，这根手指算不了行程，要挪齿位重装。
+      for (int s = 0; s < glove::SLOT_COUNT; ++s) {
+        const uint16_t lo = glove::autoLo(s), hi = glove::autoHi(s);
+        sayf("CAL_DONE slot=%d n=%u lo=%u hi=%u span=%u drop=%u bad=%u wrap=%d",
+             s, (unsigned)glove::autoSamples(s), (unsigned)lo, (unsigned)hi,
+             (unsigned)((hi > lo) ? (hi - lo) : 0), (unsigned)glove::autoDrop(s),
+             (unsigned)glove::autoBad(s), glove::autoWrap(s) ? 1 : 0);
+      }
       okf("CAL AUTO FINISH torque=off");
       return;
     }

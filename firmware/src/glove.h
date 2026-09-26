@@ -71,8 +71,16 @@ void     autoFinish();
 void     autoCancel();
 uint32_t autoSamples(int s);
 int16_t  autoLast(int s);
-uint16_t autoMin(int s);
+uint16_t autoMin(int s);       // 原始极值（可能被离群读数污染）
 uint16_t autoMax(int s);
+uint16_t autoLo(int s);        // 稳健区间：从采样轨迹主簇里算出来的，剔掉了离群
+uint16_t autoHi(int s);
+uint32_t autoDrop(int s);      // 被判为离群、没进稳健区间的样本数
+uint32_t autoBad(int s);       // 读到无效位置（负值）的次数，压根没进轨迹
+bool     autoWrap(int s);      // 行程跨过编码器 0/4095 接缝 —— 这套装法算不了行程
+int      autoHistBins();       // 轨迹直方图的桶数
+uint16_t autoHistBw();         // 每个桶覆盖多少计数（随量程走）
+uint16_t autoHist(int s, int b);
 
 // 扫频：行程 depth% 、频率 freq、持续 dur
 bool     sweepStart(uint8_t mask, uint16_t freqMilliHz, uint8_t depthPct, uint32_t durMs,

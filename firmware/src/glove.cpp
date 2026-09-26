@@ -36,6 +36,22 @@ uint16_t g_autoMin[SLOT_COUNT];
 uint16_t g_autoMax[SLOT_COUNT];
 uint32_t g_autoTickMs   = 0;
 
+// 采样期的**轨迹**（直方图）。
+//
+// 只记 min/max 是不够的 —— 实测踩到过：食指静止在 4077，离编码器 4095/0
+// 接缝只剩 18 个计数，采样期一次越过接缝的读数（2）就把它算成行程 4092
+// （满量程），而这只手指的真实行程只有 500 上下。min/max 里看不出任何异常，
+// 因为**离群值和真值一样"合法"**。
+//
+// 直方图是轨迹的压缩表示：结束时靠它剔离群、并认出"行程跨过接缝"。
+constexpr int HIST_BINS = 128;
+uint16_t g_autoHist[SLOT_COUNT][HIST_BINS];
+uint32_t g_autoBad[SLOT_COUNT];     // 读到负位置（无效反馈）的次数 —— 不计入轨迹
+uint16_t g_autoLo[SLOT_COUNT];      // 稳健区间：剔掉离群后真正的主簇范围
+uint16_t g_autoHi[SLOT_COUNT];
+uint32_t g_autoDrop[SLOT_COUNT];    // 被判为离群、没进稳健区间的样本数
+bool     g_autoWrap[SLOT_COUNT];    // 主簇绕过了编码器零点（行程跨接缝）
+
 // ---- 扫频 ----
 bool     g_sweep        = false;
 uint8_t  g_swMask       = 0;
@@ -303,8 +319,16 @@ void tick() {
         if (!scs::readFeedback(g_slot[s].id, fb)) continue;
         g_slot[s].online = true;
         g_slot[s].last   = fb.pos;
-        const uint16_t p = clampPos(fb.pos);
-        if (g_autoN[s] == 0) {
+        // ★ 负位置 = 无效反馈，直接跳过，别让它进轨迹。
+        //   原实现走 clampPos()，而 clampPos 把"负数"当"越界"钳到 0 ——
+        //   于是读失败的 -1 被伪装成"手指在量程零点"，成了最脏的那个离群值。
+        if (fb.pos < 0) { ++g_autoBad[s]; continue; }
+        const uint16_t p   = clampPos(fb.pos);
+        const uint16_t rng = scs::profile().range;
+        int bin = (int)((uint32_t)p * HIST_BINS / (rng ? rng : 1));
+        if (bin >= HIST_BINS) bin = HIST_BINS - 1;
+        ++g_autoHist[s][bin];            // 轨迹：这一帧落在哪个桶
+        if (g_autoN[s] == 0) {           // 极值照旧记 —— 上报时和稳健区间对照着看
           g_autoMin[s] = p;
           g_autoMax[s] = p;
         } else {
@@ -493,6 +517,12 @@ void autoStart() {
     g_autoN[s]   = 0;
     g_autoMin[s] = 4095;
     g_autoMax[s] = 0;
+    memset(g_autoHist[s], 0, sizeof(g_autoHist[s]));
+    g_autoBad[s]  = 0;
+    g_autoLo[s]   = 0;
+    g_autoHi[s]   = 0;
+    g_autoDrop[s] = 0;
+    g_autoWrap[s] = false;
   }
   g_auto       = true;
   g_autoTickMs = 0;
@@ -505,13 +535,95 @@ uint32_t autoSamples(int s) { return (s >= 0 && s < SLOT_COUNT) ? g_autoN[s] : 0
 int16_t  autoLast(int s)    { return (s >= 0 && s < SLOT_COUNT) ? g_slot[s].last : -1; }
 uint16_t autoMin(int s)     { return (s >= 0 && s < SLOT_COUNT) ? g_autoMin[s] : 0; }
 uint16_t autoMax(int s)     { return (s >= 0 && s < SLOT_COUNT) ? g_autoMax[s] : 0; }
+uint16_t autoLo(int s)      { return (s >= 0 && s < SLOT_COUNT) ? g_autoLo[s] : 0; }
+uint16_t autoHi(int s)      { return (s >= 0 && s < SLOT_COUNT) ? g_autoHi[s] : 0; }
+uint32_t autoDrop(int s)    { return (s >= 0 && s < SLOT_COUNT) ? g_autoDrop[s] : 0; }
+uint32_t autoBad(int s)     { return (s >= 0 && s < SLOT_COUNT) ? g_autoBad[s] : 0; }
+bool     autoWrap(int s)    { return (s >= 0 && s < SLOT_COUNT) ? g_autoWrap[s] : false; }
+int      autoHistBins()     { return HIST_BINS; }
+uint16_t autoHistBw() {
+  return (uint16_t)(((int)scs::profile().range + HIST_BINS - 1) / HIST_BINS);
+}
+uint16_t autoHist(int s, int b) {
+  return (s >= 0 && s < SLOT_COUNT && b >= 0 && b < HIST_BINS) ? g_autoHist[s][b] : 0;
+}
+
+// 从采样轨迹（直方图）里挑出「主簇」—— 样本最集中的那段连续桶。
+//
+// 返回被丢弃的样本数；lo/hi 输出该簇覆盖的位置范围。
+// 若主簇绕过了编码器零点（行程真的跨 0/4095 接缝），标记 wrap 并把 lo/hi 留 0 ——
+// lo/hi 这两个 uint16 表达不了环形区间，硬塞进去只会算错，不如交给上层报警。
+//
+// 判据用「桶内样本数是否达标」而不是「桶是否非空」：单点噪声只占 1 个样本，
+// 0.5% 的阈值天然把它挡在外面，而真轨迹的边缘桶总会有几十个样本。
+// 直接用 min/max 的教训见 g_autoHist 的注释（食指被一次越缝读数撑成满量程）。
+static uint32_t robustRange(int s, uint16_t &lo, uint16_t &hi) {
+  const uint16_t rng = scs::profile().range;
+  const uint32_t N   = g_autoN[s];
+  lo = 0;
+  hi = 0;
+  if (!N) return 0;
+
+  const int      bw  = ((int)rng + HIST_BINS - 1) / HIST_BINS;
+  const uint32_t thr = (N / 200) ? (N / 200) : 1;      // 0.5% 样本，至少 1
+
+  // 环形扫描所有「连续达标桶段」，取样本最多的那段当主簇。
+  int bestSum = -1, bestStart = 0, bestLen = 0;
+  for (int i = 0; i < HIST_BINS; ++i) {
+    if (g_autoHist[s][(i + HIST_BINS - 1) % HIST_BINS] >= thr) continue;  // 前一桶也达标 -> 不是段首
+    int sum = 0, len = 0;
+    for (int k = 0; k < HIST_BINS; ++k) {
+      const int j = (i + k) % HIST_BINS;
+      if (g_autoHist[s][j] < thr) break;
+      sum += g_autoHist[s][j];
+      ++len;
+    }
+    if (sum > bestSum) {
+      bestSum = sum;
+      bestStart = i;
+      bestLen = len;
+    }
+  }
+
+  if (bestLen == 0) {                                   // 没有达标桶：样本太散，退回极值
+    lo = g_autoMin[s];
+    hi = g_autoMax[s];
+    return 0;
+  }
+  if (bestStart + bestLen > HIST_BINS) {                // 主簇绕过桶 0 = 行程跨编码器零点
+    g_autoWrap[s] = true;
+    return N;                                           // 全丢：交给上层报警，别静默算错
+  }
+
+  const int a = bestStart * bw;
+  int       b = (bestStart + bestLen - 1) * bw + bw - 1;
+  if (b > (int)rng) b = (int)rng;
+  lo = (uint16_t)a;
+  hi = (uint16_t)b;
+  return N - (uint32_t)bestSum;
+}
 
 void autoFinish() {
   g_auto = false;
   for (int s = 0; s < SLOT_COUNT; ++s) {
     if (g_autoN[s] == 0) continue;
-    g_slot[s].lo = g_autoMin[s];
-    g_slot[s].hi = g_autoMax[s];
+    uint16_t       lo   = 0, hi = 0;
+    const uint32_t drop = robustRange(s, lo, hi);
+    g_autoDrop[s] = drop;
+    if (g_autoWrap[s]) {
+      // 行程真的跨了编码器零点：这不是软件能"修"的 —— 按下行程在这里是环形的，
+      // 线性插值必然算错。保持该槽无效，让用户挪齿位重装（或用手工校准兜底）。
+      g_slot[s].valid = false;
+      continue;
+    }
+    if (lo >= hi) {                                     // 退化成一个桶：沿用旧行为，交给 CAL SAVE 判幅度
+      lo = g_autoMin[s];
+      hi = g_autoMax[s];
+    }
+    g_autoLo[s] = lo;
+    g_autoHi[s] = hi;
+    g_slot[s].lo = lo;
+    g_slot[s].hi = hi;
     // ★ 静止位 = **松开端**，不是量程中点。
     //
     // 这里原来是 (min+max)/2。同一份校准下：
