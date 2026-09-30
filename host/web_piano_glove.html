@@ -4565,7 +4565,7 @@ class StrictActionExecutor{
         if((file.benchQuick||file.fullStroke)&&(!internalSlots||file.quickDemo!==true))throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
         for(const slot of slots){const {lo,hi}=motionBounds(slot,profile);slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke||!internalSlots){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);slot.rest=slot.lift;}}
       }
-      if(file.holdThumbSide||!internalSlots){const midpoint=Math.round((slots[0].low+slots[0].high)/2);slots[0]={...slots[0],holdMidpoint:true,midpoint,rest:midpoint,press:midpoint,lift:midpoint};}
+      if(file.holdThumbSide||!internalSlots){const midpoint=Math.round((slots[0].low+slots[0].high)/2),holdPosition=(file.rhythmDemo||!internalSlots)?slots[0].lift:midpoint;slots[0]={...slots[0],holdMidpoint:true,holdPosition,midpoint,rest:holdPosition,press:holdPosition,lift:holdPosition};}
       if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
       const map={1:1,2:2,3:3,4:4,5:5};
       const events=[];
@@ -4632,7 +4632,7 @@ class StrictActionExecutor{
     events.sort((a,b)=>a.t-b.t||Number(a.on)-Number(b.on));const batches=[];for(const e of events){let batch=batches.at(-1);if(!batch||batch.t!==e.t){batch={t:e.t,events:[]};batches.push(batch);}if(batch.events.some(v=>v.s===e.s))throw Error('同指抬起与按下需要留出行程时间');batch.events.push(e);}
     if(batches.some((batch,i)=>batch.t-(i?batches[i-1].t:0)>1050))throw Error('片段停顿过长，请选连续的短乐句');
     // All five playing fingers rest at their lifted endpoint, including rests and unused fingers.
-    slots=slots.map((slot,s)=>s===0?{...slot,press:slot.midpoint,lift:slot.midpoint,rest:slot.midpoint,holdMidpoint:true}:slot);
+    slots=slots.map((slot,s)=>s===0?{...slot,holdPosition:slot.holdPosition??slot.lift,press:slot.holdPosition??slot.lift,rest:slot.holdPosition??slot.lift,holdMidpoint:true}:slot);
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
       await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
@@ -4753,7 +4753,7 @@ class StrictActionExecutor{
     const modern=bench&&info.bench_feedback==='1',cached=modern&&this.lastPositions?.positions.armed==='1'&&this.lastPositions.positions.bench_active==='1'&&this.now()-this.lastPositions.at<=100;
     const profile=motionProfile(info,{requireBench:bench}),before=cached?this.lastPositions.positions:await this.positions(slots,+info.range),speed=requestedSpeed??(bench?profile.defaultBenchSpeed:profile.normalRawSpeed),goals=new Map(),arrivals=new Map();let legDeadline=Infinity,issuedAt=null,KEEP_calls=0,lastKeepAt=null,POSALL_calls=cached?0:1+(before.retries??0);
     if(bench&&(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax))throw Error('台架档位无效');
-    for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=slots[s].holdMidpoint?slots[s].midpoint:phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
+    for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=slots[s].holdMidpoint?(slots[s].holdPosition??slots[s].midpoint):phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
       if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
       const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
       if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.family==='STS'?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
@@ -4771,7 +4771,7 @@ class StrictActionExecutor{
     while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:profile.tolerance,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
       if(goals.size&&bench&&profile.family==='STS'&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
       if(!goals.size&&bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架截止已释放，不能判定到位');if(this.now()>=legDeadline)throw Error('台架到位确认超时，已停止');}
-      this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:slots[e.slot].holdMidpoint?slots[e.slot].midpoint:phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
+      this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:slots[e.slot].holdMidpoint?(slots[e.slot].holdPosition??slots[e.slot].midpoint):phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
     return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,KEEP_calls,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
   }
   async runServoGroups(file,slots,info){
