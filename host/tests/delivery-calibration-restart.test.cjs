@@ -1,0 +1,8 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+test('restart waits for cancelled capture before clearing all six slots and starting from slot zero',async()=>{
+ const source=fs.readFileSync(__dirname+'/../delivery-demo.js','utf8'),start=source.indexOf("el('demoCalStart').onclick=async()=>{"),end=source.indexOf("\nfor(const [id,kind]",start);
+ const order=[],nodes={},cards=Array.from({length:6},()=>({classList:{remove:()=>order.push('clear-card')},querySelector:()=>({textContent:''}),style:{setProperty(){}}}));
+ let release;const previous=new Promise(resolve=>release=resolve);
+ const context={restartPending:false,playing:false,enrollActive:false,enrollStarting:false,root:{},wizardRun:previous,wizardToken:1,wizardStarted:true,wizardStep:6,repairQueue:[3],pendingRepairSlots:[3],forceCalibration:false,levelHistory:Array(6).fill({old:true}),calibration:{cancel(){order.push('cancel');release();},reset(){order.push('reset');}},document:{querySelectorAll:()=>cards},el:id=>nodes[id]??=( {} ),paint(){},runCalibration(){order.push('start');assert.equal(context.wizardStep,0);assert.equal(context.wizardStarted,false);assert.equal(context.repairQueue,null);assert.equal(context.pendingRepairSlots.length,0);assert(context.levelHistory.every(x=>x===null));return Promise.resolve();}};
+ vm.runInNewContext(source.slice(start,end),context);await nodes.demoCalStart.onclick();assert.equal(order[0],'cancel');assert.equal(order[1],'reset');assert.equal(order.filter(x=>x==='clear-card').length,6);assert.equal(order.at(-1),'start');assert.equal(context.restartPending,false);
+});
