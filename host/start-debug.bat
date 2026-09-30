@@ -14,20 +14,27 @@ REM ============================================================
 
 setlocal
 set "PORT=8123"
-set "URL=http://127.0.0.1:%PORT%/web_piano_glove.html"
+set "URL=http://127.0.0.1:%PORT%/web_piano_glove.html?simple=1"
 
 REM Python: prefer the managed runtime, fall back to whatever is on PATH.
-set "PY=C:\Users\admin\.workbuddy\binaries\python\versions\3.13.12\python.exe"
-if not exist "%PY%" set "PY=python"
+set "PY=python"
+python -c "import sys; assert sys.version_info.major == 3" >nul 2>&1
+if errorlevel 1 set "PY=py -3"
+%PY% -c "import sys; assert sys.version_info.major == 3" >nul 2>&1
+if errorlevel 1 (
+    echo Python 3 is required. Install Python and enable Add Python to PATH.
+    pause
+    exit /b 1
+)
 
 pushd "%~dp0"
 
 REM ---- pyserial 是唯一的依赖，缺了就补上 ----
-"%PY%" -c "import serial" >nul 2>&1
+%PY% -c "import serial" >nul 2>&1
 if errorlevel 1 (
     echo [*] 缺 pyserial, 正在安装 ...
-    "%PY%" -m pip install --disable-pip-version-check -q pyserial
-    "%PY%" -c "import serial" >nul 2>&1
+    %PY% -m pip install --disable-pip-version-check -q -r requirements.txt
+    %PY% -c "import serial" >nul 2>&1
     if errorlevel 1 (
         echo [!] pyserial 装不上。手动跑一下:
         echo         "%PY%" -m pip install pyserial
@@ -38,7 +45,7 @@ if errorlevel 1 (
 )
 
 REM ---- 端口被占（多半是上一次的桥还在）就先收掉 ----
-"%PY%" -c "import socket,sys;s=socket.socket();r=s.connect_ex(('127.0.0.1',%PORT%));s.close();sys.exit(0 if r==0 else 1)" >nul 2>&1
+%PY% -c "import socket,sys;s=socket.socket();r=s.connect_ex(('127.0.0.1',%PORT%));s.close();sys.exit(0 if r==0 else 1)" >nul 2>&1
 if not errorlevel 1 (
     echo [*] %PORT% 已经被占用了。
     echo     如果那就是之前开的调试台，直接用它就行；要重开请先关掉那个窗口。
@@ -50,7 +57,7 @@ if not errorlevel 1 (
 echo [*] 启动串口桥 (自动扫描 + 自动连接) ...
 echo     窗口别关 —— 串口开在这个进程里。Ctrl+C 停。
 REM 桥自己会用 --open 打开浏览器，所以这里不用再 start 一次
-"%PY%" -u bridge.py --port %PORT% --open
+%PY% -u bridge.py --port %PORT% --open
 
 :done
 popd

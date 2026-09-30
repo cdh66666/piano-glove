@@ -869,7 +869,7 @@ def main(argv=None):
 
     srv = ThreadingHTTPServer((args.bind, args.port), make_handler(bridge))
     srv.daemon_threads = True
-    url = "http://%s:%d/web_piano_glove.html" % (args.bind, args.port)
+    url = "http://%s:%d/web_piano_glove.html?simple=1" % (args.bind, args.port)
 
     print("=" * 62)
     print(" 钢琴手套 · 本地串口桥")
