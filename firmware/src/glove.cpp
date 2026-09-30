@@ -1102,8 +1102,12 @@ bool calOrigin(){
  uint8_t completed=0;
  for(uint8_t id=1;id<=6;++id){
   const uint8_t center=128;uint8_t off=255,after[2]={};scs::Feedback fb;
-  const bool ack=scs::writeRegs(id,40,&center,1)&&!scs::lastError();
-  if(!ack)return fail("origin_write_unacknowledged",id);
+  const bool ack=scs::writeRegs(id,40,&center,1);
+  const int writeError=scs::lastError();
+  // Coordinate reset can suppress its own ACK. Never repeat the write: prove
+  // the resulting passive position/offset instead. A received device error
+  // remains a failure even when its coordinate changed.
+  if(writeError)return fail("origin_device_error",id);
   const uint32_t started=millis();bool verified=false;
   do{
    const bool torqueRead=scs::readRegs(id,40,1,&off)&&!scs::lastError();
@@ -1114,7 +1118,7 @@ bool calOrigin(){
   }while(millis()-started<=200);
   if(!verified||!scs::readRegs(id,31,2,after)||scs::lastError())return fail("origin_readback_timeout",id);
   completed|=1u<<(id-1);prefs.putUChar("origin_mask",completed);
-  Serial.printf("ORIGIN_SLOT id=%u old_offset=%u new_offset=%u pos=%d torque=0 verified=1 motion=0\n",id,offsets[id-1],servoWord(after,false),fb.pos);
+  Serial.printf("ORIGIN_SLOT id=%u old_offset=%u new_offset=%u pos=%d torque=0 verified=1 motion=0 write_ack=%d\n",id,offsets[id-1],servoWord(after,false),fb.pos,ack?1:0);
  }
  strcpy(g_originFailure,"none");return true;
 }
