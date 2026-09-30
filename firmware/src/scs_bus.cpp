@@ -248,8 +248,11 @@ bool moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc) {
 bool checkedBenchSpeed(uint8_t id,uint16_t speed,uint16_t &raw,uint16_t *actual){
  if(profile().family==Family::SCS){raw=speed;if(actual)*actual=speed;return speed>=50&&speed<=1000;}
  if(profile().family!=Family::STS)return false;
- uint8_t endian=255,phase=0,resolution=0,mode=255;
- if(!readRegs(id,2,1,&endian)||lastError()||!readRegs(id,18,1,&phase)||lastError()||!readRegs(id,30,1,&resolution)||lastError()||!readRegs(id,33,1,&mode)||lastError())return false;
+ // One fresh contiguous read preserves all four configuration checks while
+ // avoiding three bus request/response round trips per selected axis.
+ uint8_t config[32];
+ if(!readRegs(id,2,sizeof(config),config)||lastError())return false;
+ const uint8_t endian=config[0],phase=config[16],resolution=config[28],mode=config[31];
  if(!normalizedStsSpeed(endian,phase,resolution,mode,speed,raw))return false;
  if(actual)*actual=raw*((phase&4)?1:50);
  return true;

@@ -730,13 +730,14 @@ pre#log .sys{color:#c9a5ff}
 /* 槽位名不要手写两份：**由角色推导**。
    之前写死成"拇指侧压/拇指下压"，改一处漏一处，读数、图例、日志全是老口径。 */
 const FINGER_BASE = ["拇指", "拇指", "食指", "中指", "无名指", "小指"];
-const ROLE_DEFAULT = ["press", "latch", "press", "press", "press", "press"];
+const ROLE_DEFAULT = ["latch", "press", "press", "press", "press", "press"];
+function normalizeGloveRoles(value){return Array.isArray(value)&&value.join(',')===ROLE_DEFAULT.join(',')?value.slice():ROLE_DEFAULT.slice();}
 
 const ROLES = (function(){
   try{
     const v = String(localStorage.getItem("pg_roles") || "").split(",");
     if(v.length === 6 && v.every(x => x === "press" || x === "latch")
-       && v.filter(x => x === "latch").length <= 1) return v;
+       && v.filter(x => x === "latch").length <= 1){const migrated=normalizeGloveRoles(v);localStorage.setItem("pg_roles",migrated.join(","));return migrated;}
   }catch(e){}
   return ROLE_DEFAULT.slice();
 })();
@@ -4498,7 +4499,7 @@ function parseActionFile(input) {
     previousEnd.set(event.finger, event.t_ms + event.duration_ms);
   }
   const duration_ms = Math.max(...events.map(e => e.t_ms + e.duration_ms));
-  const warnings = ['候选格式，尚未确认甲方认可；解析通过不等于硬件安全或实际动作通过。', '执行前须确认拇指按压仍为 slot 0，侧摆为 slot 1；角色若对调，应停止并重新核对映射。'];
+  const warnings = ['候选格式，尚未确认甲方认可；解析通过不等于硬件安全或实际动作通过。', '拇指按压对应 ID2；ID1 负责侧摆，并保持行程中点。'];
   if (duration_ms > 30000) warnings.push('文件超过 30 秒，交付演示建议拆成较短段落。');
   for (let finger = 1; finger <= 5; finger++) {
     const same = events.filter(e => e.finger === finger);
@@ -4523,7 +4524,7 @@ function actionGate(info, rows, roles){
   const range=+info.range;
   if(info.fw!=='PIANO_GLOVE_2'||info.ver!=='2.2.4'||!((info.profile==='STS'&&range===4095)||(info.profile==='SCS'&&range===1023))) throw Error('仅允许经核对的 PIANO_GLOVE_2 / 2.2.4：STS 4095 或 SCS 1023');
   if(info.calibrated!=='1'||info.armed!=='0'||+info.online!==6||['auto_active','enroll_active','sweep'].some(k=>info[k]!=='0')) throw Error('先停止当前动作，并确认六路在线、已校准且未使能');
-  if(roles.join(',')!=='press,latch,press,press,press,press') throw Error('拇指角色与动作文件映射不符');
+  if(roles.join(',')!=='latch,press,press,press,press,press') throw Error('拇指角色与动作文件映射不符');
   if(rows.length!==6||new Set(rows.map(r=>+r.slot)).size!==6||new Set(rows.map(r=>+r.id)).size!==6) throw Error('需要六路唯一槽位与舵机 ID');
   const ordered=Array(6),outside=[];
   for(const r of rows){
@@ -4564,8 +4565,9 @@ class StrictActionExecutor{
         if((file.benchQuick||file.fullStroke)&&(!internalSlots||file.quickDemo!==true))throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
         for(const slot of slots){const {lo,hi}=motionBounds(slot,profile);slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
       }
+      if(file.holdThumbSide||!internalSlots){const midpoint=Math.round((slots[0].low+slots[0].high)/2);slots[0]={...slots[0],holdMidpoint:true,midpoint,rest:midpoint,press:midpoint,lift:midpoint};}
       if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
-      const map={1:0,2:2,3:3,4:4,5:5};
+      const map={1:1,2:2,3:3,4:4,5:5};
       const events=[];
       if(!Array.isArray(file.events)||!file.events.length)throw Error('没有动作');
       for(const e of file.events){
@@ -4583,6 +4585,7 @@ class StrictActionExecutor{
       await this.command('ARM');
       const armed=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
       if(armed.armed!=='1')throw Error('使能未确认');
+      if((file.holdThumbSide||!internalSlots)&&!file.rhythmDemo)await this.reach([{slot:0,amplitude:1}],slots,info,false,runStarted,0,1,true,file.benchQuick===true,{speed:file.benchQuick?file.runtimeSpeed:null,phase:'midpoint'});
       if(internalSlots)return file.rhythmDemo?await this.runRhythmDemo(file,slots,info,runStarted):await this.runServoGroups(file,slots,info);
       let targets=new Map(),positions=[],nextPoll=0,index=0;
       const range=Number(info.range),tol=info.profile==='SCS'?6:24,speed=info.profile==='SCS'?200:1200,start=this.now();
@@ -4623,12 +4626,12 @@ class StrictActionExecutor{
   async runRhythmDemo(file,slots,info,lifecycleStarted=this.now()){
     const profile=motionProfile(info,{requireBench:true});
     if(info.bench_group!=='1'||!file.fullStroke||!file.benchQuick||!file.quickDemo)throw Error('节奏展示需要已更新同步控制固件');
-    if(file.events.some(e=>![0,2,3,4,5].includes(e.slot)))throw Error('节奏曲目仅支持五根手指，拇指侧摆保持休止');
+    if(file.events.some(e=>![1,2,3,4,5].includes(e.slot)))throw Error('节奏曲目仅支持五根手指，拇指侧摆保持休止');
     if(!Number.isFinite(file.duration_ms)||file.duration_ms<=0||file.duration_ms>9000)throw Error('节奏片段最多9秒');
     const events=[];for(const e of file.events){if(e.t_ms+e.duration_ms>file.duration_ms)throw Error('动作超出曲目时长');events.push({t:e.t_ms,on:true,s:e.slot},{t:e.t_ms+e.duration_ms,on:false,s:e.slot});}
     events.sort((a,b)=>a.t-b.t||Number(a.on)-Number(b.on));const batches=[];for(const e of events){let batch=batches.at(-1);if(!batch||batch.t!==e.t){batch={t:e.t,events:[]};batches.push(batch);}if(batch.events.some(v=>v.s===e.s))throw Error('同指抬起与按下需要留出行程时间');batch.events.push(e);}
     if(batches.some((batch,i)=>batch.t-(i?batches[i-1].t:0)>1050))throw Error('片段停顿过长，请选连续的短乐句');
-    const used=new Set(file.events.map(e=>e.slot));slots=slots.map((slot,s)=>used.has(s)?slot:{...slot,lift:slot.midpoint});
+    const used=new Set(file.events.map(e=>e.slot));slots=slots.map((slot,s)=>used.has(s)?slot:{...slot,lift:slot.midpoint,holdMidpoint:s===0});
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
       await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
@@ -4666,13 +4669,14 @@ class StrictActionExecutor{
   }
   async runSpeedTest(options,roles,onProgress=()=>{}){
     if(this.active||this.pending)throw Error('已有动作正在执行或正在停止');
-    const selected=options?.slots??[0,1,2,3,4,5],requestedAmplitudes=options?.amplitudes,amplitudes=requestedAmplitudes??[1],cycles=options?.cycles??3;
-    if(!Array.isArray(selected)||!selected.length||selected.some(s=>!Number.isInteger(s)||s<0||s>5)||new Set(selected).size!==selected.length||!Array.isArray(amplitudes)||!amplitudes.length||amplitudes.some(a=>!Number.isFinite(a)||a<=0||a>1)||!Number.isInteger(cycles)||cycles<2||cycles>10)throw Error('测速参数无效');
+    const selected=options?.slots??[1,2,3,4,5],requestedAmplitudes=options?.amplitudes,amplitudes=requestedAmplitudes??[1],cycles=options?.cycles??3;
+    if(!Array.isArray(selected)||!selected.length||selected.some(s=>!Number.isInteger(s)||s<1||s>5)||new Set(selected).size!==selected.length||!Array.isArray(amplitudes)||!amplitudes.length||amplitudes.some(a=>!Number.isFinite(a)||a<=0||a>1)||!Number.isInteger(cycles)||cycles<2||cycles>10)throw Error('测速参数无效');
     this.active=true;this.cancelled=false;this.deadline=null;this.feedbackMetrics=null;this.lastPositions=null;this.feedbackRetries=0;this.feedbackArmedExpected=false;this.generation++;const results=[];
     try{
       const {info,slots}=await this.prepare(roles);
       const initial=actionKV((await this.command('RATE')).find(l=>l.startsWith('OK RATE ')));if(initial.active!=='0')throw Error('先停止当前测速');
       if(info.profile==='SCS'||info.bench_sts==='1')return await this.runFeedbackSpeedTest({selected,amplitudes,cycles,speed:options?.speed},slots,info,onProgress);
+      throw Error('请更新支持STS归一化同步控制的固件');
       if(requestedAmplitudes===undefined)amplitudes.splice(0,amplitudes.length,.25,.5,1);
       const mask='0x'+selected.reduce((m,s)=>m|(1<<s),0).toString(16);
       for(const amplitude of amplitudes){
@@ -4681,33 +4685,33 @@ class StrictActionExecutor{
         do{this.check();await this.sleep(80);const lines=await this.command('RATE');if(lines.some(l=>l.startsWith('RATE_FAILED')))throw Error('测速未到位，已停止');state=actionKV(lines.find(l=>l.startsWith('OK RATE ')));onProgress({amplitude,slots:selected,cycles,done:state.done,active:state.active==='1',results:[...results]});if(this.now()-start>45000)throw Error('测速超时，已停止');}while(state.active==='1');
         const full=+state.full_ms,hz=+state.hz;
         if(state.valid!=='1'||+state.lost!==0||state.done!==cycles+'/'+cycles||!Number.isFinite(full)||full<=0||!Number.isFinite(hz)||hz<=0)throw Error('测速反馈不完整，不能认定频率');
-        results.push({amplitude,slots:[...selected],cycles,full_ms:full,hz,feedbackVerified:true});onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length});
+        results.push({amplitude,slots:selected.filter(slot=>slot!==0),heldSlots:[0],cycles,full_ms:full,hz,feedbackVerified:true});onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length});
       }
       return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
     }finally{this.cancelled=true;this.deadline=null;this.generation++;try{await this.io.safe();}finally{this.active=false;}}
   }
   async runFeedbackSpeedTest({selected,amplitudes,cycles,speed:requestedSpeed},slots,info,onProgress){
     const profile=motionProfile(info,{requireBench:true}),speed=requestedSpeed??profile.defaultBenchSpeed;if(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax)throw Error('测速速度超出当前型号范围');
-    if(selected.length!==6)throw Error('测速需要六台舵机一起');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
-    const base=slots.map(slot=>{const {lo,hi}=motionBounds(slot,profile);const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
+    if(selected.length!==1&&selected.length!==5)throw Error('请选择单指或五指同步测速');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
+    const base=slots.map(slot=>{const {lo,hi}=motionBounds(slot,profile);const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;const midpoint=Math.round((lo+hi)/2);return {...slot,press:slot.id===1?midpoint:press,lift:slot.id===1?midpoint:lift,rest:slot.id===1?midpoint:lift,midpoint,holdMidpoint:slot.id===1};});
     const started=this.now(),results=[];let watchdog;const budget=profile.family==='STS'?Math.min(180000,Math.max(45000,(2*cycles+2)*amplitudes.reduce((n,a)=>n+Math.max(...base.map(s=>Math.abs(s.press-s.lift)*a))/speed*1000+2000,0))):45000;this.deadline=started+budget;this.feedbackMetrics={start:started,samples:0};
     const execute=async()=>{
       await this.command('ARM');if(actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO '))).armed!=='1')throw Error('使能未确认');
       for(const amplitude of amplitudes){
         this.check();const scaled=base.map(slot=>({...slot,press:Math.round(slot.lift+(slot.press-slot.lift)*amplitude),measurementTolerance:amplitude<1?Math.max(profile.feedbackTolerance,Math.min(profile.tolerance,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):profile.tolerance}));
-        if(scaled.some(slot=>Math.abs(slot.press-slot.lift)<profile.feedbackTolerance*2))throw Error('测速幅度过小，无法区分反馈噪声');
+        if(scaled.some((slot,index)=>selected.includes(index)&&!slot.holdMidpoint&&Math.abs(slot.press-slot.lift)<profile.feedbackTolerance*2))throw Error('测速幅度过小，无法区分反馈噪声');
         const group=selected.map(slot=>({slot,amplitude:1})),cfg={speed,scaledTolerance:true};
-        await this.reach(group,scaled,info,false,started,0,cycles,true,true,{...cfg,phase:'lift'});
+        await this.reach([{slot:0,amplitude:1},...group],scaled,info,false,started,0,cycles,true,true,{...cfg,phase:'lift'});
         const measureStart=this.now();let completedCycles=0;const legMetrics=[];
         for(let cycle=0;cycle<cycles;cycle++){this.check();legMetrics.push(await this.reach(group,scaled,info,true,started,cycle,cycles,true,true,cfg));this.check();legMetrics.push(await this.reach(group,scaled,info,false,started,cycle,cycles,true,true,{...cfg,phase:'lift'}));completedCycles++;onProgress({amplitude,slots:[...selected],cycles,done:completedCycles+'/'+cycles,active:true,results:[...results],...this.feedbackStats()});}
         const fullElapsed=this.now()-measureStart;if(!Number.isFinite(fullElapsed)||fullElapsed<=0||completedCycles!==cycles)throw Error('测速时间或反馈不完整，不能认定频率');
-        const result={amplitude,slots:[...selected],cycles,full_ms:fullElapsed/cycles,hz:cycles*1000/fullElapsed,elapsed_ms:fullElapsed,feedbackVerified:true,protocol:info.profile==='SCS'?'scs-feedback-ensemble-v1':'sts-feedback-ensemble-v1',family:info.profile,speed,speedUnit:profile.unit,performance:{commandMs:legMetrics.reduce((n,l)=>n+l.command_ms,0),preflightMs:legMetrics.reduce((n,l)=>n+l.preflight_ms,0),feedbackWaitMs:legMetrics.reduce((n,l)=>n+l.feedback_wait_ms,0),KEEP_calls:legMetrics.reduce((n,l)=>n+(l.KEEP_calls??0),0),INFO_calls:legMetrics.reduce((n,l)=>n+l.INFO_calls,0),POSALL_calls:legMetrics.reduce((n,l)=>n+l.POSALL_calls,0),legs:legMetrics},...this.feedbackStats()};
-        await this.reach(group,scaled,info,false,started,cycles,cycles,true,true,{...cfg,phase:'midpoint'});
+        const result={amplitude,slots:selected.filter(slot=>slot!==0),heldSlots:[0],cycles,full_ms:fullElapsed/cycles,hz:cycles*1000/fullElapsed,elapsed_ms:fullElapsed,feedbackVerified:true,protocol:info.profile==='SCS'?'scs-feedback-ensemble-v1':'sts-feedback-ensemble-v1',family:info.profile,speed,speedUnit:profile.unit,performance:{commandMs:legMetrics.reduce((n,l)=>n+l.command_ms,0),preflightMs:legMetrics.reduce((n,l)=>n+l.preflight_ms,0),feedbackWaitMs:legMetrics.reduce((n,l)=>n+l.feedback_wait_ms,0),KEEP_calls:legMetrics.reduce((n,l)=>n+(l.KEEP_calls??0),0),INFO_calls:legMetrics.reduce((n,l)=>n+l.INFO_calls,0),POSALL_calls:legMetrics.reduce((n,l)=>n+l.POSALL_calls,0),legs:legMetrics},...this.feedbackStats()};
+        await this.reach([{slot:0,amplitude:1},...group],scaled,info,false,started,cycles,cycles,true,true,{...cfg,phase:'midpoint'});
         results.push(result);onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length,active:false});
       }
       return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
     };
-    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('六台测速超时，已停止'));},budget);})]);}finally{clearTimeout(watchdog);this.deadline=null;}
+    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('五指同步测速超时，已停止'));},budget);})]);}finally{clearTimeout(watchdog);this.deadline=null;}
   }
   async prepare(roles){
       const info=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
@@ -4748,7 +4752,7 @@ class StrictActionExecutor{
     const modern=bench&&info.bench_feedback==='1',cached=modern&&this.lastPositions?.positions.armed==='1'&&this.lastPositions.positions.bench_active==='1'&&this.now()-this.lastPositions.at<=100;
     const profile=motionProfile(info,{requireBench:bench}),before=cached?this.lastPositions.positions:await this.positions(slots,+info.range),speed=requestedSpeed??(bench?profile.defaultBenchSpeed:profile.normalRawSpeed),goals=new Map(),arrivals=new Map();let legDeadline=Infinity,issuedAt=null,KEEP_calls=0,lastKeepAt=null,POSALL_calls=cached?0:1+(before.retries??0);
     if(bench&&(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax))throw Error('台架档位无效');
-    for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
+    for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=slots[s].holdMidpoint?slots[s].midpoint:phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
       if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
       const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
       if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.family==='STS'?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
@@ -4766,7 +4770,7 @@ class StrictActionExecutor{
     while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:profile.tolerance,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
       if(goals.size&&bench&&profile.family==='STS'&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
       if(!goals.size&&bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架截止已释放，不能判定到位');if(this.now()>=legDeadline)throw Error('台架到位确认超时，已停止');}
-      this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
+      this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:slots[e.slot].holdMidpoint?slots[e.slot].midpoint:phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
     return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,KEEP_calls,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
   }
   async runServoGroups(file,slots,info){

@@ -9,20 +9,21 @@ prefix=prefix.replace('maximum=1003','maximum=4095')
 prefix+=r'''
 namespace scs{
 enum class Family{STS,SCS};struct Profile{Family family=Family::STS;bool probed=true;int range=4095;}pf;
-const Profile&profile(){return pf;}int posTol(){return pf.family==Family::SCS?6:24;}int lastError(){return 0;}
+const Profile&profile(){return pf;}int posTol(){return pf.family==Family::SCS?6:24;}int deviceError=0;int lastError(){return deviceError;}
 bool setTorque(uint8_t,bool on){assert(!on);return true;}
-uint8_t endian=0,phase=4,resolution=1,mode=0;bool configFail=false,badRead=false;int writes=0,syncCalls=0;uint8_t last[8],saved[7][8];
+uint8_t endian=0,phase=4,resolution=1,mode=0;bool configFail=false,badRead=false;int configReads=0,writes=0,syncCalls=0;uint8_t last[8],saved[7][8];
 struct SyncItem{uint8_t id;uint16_t pos,speed;uint8_t acc;};
-bool readRegs(uint8_t id,uint8_t a,uint8_t n,uint8_t*d){memset(d,0,n);if(configFail)return false;if(a==2)*d=endian;if(a==18)*d=phase;if(a==30)*d=resolution;if(a==33)*d=mode;if(a==41||a==42){memcpy(d,saved[id]+1,n);if(badRead)d[1]^=1;}return true;}
+bool readRegs(uint8_t id,uint8_t a,uint8_t n,uint8_t*d){memset(d,0,n);if(configFail)return false;if(a==2){assert(n==32);++configReads;d[0]=endian;d[16]=phase;d[28]=resolution;d[31]=mode;}if(a==41||a==42){memcpy(d,saved[id]+1,n);if(badRead)d[1]^=1;}return true;}
 bool writeRegs(uint8_t id,uint8_t a,const uint8_t*d,uint8_t n){++writes;saved[id][0]=a;memcpy(saved[id]+1,d,n);return true;}
 void syncMove(const SyncItem*v,int n,bool raw){assert(raw);++syncCalls;for(int i=0;i<n;i++)benchMotionPayload(pf.family==Family::SCS,v[i].pos,v[i].speed,v[i].acc,saved[v[i].id]);}
 '''+config.replace('uint16_t *actual){','uint16_t *actual=nullptr){')+'\n}\n'
 tests=r'''
-void reset(){now=0;g_armed=g_calibrated=true;g_benchActive=false;g_sweep=g_rate=g_auto=g_demo=false;offline=false;feedbackPosition=100;for(auto &sl:g_slot){sl.lo=50;sl.hi=3000;sl.valid=true;}scs::pf={};scs::endian=0;scs::phase=4;scs::resolution=1;scs::mode=0;scs::configFail=scs::badRead=false;scs::writes=scs::syncCalls=offCalls=0;}
+void reset(){now=0;g_armed=g_calibrated=true;g_benchActive=false;g_sweep=g_rate=g_auto=g_demo=false;offline=false;feedbackPosition=100;for(auto &sl:g_slot){sl.lo=50;sl.hi=3000;sl.valid=true;}scs::pf={};scs::endian=0;scs::phase=4;scs::resolution=1;scs::mode=0;scs::configFail=scs::badRead=false;scs::deviceError=scs::configReads=scs::writes=scs::syncCalls=offCalls=0;}
 int main(){uint16_t raw;
-reset();assert(scs::checkedBenchSpeed(1,8000,raw)&&raw==8000);scs::phase=0;assert(scs::checkedBenchSpeed(1,1000,raw)&&raw==20);assert(scs::checkedBenchSpeed(1,999,raw)&&raw==19);assert(!scs::checkedBenchSpeed(1,49,raw));assert(!scs::checkedBenchSpeed(1,8001,raw));scs::mode=1;assert(!scs::checkedBenchSpeed(1,1000,raw));scs::mode=0;scs::resolution=2;assert(!scs::checkedBenchSpeed(1,1000,raw));scs::resolution=1;scs::endian=1;assert(!scs::checkedBenchSpeed(1,1000,raw));
+reset();assert(scs::checkedBenchSpeed(1,8000,raw)&&raw==8000);assert(scs::configReads==1);scs::phase=0;assert(scs::checkedBenchSpeed(1,1000,raw)&&raw==20);assert(scs::checkedBenchSpeed(1,999,raw)&&raw==19);assert(!scs::checkedBenchSpeed(1,49,raw));assert(!scs::checkedBenchSpeed(1,8001,raw));scs::mode=1;assert(!scs::checkedBenchSpeed(1,1000,raw));scs::mode=0;scs::resolution=2;assert(!scs::checkedBenchSpeed(1,1000,raw));scs::resolution=1;scs::endian=1;assert(!scs::checkedBenchSpeed(1,1000,raw));
+reset();scs::configFail=true;assert(!scs::checkedBenchSpeed(1,1000,raw));reset();scs::deviceError=8;assert(!scs::checkedBenchSpeed(1,1000,raw));
 reset();assert(benchMove(1,2000,1000)&&benchActualSpeed()==1000);const uint8_t expected[]={41,0,208,7,0,0,232,3};assert(!memcmp(scs::saved[1],expected,8));
-reset();scs::phase=0;uint16_t targets[]={200,210,220,230,240,250};assert(benchGroup(63,targets,999)&&benchActualSpeed()==950);assert(scs::syncCalls==1&&scs::writes==0);for(int id=1;id<=6;id++){assert(scs::saved[id][0]==41&&scs::saved[id][1]==0&&scs::saved[id][6]==19&&scs::saved[id][7]==0);}
+reset();scs::phase=0;uint16_t targets[]={200,210,220,230,240,250};assert(benchGroup(63,targets,999)&&benchActualSpeed()==950);assert(scs::syncCalls==1&&scs::writes==0&&scs::configReads==6);for(int id=1;id<=6;id++){assert(scs::saved[id][0]==41&&scs::saved[id][1]==0&&scs::saved[id][6]==19&&scs::saved[id][7]==0);}
 reset();scs::mode=1;assert(!benchGroup(63,targets,1000)&&scs::syncCalls==0&&!g_armed);
 reset();targets[5]=3001;assert(!benchGroup(63,targets,1000)&&scs::syncCalls==0);targets[5]=250;
 reset();scs::badRead=true;assert(!benchGroup(63,targets,8000)&&!g_armed&&!g_benchActive);
