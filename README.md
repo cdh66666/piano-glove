@@ -5,14 +5,13 @@
 
 ## 当前交付 · 2026-10-01 · STS3032-C001
 
-- [公网指法预览](https://cdh66666.github.io/piano-glove/)：三段右手原谱和指法动画，不访问串口、不控制远端设备。
 - [下载完整调试台与固件源码](https://github.com/cdh66666/piano-glove/archive/refs/heads/main.zip)：解压，安装 Python 3（加入 PATH），双击 `host/start-debug.bat`。首次自动安装 pyserial；本机调试台提供编号、校准、动作、测速和曲目演奏。
 - 贵舵机固件源码在 `firmware/`，主控为微雪 Servo Driver with ESP32（SKU 21593），构建环境由 `firmware/platformio.ini` 固定。详见 [STS 适配记录](docs/STS3032-ADAPTATION.md)。
 - ID1 为拇指外展/内收，ID2 为拇指按压，ID3–6 为食指至小指。曲目中 ID1 保持抬起位置，五根按压轴在抬起和按下端点间运动，不逐音回中点。
 - STS 控制使用校准行程中央 90%，默认速度命令 8000 counts/s。更换手套或舵机后重新编号、校准；本机校准记录不上传。
 - 本轮三段曲目实机完成，含准备收尾分别约 5.23 / 3.92 / 3.92 秒；谱内演示为 120 / 80 / 80 BPM。这是演示拍速，不是原谱标定速度。相关软件回归 152 项通过；数字检查不替代每副手套的实测。
 
-公网站点由 `.github/workflows/pages.yml` 部署，`site/` 为独立静态预览；`scripts/build-public-site.cjs` 从本机调试台同一份曲目数据生成并复制原谱图片。公开站点不代理本机 API。
+当前交付使用本机调试台，公网发布已关闭。`site/` 保留静态预览源码供参考，不影响本机功能；代码更新不会自动发布网站。
 
 ## 历史交付基线 · 2026-09-30 · SC09
 
