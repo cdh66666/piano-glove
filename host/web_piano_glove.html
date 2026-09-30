@@ -4756,7 +4756,7 @@ class StrictActionExecutor{
     for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=slots[s].holdMidpoint?(slots[s].holdPosition??slots[s].midpoint):phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
       if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
       const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
-      if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.family==='STS'?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
+      if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.keep?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
     if(modern&&before.armed!=='1')throw Error('台架已释放，停止当前档位');
     if(bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架已释放，停止当前档位');}
     if(bench&&group.length>1){
@@ -4769,7 +4769,7 @@ class StrictActionExecutor{
     }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+g.timeout);const reply=await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');if(bench&&profile.family==='STS'){const ack=actionKV(reply.find(l=>l.startsWith('OK BENCH MOVE ')));const actual=+ack.actual_speed;if(!Number.isInteger(actual)||actual<50||actual>speed)throw Error('实际速度未确认');g.timeout=Math.min(20000,Math.max(1200,g.travel/actual*1000+1000));legDeadline=at+g.timeout;}}
     const feedbackStarted=this.now();lastKeepAt=issuedAt;
     while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:profile.tolerance,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
-      if(goals.size&&bench&&profile.family==='STS'&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
+      if(goals.size&&bench&&profile.keep&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
       if(!goals.size&&bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架截止已释放，不能判定到位');if(this.now()>=legDeadline)throw Error('台架到位确认超时，已停止');}
       this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:slots[e.slot].holdMidpoint?(slots[e.slot].holdPosition??slots[e.slot].midpoint):phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
     return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,KEEP_calls,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
@@ -4805,7 +4805,7 @@ card.innerHTML=`<h2>带指法动作 JSON</h2>
   <progress id="strictActionProgress" value="0" max="1" aria-label="动作预览进度"></progress>
   <div id="strictActionTime" class="hint">0.00 秒</div>
   <div class="row"><button type="button" id="strictActionHardwareStart" class="primary">开始手套训练</button></div>
-  <p class="hint">训练使用每指完整校准行程，未加琴音；开始前必须确认穿戴与行程舒适。仅支持已核对的 2.2.4 / STS 固件；角色、校准、反馈或时序异常立即停止，不丢事件继续。遇到不适切断动力电源。原 MIDI 按钮仍只执行 MIDI。</p>
+  <p class="hint">训练使用每指完整校准行程，未加琴音；开始前必须确认穿戴与行程舒适。支持已核对的 2.2.4 / SC09 或 STS3032 固件；角色、校准、反馈或时序异常立即停止，不丢事件继续。遇到不适切断动力电源。原 MIDI 按钮仍只执行 MIDI。</p>
 </div>`;
 section.prepend(card);
 const el=id=>document.getElementById(id);

@@ -2,17 +2,18 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync(path.join(__dirname,'../web_piano_glove.html'),'utf8'),a=html.indexOf('function actionKV('),b=html.indexOf("const section=document.querySelector('#p-play');",a),Executor=vm.runInNewContext(html.slice(a,b)+'\nStrictActionExecutor',{setTimeout,clearTimeout});
 const roles=['latch','press','press','press','press','press'];
 test('partial-stroke speed uses separated endpoint windows and retains full-stroke35',async()=>{const f=setup({latency:5,benchFeedback:true});const r=await f.executor.runSpeedTest({amplitudes:[1,.5,.2],cycles:3},roles);assert.equal(r.results.length,3);for(const [i,tol]of [35,29,11].entries()){for(const leg of r.results[i].performance.legs){assert.equal(leg.arrivals.length,5);assert(leg.arrivals.every(a=>a.completionTolerance===tol&&a.error<=tol));}if(i)assert(tol*2<238*r.results[i].amplitude);}assert.equal(f.sent.at(-1),'SAFE');});
-function setup({profile='SCS',benchFeedback=false,travelMs=0,slow=false,escape=false,rateValid=true,noisy=false,stall=false,latency=0}={}){
+function setup({profile='SCS',benchFeedback=false,keep=false,travelMs=0,slow=false,escape=false,rateValid=true,noisy=false,stall=false,latency=0}={}){
  let clock=0,armed=false,benchActive=false,benchDeadline=0,rate=false,depth=0,polls=0;const sent=[],progress=[],pos=Array(6).fill(100),goals=Array(6).fill(100),origin=Array(6).fill(100),goalAt=Array(6).fill(0);
  const move=(i,target)=>{if(stall)return;origin[i]=pos[i];goalAt[i]=clock;goals[i]=target;};
  const io={safe:async()=>{sent.push('SAFE');armed=false;benchActive=false;},send:async c=>{sent.push(c);clock+=latency;
  if(travelMs)for(let i=0;i<6;i++)pos[i]=Math.round(origin[i]+(goals[i]-origin[i])*Math.min(1,(clock-goalAt[i])/travelMs));
  if(benchFeedback&&benchActive&&clock>=benchDeadline){armed=false;benchActive=false;}
- if(c==='INFO')return[`OK INFO fw=PIANO_GLOVE_2 ver=2.2.4 profile=${profile} range=${profile==='SCS'?1023:4095} calibrated=1 armed=${+armed} online=6 auto_active=0 enroll_active=0 sweep=0 bench_group=1 bench_feedback=${+benchFeedback}`];
+ if(c==='INFO')return[`OK INFO fw=PIANO_GLOVE_2 ver=2.2.4 profile=${profile} range=${profile==='SCS'?1023:4095} calibrated=1 armed=${+armed} online=6 auto_active=0 enroll_active=0 sweep=0 bench_group=1 bench_feedback=${+benchFeedback} bench_keep=${+keep}`];
  if(c==='STATUS_ALL')return [...pos.map((p,s)=>`SLOT slot=${s} id=${s+1} min=100 max=${profile==='STS'?600:350} standby=100 pos=${p} online=1 valid=1 press=max`),'OK STATUS_ALL'];
  if(c==='ARM CHECK')return [...pos.map((p,s)=>`ARM_CHECK_SLOT slot=${s} id=${s+1} ok=1 torque=0 pos=${p} min=20 max=1003`),'OK ARM CHECK'];
  if(c==='ARM'){armed=true;return['OK ARM armed=1'];}
  if(c==='POSALL'){polls++;if(!travelMs)for(let i=0;i<6;i++)pos[i]=slow?pos[i]+Math.sign(goals[i]-pos[i])*Math.min(5,Math.abs(goals[i]-pos[i])):goals[i];if(noisy&&!armed)pos[2]=100+(polls%2)*20;return ['OK POSALL '+(escape?[999,...pos.slice(1)]:pos).join(' ')+(benchFeedback?` armed=${+armed} bench_active=${+benchActive}`:'')];}
+ if(c==='BENCH KEEP'){if(!armed||!benchActive)return ['ERR BENCH KEEP inactive_or_expired'];benchDeadline=clock+1200;return ['OK BENCH KEEP active=1 armed=1 cutoff_ms=1200'];}
  if(c.startsWith('BENCH GROUP ')){const x=c.split(' '),mask=parseInt(x[2]);for(let id=1;id<=6;id++)if(mask&(1<<(id-1)))move(id-1,+x[id+2]);benchActive=true;benchDeadline=clock+1200;return [`OK BENCH GROUP mask=${x[2]} speed=${x[9]} readback=1 count=${Array.from({length:6},(_,i)=>!!(mask&(1<<i))).filter(Boolean).length} cutoff_ms=1200`+(benchFeedback?' armed=1 bench_active=1':'')];}
  if(c.startsWith('MOVE ')||c.startsWith('BENCH MOVE ')){const [,id,p]=(c.startsWith('BENCH ')?c.slice(6):c).split(' ');move(+id-1,+p);if(c.startsWith('BENCH ')){benchActive=true;benchDeadline=clock+1200;}return['OK MOVE'];}
  if(c.startsWith('RATE ')){rate=true;depth=+c.split(' ')[4];return['OK RATE_START'];}
@@ -129,3 +130,27 @@ test('imported score parser uses the same five physical IDs as built-in songs',(
 test('all three songs keep unused fingers lifted and never command a playing finger to midpoint',async()=>{const {songs,songPlan}=require('../delivery-demo.js');for(const song of songs){const f=setup({latency:5,benchFeedback:true});await f.executor.run(songPlan(song),roles,{internalSlots:true});const commands=f.sent.filter(c=>c.startsWith('BENCH GROUP '));for(const cmd of commands){const x=cmd.split(' '),mask=parseInt(x[2]);if(mask&1)assert.equal(+x[3],106);for(let id=2;id<=6;id++)if(mask&(1<<(id-1)))assert([106,344].includes(+x[id+2]),cmd);}for(const cmd of [commands[0],commands.at(-1)])assert.deepEqual(cmd.split(' ').slice(3,9).map(Number),[106,106,106,106,106,106]);assert.equal(f.sent.at(-1),'SAFE');}});
 
 test('song ID1 holds lifted endpoint in either calibrated direction instead of midpoint',async()=>{const {songPlan}=require('../delivery-demo.js');for(const direction of ['min','max']){const f=stsSetup(),base=f.io.send;f.io.send=async cmd=>{const lines=await base(cmd);return cmd==='STATUS_ALL'?lines.map(l=>l.startsWith('SLOT slot=0 ')?l.replace('press=max','press='+direction):l):lines;};await f.executor.run(songPlan(rhythmPlan([{finger:1,t_ms:0,duration_ms:300,amplitude:1}],650)),roles,{internalSlots:true});const targets=f.sent.filter(c=>c.startsWith('BENCH GROUP ')&&(parseInt(c.split(' ')[2])&1)).map(c=>+c.split(' ')[3]);assert(targets.length>=2);assert(targets.every(p=>p===(direction==='min'?575:125)));assert.equal(f.sent.at(-1),'SAFE');}});
+
+// A long SC09 movement must retain the firmware watchdog, not fail at the
+// former unconditional one-second host deadline. It must still time out on stall.
+test('SC09 slow-stage travel uses acknowledged KEEP and bounded travel deadline',async()=>{
+ const f=setup({travelMs:1400,latency:10,benchFeedback:true,keep:true});
+ const r=await f.executor.runSpeedTest({slots:[1,2,3,4,5],amplitudes:[1],cycles:3,speed:400},roles);
+ assert(r.completed);assert(f.sent.includes('BENCH KEEP'));assert.equal(f.sent.at(-1),'SAFE');
+ assert(r.results[0].elapsed_ms>2000);assert(r.results[0].performance.KEEP_calls>0);
+});
+test('SC09 KEEP never turns a stalled axis into completion or an unbounded hold',async()=>{
+ const f=setup({stall:true,latency:10,benchFeedback:true,keep:true});
+ await assert.rejects(f.executor.runSpeedTest({cycles:3,speed:400},roles),/未到位/);
+ assert(f.sent.includes('BENCH KEEP'));assert.equal(f.sent.at(-1),'SAFE');assert(!f.progress.some(p=>p.completed));
+});
+
+test('SC09 model-specific songs finish with 300ms feedback travel and keep chord batches',async()=>{
+ const {songs,songForProfile,songPlan}=require('../delivery-demo.js');
+ for(const source of songs){const f=setup({travelMs:300,latency:5,benchFeedback:true,keep:true});
+ const song=songPlan(songForProfile(source,'SCS'));const r=await f.executor.run(song,roles,{internalSlots:true});
+ assert(r.feedbackVerified);assert(r.elapsed_ms<10000);assert(r.score_elapsed_ms>=6400);
+ assert(!f.sent.some(c=>c.startsWith('BENCH MOVE ')||c.startsWith('MOVE ')));
+ assert(f.sent.filter(c=>c.startsWith('BENCH GROUP ')).every(c=>c.endsWith(' 1000')));
+ assert.equal(f.sent.at(-1),'SAFE');}
+});
