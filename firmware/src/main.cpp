@@ -34,7 +34,7 @@
 // ---------------------------------------------------------------- 输出
 
 static void sayf(const char *fmt, ...) {
-  char    b[384];
+  char    b[1024];
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(b, sizeof(b), fmt, ap);
@@ -42,7 +42,7 @@ static void sayf(const char *fmt, ...) {
   Serial.println(b);
 }
 static void okf(const char *fmt, ...) {
-  char    b[384];
+  char    b[1024];
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(b, sizeof(b), fmt, ap);
@@ -51,7 +51,7 @@ static void okf(const char *fmt, ...) {
   Serial.println(b);
 }
 static void errf(const char *fmt, ...) {
-  char    b[384];
+  char    b[1024];
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(b, sizeof(b), fmt, ap);
@@ -137,7 +137,8 @@ static bool enrollIdentity(uint8_t id,scs::Profile &p){
   if(!scs::readRegs(id,9,2,lo))return enrollFail("read_limit_failed","read_reg9");
   if(!scs::readRegs(id,11,2,hi))return enrollFail("read_limit_failed","read_reg11");
   g_enrollMaxRaw=(uint16_t(hi[0])<<8)|hi[1];
-  uint16_t mn=0,mx=0;const int kind=identifyLimitEndian(lo,hi,mn,mx);
+  uint16_t mn=0,mx=0;int kind=identifyLimitEndian(lo,hi,mn,mx);
+  if(!kind){uint8_t endian=255;if(!scs::readRegs(id,2,1,&endian)||scs::lastError())return enrollFail("read_endian_failed","read_reg2");kind=identifyMarkedLimits(lo,hi,endian,mn,mx);}
   if(!kind)return enrollFail("family_ambiguous_limits","identify");
   p.family=kind==1?scs::Family::STS:scs::Family::SCS;p.range=kind==1?4095:1023;
   p.model=raw;p.minAng=mn;p.maxAng=mx;p.probed=true;return true;
@@ -306,11 +307,11 @@ static void cmdInfo() {
   const scs::Profile &pf = scs::profile();
   sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=PIANO_GLOVE_A50528 ip=192.168.4.1 "
        "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=20 "
-       "enroll_phase=%s enroll_flow=3 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1",
+       "enroll_phase=%s enroll_flow=3 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1 bench_sts=1 bench_keep=1 bench_fullstroke=1 cal_origin=1 bench_acc=0 motion_speed_unit=counts_per_s bench_speed_min=50 bench_speed_max=%d bench_default_speed=%d motion_speed_default=%d motion_speed_max=%d motion_tolerance=%d motion_inset=%d mount_target=%d mount_speed=%d origin_epoch=%lu",
        FW_ID, scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0,
        glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
        g_enroll ? 1 : 0, (unsigned)g_enrollNext, g_enrollPhase,
-       bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER);
+       bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?200:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?35:114,pf.family==scs::Family::SCS?6:24,glove::mountTarget(),glove::mountSpeed(),(unsigned long)glove::originEpoch());
 }
 
 static void cmdStatusAll() {
@@ -403,6 +404,7 @@ static void cmdCal(const int n, char **t) {
     okf("CAL CLEAR torque=off");
     return;
   }
+  if (strcmp(sub,"ORIGIN")==0){enrollStop();if(!glove::calOrigin()){errf("CAL ORIGIN %s",glove::originFailure());return;}okf("CAL ORIGIN target=2048 verified=1 motion=0");return;}
   if (strcmp(sub, "CAPTURE") == 0) {
     if (n < 6) {
       errf("CAL CAPTURE usage_slot_MIN_STANDBY_MAX");
@@ -626,7 +628,7 @@ static void cmdSetId(const int n, char **t) {
 }
 
 static bool servoDiag(uint8_t id){
- if(id<1||id>6||scs::profile().family!=scs::Family::SCS){errf("DIAG SCS_id1to6_required");return false;}
+ if(id<1||id>6||(scs::profile().family!=scs::Family::SCS&&scs::profile().family!=scs::Family::STS)){errf("DIAG verified_family_id1to6_required");return false;}
  uint8_t d[67]={};
  for(uint8_t start=0;start<67;start+=16){
   const uint8_t n=start+16<=67?16:67-start;
@@ -635,6 +637,11 @@ static bool servoDiag(uint8_t id){
   sayf("DIAG_RAW id=%u start=%u length=%u hex=%s",id,start,n,hex);
  }
  const auto be=[&](int a)->uint16_t{return (uint16_t(d[a])<<8)|d[a+1];};
+ if(scs::profile().family==scs::Family::STS){
+  const auto le=[&](int a)->uint16_t{return uint16_t(d[a])|(uint16_t(d[a+1])<<8);};
+  sayf("DIAG_STS id=%u endian=%u model_raw=%u min=%u max=%u phase=%u resolution=%u mode=%u offset=%u torque=%u acceleration=%u goal=%u pwm=%u speed_raw=%u position_raw=%u status=%u lock=%u speed_unit=%s speed_zero=%s",id,d[2],be(3),le(9),le(11),d[18],d[30],d[33],le(31),d[40],d[41],le(42),le(44),le(46),le(56),d[65],d[55],(d[18]&4)?"counts_per_s":"50counts_per_s",(d[18]&8)?"max":"stop");
+  okf("DIAG id=%u raw_count=67 read_only=1",id);return true;
+ }
  sayf("DIAG_SCS id=%u min=%u max=%u max_torque=%u phase=%u P=%u D=%u punch=%u dead_positive=%u dead_negative=%u hold_torque=%u protection_time=%u overload_torque=%u lock=%u",id,be(9),be(11),be(16),d[18],d[21],d[22],be(24),d[26],d[27],d[37],d[38],d[39],d[48]);
  sayf("DIAG_FEEDBACK id=%u torque=%u goal=%u time=%u speed=%u position_raw=%u speed_raw=%u load_raw=%u voltage_raw=%u temperature=%u async=%u status=%u moving=%u",id,d[40],be(42),be(44),be(46),be(56),be(58),be(60),d[62],d[63],d[64],d[65],d[66]);
  okf("DIAG id=%u raw_count=67 read_only=1",id);return true;
@@ -679,34 +686,35 @@ static void cmdLine(char *raw) {
     if(!strcasecmp(action,"START")){
       if(glove::mountActive()){errf("MOUNT already_active");return;}
       enrollStop();if(!glove::mountStart()){errf("MOUNT %s",glove::mountReason());return;}
-      okf("MOUNT START active=1 target=512 speed=200 watchdog_ms=3000 ready_mask=0x%02X",glove::mountReadyMask());return;
+      okf("MOUNT START active=1 target=%d speed=%d profile=%s tolerance=%d watchdog_ms=3000 ready_mask=0x%02X",glove::mountTarget(),glove::mountSpeed(),scs::familyName(scs::profile().family),scs::posTol(),glove::mountReadyMask());return;
     }
     if(!strcasecmp(action,"KEEP")){if(!glove::mountKeep()){errf("MOUNT inactive reason=%s",glove::mountReason());return;}okf("MOUNT KEEP active=1 watchdog_ms=3000");return;}
     if(!strcasecmp(action,"STOP")){if(!glove::mountStop()){errf("MOUNT STOP active=0 release_unverified");return;}okf("MOUNT STOP active=0 torque=off verified=1");return;}
     if(!strcasecmp(action,"STATUS")){
       for(int id=1;id<=6;++id)sayf("MOUNT_SLOT id=%d pos=%d ready=%d",id,glove::mountPosition(id),(glove::mountReadyMask()>>(id-1))&1);
-      okf("MOUNT STATUS active=%d target=512 ready_mask=0x%02X ready=%d reason=%s",glove::mountActive(),glove::mountReadyMask(),glove::mountActive()&&glove::mountReadyMask()==0x3F,glove::mountReason());return;
+      okf("MOUNT STATUS active=%d target=%d profile=%s tolerance=%d ready_mask=0x%02X ready=%d reason=%s",glove::mountActive(),glove::mountTarget(),scs::familyName(scs::profile().family),scs::posTol(),glove::mountReadyMask(),glove::mountActive()&&glove::mountReadyMask()==0x3F,glove::mountReason());return;
     }
     errf("MOUNT usage_START_KEEP_STOP_STATUS");return;
   }
   if(!strcmp(v,"DIAG")){if(n!=2){errf("DIAG usage_id1to6");return;}const int id=atoi(t[1]);if(id<1||id>6){errf("DIAG id_outside1to6");return;}servoDiag(id);return;}
   if(!strcmp(v,"BENCH")){
+    if(n==2&&!strcasecmp(t[1],"KEEP")){if(!glove::benchKeep()){errf("BENCH KEEP inactive_or_expired");return;}okf("BENCH KEEP active=1 armed=1 cutoff_ms=1200");return;}
     if(n>=2&&!strcasecmp(t[1],"GROUP")){
       if(n!=10){glove::safe();errf("BENCH GROUP usage_mask_p1_p2_p3_p4_p5_p6_speed");return;}
       char *end=nullptr;const unsigned long mask=strtoul(t[2],&end,0);
       if(!end||*end||!mask||mask>0x3F){glove::safe();errf("BENCH GROUP mask_outside1to63");return;}
-      uint16_t positions[6];for(int id=0;id<6;++id){const long pos=strtol(t[id+3],&end,10);if(!end||*end||pos<0||pos>1023){glove::safe();errf("BENCH GROUP target_outside_bounds id=%d",id+1);return;}positions[id]=uint16_t(pos);}
-      const long speed=strtol(t[9],&end,10);if(!end||*end||speed<50||speed>1000){glove::safe();errf("BENCH GROUP speed_outside50to1000");return;}
+      uint16_t positions[6];for(int id=0;id<6;++id){const long pos=strtol(t[id+3],&end,10);if(!end||*end||pos<0||pos>scs::profile().range){glove::safe();errf("BENCH GROUP target_outside_bounds id=%d",id+1);return;}positions[id]=uint16_t(pos);}
+      const long speed=strtol(t[9],&end,10);if(!end||*end||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){glove::safe();errf("BENCH GROUP speed_outside_profile_bounds");return;}
       if(!glove::benchGroup(uint8_t(mask),positions,uint16_t(speed))){errf("BENCH GROUP %s",glove::benchFailure());return;}
       glove::benchTick();
       if(!glove::armed()||!glove::benchActive()){errf("BENCH GROUP deadline");return;}
-      okf("BENCH GROUP mask=0x%02lX speed=%ld readback=1 count=%d cutoff_ms=1200 armed=1 bench_active=1",mask,speed,bitcount(uint8_t(mask)));return;
+      okf("BENCH GROUP mask=0x%02lX speed=%ld readback=1 count=%d cutoff_ms=1200 armed=1 bench_active=1 actual_speed=%u",mask,speed,bitcount(uint8_t(mask)),glove::benchActualSpeed());return;
     }
     if(n!=5||strcasecmp(t[1],"MOVE")){errf("BENCH usage_MOVE_id_position_speed");return;}
     const int id=atoi(t[2]),pos=atoi(t[3]),speed=atoi(t[4]);
-    if(id<1||id>6||pos<0||pos>1023||speed<50||speed>1000){errf("BENCH input_outside_bounds");return;}
+    if(id<1||id>6||pos<0||pos>scs::profile().range||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){errf("BENCH input_outside_bounds");return;}
     if(!glove::benchMove(id,pos,speed)){errf("BENCH %s",glove::benchFailure());return;}
-    okf("BENCH MOVE id=%d pos=%d speed=%d readback=1 cutoff_ms=1200",id,pos,speed);return;
+    okf("BENCH MOVE id=%d pos=%d speed=%d readback=1 cutoff_ms=1200 actual_speed=%u",id,pos,speed,glove::benchActualSpeed());return;
   }
   // ---- 全局 ----
   if (strcmp(v, "INFO") == 0)     { cmdInfo(); return; }

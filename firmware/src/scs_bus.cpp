@@ -229,20 +229,30 @@ bool readFeedback(uint8_t id, Feedback &fb, uint16_t timeoutMs) {
   // 64..65 保留 / 66 运动中 / 67..68 保留 / 69..70 电流
   const auto decodeWord=[big](const uint8_t *p)->int16_t{return servoWord(p,big);};
   fb.pos     = decodeWord(d);
-  fb.speed   = decodeWord(d+2);
-  fb.load    = decodeWord(d+4);
+  const auto signedSts=[&](const uint8_t*p,uint16_t sign)->int16_t{const uint16_t v=servoWord(p,false);return (v&sign)?-int16_t(v&uint16_t(sign-1)):int16_t(v);};
+  fb.speed   = big?decodeWord(d+2):signedSts(d+2,0x8000);
+  fb.load    = big?decodeWord(d+4):signedSts(d+4,0x0400);
   fb.voltage = d[6];
   fb.temp    = d[7];
   fb.moving  = d[10];
-  fb.current = big?0:decodeWord(d+13);
+  fb.current = big?0:signedSts(d+13,0x8000);
   fb.mode    = 0;
-  fb.ok      = true;
-  return true;
+  fb.ok      = fb.pos>=0&&fb.pos<=profile().range&&d[9]==0;
+  return fb.ok;
 }
 
 bool moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc) {
   uint8_t p[8];const uint8_t size=motionPayload(profile().family==Family::SCS,pos,speed,acc,p);
   uint8_t r[RESP_BUF];int rl=0;return sendRecv(id,INST_WRITE,p,size,r,rl,true);
+}
+bool checkedBenchSpeed(uint8_t id,uint16_t speed,uint16_t &raw,uint16_t *actual){
+ if(profile().family==Family::SCS){raw=speed;if(actual)*actual=speed;return speed>=50&&speed<=1000;}
+ if(profile().family!=Family::STS)return false;
+ uint8_t endian=255,phase=0,resolution=0,mode=255;
+ if(!readRegs(id,2,1,&endian)||lastError()||!readRegs(id,18,1,&phase)||lastError()||!readRegs(id,30,1,&resolution)||lastError()||!readRegs(id,33,1,&mode)||lastError())return false;
+ if(!normalizedStsSpeed(endian,phase,resolution,mode,speed,raw))return false;
+ if(actual)*actual=raw*((phase&4)?1:50);
+ return true;
 }
 
 bool setTorque(uint8_t id, bool on) {
@@ -273,11 +283,11 @@ void syncMove(const SyncItem *items, int n, bool benchRaw) {
   if(n<=0)return;
   if(n>8)n=8;
   const bool scs=profile().family==Family::SCS;
-  if(benchRaw){uint8_t seen=0;if(!scs||n>6){g_lastErr=255;return;}for(int i=0;i<n;++i){const auto &v=items[i];if(v.id<1||v.id>6||v.pos>1023||v.speed<50||v.speed>1000||(seen&(1u<<(v.id-1)))){g_lastErr=255;return;}seen|=1u<<(v.id-1);}}
+  if(benchRaw){uint8_t seen=0;if((!scs&&profile().family!=Family::STS)||n>6){g_lastErr=255;return;}for(int i=0;i<n;++i){const auto &v=items[i];if(v.id<1||v.id>6||v.pos>profile().range||v.speed<(scs?50:1)||v.speed>(scs?1000:8000)||(seen&(1u<<(v.id-1)))){g_lastErr=255;return;}seen|=1u<<(v.id-1);}}
   uint8_t p[2+8*8];int k=0;p[k++]=scs?42:41;p[k++]=scs?6:7;
   for(int i=0;i<n;++i){
     uint8_t data[8];uint8_t size;
-    if(benchRaw){data[0]=42;data[1]=items[i].pos>>8;data[2]=items[i].pos;data[3]=data[4]=0;data[5]=items[i].speed>>8;data[6]=items[i].speed;size=7;}
+    if(benchRaw)size=benchMotionPayload(scs,items[i].pos,items[i].speed,items[i].acc,data);
     else size=motionPayload(scs,items[i].pos,items[i].speed,items[i].acc,data);
     p[k++]=items[i].id;for(int j=1;j<size;++j)p[k++]=data[j];
   }
@@ -330,10 +340,12 @@ int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
     if (spent >= timeoutMs) break;
     int rl = 0;
     if (!readPacket(0xFF, r, rl, (uint16_t)(timeoutMs - spent))) break;   // 0xFF = 收谁的都行
-    if (rl < 8) continue;
+    if (rl != 8 || r[4]!=0) continue;
     for (int i = 0; i < n; ++i) {
       if (ids[i] == r[2] && pos[i] == 0xFFFF) {
-        pos[i] = (uint16_t)(r[5] | ((uint16_t)r[6] << 8));
+        const uint16_t value=(uint16_t)(r[5] | ((uint16_t)r[6] << 8));
+        if(value>profile().range)continue;
+        pos[i] = value;
         ++got;
         break;
       }
@@ -366,7 +378,8 @@ bool probeProfile(uint8_t id, Profile &out) {
   uint8_t m[2],lo[2],hi[2];
   if(!readRegs(id,REG_MODEL_L,2,m)||!readRegs(id,REG_MIN_ANGLE_L,2,lo)||!readRegs(id,REG_MAX_ANGLE_L,2,hi))return false;
   const uint16_t raw=(uint16_t(m[0])<<8)|m[1];if(raw==0||raw==0xffff)return false;
-  uint16_t mn=0,mx=0;const int kind=identifyLimitEndian(lo,hi,mn,mx);if(!kind)return false;
+  uint16_t mn=0,mx=0;int kind=identifyLimitEndian(lo,hi,mn,mx);
+  if(!kind){uint8_t endian=255;if(!readRegs(id,2,1,&endian)||lastError())return false;kind=identifyMarkedLimits(lo,hi,endian,mn,mx);}if(!kind)return false;
   Profile p;p.family=kind==1?Family::STS:Family::SCS;p.range=kind==1?4095:1023;
   p.model=raw;p.minAng=mn;p.maxAng=mx;p.probed=true;out=p;return true;
 }

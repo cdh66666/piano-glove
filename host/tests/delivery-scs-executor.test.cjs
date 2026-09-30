@@ -8,7 +8,7 @@ return {sent,executor:new Executor(io,{now:()=>clock,sleep:async ms=>{clock+=ms;
 for(const profile of ['SCS','STS'])test(profile+' executor keeps timing and sends family speed',async()=>{const {executor,sent}=fixture(profile);await executor.run({events:[{finger:1,t_ms:0,duration_ms:160}],duration_ms:160},['press','latch','press','press','press','press']);const moves=sent.filter(c=>c.startsWith('MOVE'));assert.equal(moves.length,2);assert(moves.every(c=>c.endsWith(profile==='SCS'?' 200 30':' 1200 30')));assert.equal(sent.at(-1),'SAFE');});
 test('SCS feedback above1023 aborts before MOVE and always SAFE',async()=>{const {executor,sent}=fixture('SCS',true);await assert.rejects(executor.run({events:[{finger:1,t_ms:0,duration_ms:160}],duration_ms:160},['press','latch','press','press','press','press']),/位置反馈丢失/);assert(!sent.some(c=>c.startsWith('MOVE')));assert.equal(sent.at(-1),'SAFE');});
 test('small spans have proportionate arrival tolerance; wrapped intervals use circular membership',()=>{
- const a=html.indexOf('function actionGate('),b=html.indexOf('class StrictActionExecutor',a),gate=vm.runInNewContext(html.slice(a,b)+'\nactionGate');
+ const a=html.indexOf('function actionKV('),b=html.indexOf('class StrictActionExecutor',a),gate=vm.runInNewContext(html.slice(a,b)+'\nactionGate');
  const info={fw:'PIANO_GLOVE_2',ver:'2.2.4',profile:'STS',range:4095,calibrated:'1',armed:'0',online:6,auto_active:'0',enroll_active:'0',sweep:'0'},roles=['press','latch','press','press','press','press'];
  const rows=Array.from({length:6},(_,slot)=>({slot,id:slot+1,min:100,max:101,standby:100,pos:100,valid:'1',online:'1',press:'max'}));
  assert.throws(()=>gate(info,rows,roles),/活动幅度不足/);
@@ -17,7 +17,7 @@ test('small spans have proportionate arrival tolerance; wrapped intervals use ci
 });
 
 test('stored calibration remains valid while resting fingers outside bounds request only affected repairs',()=>{
- const a=html.indexOf('function actionGate('),b=html.indexOf('class StrictActionExecutor',a),gate=vm.runInNewContext(html.slice(a,b)+'\nactionGate');
+ const a=html.indexOf('function actionKV('),b=html.indexOf('class StrictActionExecutor',a),gate=vm.runInNewContext(html.slice(a,b)+'\nactionGate');
  const info={fw:'PIANO_GLOVE_2',ver:'2.2.4',profile:'SCS',range:1023,calibrated:'1',armed:'0',online:6,auto_active:'0',enroll_active:'0',sweep:'0'},roles=['press','latch','press','press','press','press'];
  const values=[[328,504,504,465,'min'],[798,885,885,845,'min'],[550,550,718,995,'max'],[750,828,914,831,'max'],[50,95,205,108,'max'],[717,717,877,708,'max']];
  const rows=values.map(([min,standby,max,pos,press],slot)=>({slot,id:slot+1,min,standby,max,pos,press,valid:'1',online:'1'}));

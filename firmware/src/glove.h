@@ -65,6 +65,11 @@ bool benchGroup(uint8_t mask,const uint16_t positions[6],uint16_t speed);
 bool benchActive();
 const char *benchFailure();
 void benchTick();
+bool benchKeep();
+uint16_t benchActualSpeed();
+bool calOrigin();
+const char *originFailure();
+uint32_t originEpoch();
 
 bool mountStart();
 bool mountKeep();
@@ -73,6 +78,8 @@ void mountTick();
 bool mountActive();
 uint8_t mountReadyMask();
 int mountPosition(int id);
+int mountTarget();
+int mountSpeed();
 const char *mountReason();
 
 bool    setMap(int s, uint8_t id);

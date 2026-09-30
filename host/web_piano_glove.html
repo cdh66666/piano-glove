@@ -4511,6 +4511,14 @@ function parseActionFile(input) {
 
 // Strict, single-hand action execution. No device access until run() is called.
 function actionKV(line){return Object.fromEntries(String(line).split(/\s+/).filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1)];}));}
+function motionProfile(info,{requireBench=false}={}){
+  const family=info.profile,range=+info.range;if(!((family==='SCS'&&range===1023)||(family==='STS'&&range===4095)))throw Error('舵机型号与量程未确认');
+  const sts=family==='STS',speedMax=Number(info.bench_speed_max??(sts?8000:1000)),defaultBenchSpeed=Number(info.bench_default_speed??1000),inset=Number(info.motion_inset??(sts?24:6)),tolerance=Number(info.motion_tolerance??(sts?114:35));
+  if(!Number.isInteger(speedMax)||speedMax<50||speedMax>(sts?8000:1000)||!Number.isInteger(defaultBenchSpeed)||defaultBenchSpeed<50||defaultBenchSpeed>speedMax||!Number.isInteger(inset)||inset<1||inset>=range/4||!Number.isInteger(tolerance)||tolerance<1||tolerance>=range/4)throw Error('舵机运动参数未确认');
+  if(requireBench&&sts&&(info.bench_sts!=='1'||info.bench_fullstroke!=='1'||info.motion_speed_unit!=='counts_per_s'||info.bench_keep!=='1'||info.bench_feedback!=='1'))throw Error('请更新支持STS归一化同步控制的固件');
+  return {family,range,model:info.model??info.servo_model??null,unit:'counts_per_s',speedMin:50,speedMax,defaultBenchSpeed,inset,tolerance,feedbackTolerance:sts?24:6,mountTarget:sts?2048:512,mountTolerance:sts?24:6,requiresMount:!sts,normalRawSpeed:sts?1200:200,stages:(sts?[200,400,600,800,1000,2000,4000,8000]:[200,400,600,800,1000]).filter(speed=>speed<=speedMax),keep:info.bench_keep==='1',normalized:!sts||info.motion_speed_unit==='counts_per_s'};
+}
+
 function actionGate(info, rows, roles){
   const range=+info.range;
   if(info.fw!=='PIANO_GLOVE_2'||info.ver!=='2.2.4'||!((info.profile==='STS'&&range===4095)||(info.profile==='SCS'&&range===1023))) throw Error('仅允许经核对的 PIANO_GLOVE_2 / 2.2.4：STS 4095 或 SCS 1023');
@@ -4528,7 +4536,7 @@ function actionGate(info, rows, roles){
     if(!Number.isInteger(pos)||pos<0||pos>range)throw Error('未读到有效位置，请保持连接。');
     const startTolerance=info.profile==='SCS'?Math.min(6,Math.floor(span/4)):0;
     if(pos<lo-startTolerance||pos>hi+startTolerance)outside.push(s);
-    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:35,tolerance:Math.min(info.profile==='SCS'?6:24,Math.floor(span/4))};
+    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.min(info.profile==='SCS'?6:24,Math.floor(span/4))};
   }
   if(outside.length){const labels=['拇指按压','拇指侧摆','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
   return ordered;
@@ -4544,16 +4552,16 @@ class StrictActionExecutor{
     if(cmd==='ARM')this.feedbackArmedExpected=true;
     return lines;
   }
-  async run(file,roles,{internalSlots=false,validationSpeed=null}={}){
+  async run(file,roles,{internalSlots=false,validationSpeed=null,demoSpeed=null}={}){
     if(this.active||this.pending)throw Error('已有动作正在执行或正在停止');
     this.active=true;this.cancelled=false;const runStarted=this.now();this.deadline=file.rhythmDemo?runStarted+10000:null;this.feedbackMetrics=null;this.lastPositions=null;this.feedbackRetries=0;this.feedbackArmedExpected=false;this.generation++;
     try{
-      const {info,slots}=await this.prepare(roles);
+      const {info,slots}=await this.prepare(roles),profile=motionProfile(info);if(demoSpeed!==null&&(!internalSlots||!file.benchQuick||!Number.isInteger(demoSpeed)||demoSpeed<profile.speedMin||demoSpeed>profile.speedMax))throw Error('展示速度超出当前型号范围');file={...file,runtimeSpeed:demoSpeed??profile.defaultBenchSpeed};
       if((file.validationOnly||file.validationSpeed!==undefined)&&validationSpeed===null)throw Error('档位验证只能从专用流程启动');
-      if(validationSpeed!==null){if(![200,400,600,800,1000].includes(validationSpeed)||!internalSlots||info.profile!=='SCS')throw Error('档位验证参数无效');file={...file,validationOnly:true,validationSpeed,fullStroke:true,quickDemo:true,benchQuick:validationSpeed>200};}
+      if(validationSpeed!==null){if(!profile.stages.includes(validationSpeed)||!internalSlots)throw Error('档位验证参数无效');file={...file,validationOnly:true,validationSpeed,fullStroke:true,quickDemo:true,benchQuick:info.profile==='STS'||validationSpeed>200};}
       if(file.benchQuick||file.fullStroke){
-        if(!internalSlots||file.quickDemo!==true||info.profile!=='SCS')throw Error('高速展示仅支持已识别的SCS短演示');
-        for(const slot of slots){const lo=slot.low+6,hi=slot.high-6;if(lo>=hi)throw Error('校准行程不足以保留端点余量');slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
+        if(!internalSlots||file.quickDemo!==true)throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
+        for(const slot of slots){const lo=slot.low+profile.inset,hi=slot.high-profile.inset;if(lo>=hi)throw Error('校准行程不足以保留端点余量');slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
       }
       if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
       const map={1:0,2:2,3:3,4:4,5:5};
@@ -4612,7 +4620,8 @@ class StrictActionExecutor{
   }
 
   async runRhythmDemo(file,slots,info,lifecycleStarted=this.now()){
-    if(info.profile!=='SCS'||info.bench_group!=='1'||!file.fullStroke||!file.benchQuick||!file.quickDemo)throw Error('节奏展示需要已更新同步控制的SCS固件');
+    const profile=motionProfile(info,{requireBench:true});
+    if(info.bench_group!=='1'||!file.fullStroke||!file.benchQuick||!file.quickDemo)throw Error('节奏展示需要已更新同步控制固件');
     if(file.events.some(e=>![0,2,3,4,5].includes(e.slot)))throw Error('节奏曲目仅支持五根手指，拇指侧摆保持休止');
     if(!Number.isFinite(file.duration_ms)||file.duration_ms<=0||file.duration_ms>9000)throw Error('节奏片段最多9秒');
     const events=[];for(const e of file.events){if(e.t_ms+e.duration_ms>file.duration_ms)throw Error('动作超出曲目时长');events.push({t:e.t_ms,on:true,s:e.slot},{t:e.t_ms+e.duration_ms,on:false,s:e.slot});}
@@ -4621,26 +4630,27 @@ class StrictActionExecutor{
     const used=new Set(file.events.map(e=>e.slot));slots=slots.map((slot,s)=>used.has(s)?slot:{...slot,lift:slot.midpoint});
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
-      await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:1000,phase:'lift'});
-      const scoreStarted=this.now(),pending=new Map();let index=0,nextPoll=0,nextInfo=0,positions=slots.map(slot=>slot.lift);
+      await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
+      const scoreStarted=this.now(),pending=new Map();let index=0,nextPoll=0,nextInfo=0,positions=this.lastPositions?.positions??slots.map(slot=>slot.lift),positionsAt=this.lastPositions?.at??-Infinity;
       while(index<batches.length||pending.size){
         this.check();let now=this.now(),elapsed=now-scoreStarted;
-        if(now>=nextPoll){positions=await this.positions(slots,+info.range);now=this.now();elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);if(Math.abs(positions[slot]-goal.pos)<=35)pending.delete(slot);}
+        const due=index<batches.length&&elapsed>=batches[index].t,priority=due&&info.bench_feedback==='1'&&now-positionsAt<=100&&positions.armed==='1'&&positions.bench_active==='1'&&batches[index].events.every(e=>!pending.has(e.s))&&[...pending.values()].every(goal=>now-goal.at<1000);
+        if(now>=nextPoll&&!priority){positions=await this.positions(slots,+info.range);now=this.now();positionsAt=now;elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);if(Math.abs(positions[slot]-goal.pos)<=profile.tolerance)pending.delete(slot);}
           this.progress({elapsed,index,groupIndex:index,total:batches.length,positions,targets:[...pending].map(([slot,g])=>({slot,pos:g.pos})),feedback:true,rhythm:true,...this.feedbackStats()});}
         if(info.bench_feedback==='1'&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('节奏展示已被安全释放，请重新开始');
         if(info.bench_feedback!=='1'&&now>=nextInfo){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('节奏展示已被安全释放，请重新开始');now=this.now();elapsed=now-scoreStarted;nextInfo=now+200;}
         if(index<batches.length&&elapsed>=batches[index].t){const batch=batches[index];if(elapsed-batch.t>100)throw Error('节奏延迟超过100毫秒，已停止，不追赶旧动作');
           for(const e of batch.events)if(pending.has(e.s))throw Error('ID '+slots[e.s].id+' 上一动作未到位，节奏过快');
           const targets=Array(6).fill(512);slots.forEach((slot,s)=>{if(slot.id<1||slot.id>6)throw Error('节奏展示需要ID1–6');targets[slot.id-1]=positions[s];});let mask=0;for(const e of batch.events){targets[slots[e.s].id-1]=e.on?slots[e.s].press:slots[e.s].lift;mask|=1<<(slots[e.s].id-1);}
-          const at=this.now(),lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' 1000'),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
+          const at=this.now(),lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' '+(file.runtimeSpeed??profile.defaultBenchSpeed)),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
           if(info.bench_feedback==='1'&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('节奏控制状态未确认');
-          if(ack.readback!=='1'||+ack.count!==batch.events.length||parseInt(ack.mask)!==mask||+ack.speed!==1000)throw Error('节奏组合写入未完整确认');
+          if(ack.readback!=='1'||+ack.count!==batch.events.length||parseInt(ack.mask)!==mask||+ack.speed!==(file.runtimeSpeed??profile.defaultBenchSpeed))throw Error('节奏组合写入未完整确认');
           if(this.now()-scoreStarted-batch.t>100)throw Error('节奏写入延迟超过100毫秒，已停止');
           for(const e of batch.events)pending.set(e.s,{pos:targets[slots[e.s].id-1],at});index++;nextPoll=0;
           this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,...this.feedbackStats()});continue;}
         await this.sleep(4);
       }
-      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:1000,phase:'midpoint'});
+      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'midpoint'});
       await this.io.safe();this.feedbackArmedExpected=false;this.lastPositions=null;
       while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
       const scoreElapsed=this.now()-scoreStarted;
@@ -4649,7 +4659,7 @@ class StrictActionExecutor{
     try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('节奏展示超过10秒，已停止'));},Math.max(1,10000-(this.now()-started)));})]);}finally{clearTimeout(watchdog);this.deadline=null;}
   }
   async runValidation({speed}={},roles){
-    if(![200,400,600,800,1000].includes(speed))throw Error('请选择200、400、600、800或1000档位');
+    if(![200,400,600,800,1000,2000,4000,8000].includes(speed))throw Error('请选择当前型号支持的速度档位');
     const plan={quickDemo:true,fullStroke:true,events:Array.from({length:6},(_,slot)=>({slot,t_ms:slot*100,duration_ms:60,amplitude:1}))};
     return this.run(plan,roles,{internalSlots:true,validationSpeed:speed});
   }
@@ -4661,7 +4671,7 @@ class StrictActionExecutor{
     try{
       const {info,slots}=await this.prepare(roles);
       const initial=actionKV((await this.command('RATE')).find(l=>l.startsWith('OK RATE ')));if(initial.active!=='0')throw Error('先停止当前测速');
-      if(info.profile==='SCS')return await this.runScsSpeedTest({selected,amplitudes,cycles},slots,info,onProgress);
+      if(info.profile==='SCS'||info.bench_sts==='1')return await this.runFeedbackSpeedTest({selected,amplitudes,cycles,speed:options?.speed},slots,info,onProgress);
       if(requestedAmplitudes===undefined)amplitudes.splice(0,amplitudes.length,.25,.5,1);
       const mask='0x'+selected.reduce((m,s)=>m|(1<<s),0).toString(16);
       for(const amplitude of amplitudes){
@@ -4675,27 +4685,28 @@ class StrictActionExecutor{
       return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
     }finally{this.cancelled=true;this.deadline=null;this.generation++;try{await this.io.safe();}finally{this.active=false;}}
   }
-  async runScsSpeedTest({selected,amplitudes,cycles},slots,info,onProgress){
-    if(selected.length!==6)throw Error('SCS测速需要六台舵机一起');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
-    const base=slots.map(slot=>{const lo=slot.low+6,hi=slot.high-6;if(lo>=hi)throw Error('校准行程不足以保留端点余量');const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
-    const started=this.now(),results=[];let watchdog;this.deadline=started+45000;this.feedbackMetrics={start:started,samples:0};
+  async runFeedbackSpeedTest({selected,amplitudes,cycles,speed:requestedSpeed},slots,info,onProgress){
+    const profile=motionProfile(info,{requireBench:true}),speed=requestedSpeed??profile.defaultBenchSpeed;if(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax)throw Error('测速速度超出当前型号范围');
+    if(selected.length!==6)throw Error('测速需要六台舵机一起');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
+    const base=slots.map(slot=>{const lo=slot.low+profile.inset,hi=slot.high-profile.inset;if(lo>=hi)throw Error('校准行程不足以保留端点余量');const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
+    const started=this.now(),results=[];let watchdog;const budget=profile.family==='STS'?Math.min(180000,Math.max(45000,(2*cycles+2)*amplitudes.reduce((n,a)=>n+Math.max(...base.map(s=>Math.abs(s.press-s.lift)*a))/speed*1000+2000,0))):45000;this.deadline=started+budget;this.feedbackMetrics={start:started,samples:0};
     const execute=async()=>{
       await this.command('ARM');if(actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO '))).armed!=='1')throw Error('使能未确认');
       for(const amplitude of amplitudes){
-        this.check();const scaled=base.map(slot=>({...slot,press:Math.round(slot.lift+(slot.press-slot.lift)*amplitude),measurementTolerance:amplitude<1?Math.max(6,Math.min(35,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):35}));
-        if(scaled.some(slot=>Math.abs(slot.press-slot.lift)<4))throw Error('测速幅度过小，无法区分反馈噪声');
-        const group=selected.map(slot=>({slot,amplitude:1})),cfg={speed:1000,scaledTolerance:true};
+        this.check();const scaled=base.map(slot=>({...slot,press:Math.round(slot.lift+(slot.press-slot.lift)*amplitude),measurementTolerance:amplitude<1?Math.max(profile.feedbackTolerance,Math.min(profile.tolerance,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):profile.tolerance}));
+        if(scaled.some(slot=>Math.abs(slot.press-slot.lift)<profile.feedbackTolerance*2))throw Error('测速幅度过小，无法区分反馈噪声');
+        const group=selected.map(slot=>({slot,amplitude:1})),cfg={speed,scaledTolerance:true};
         await this.reach(group,scaled,info,false,started,0,cycles,true,true,{...cfg,phase:'lift'});
         const measureStart=this.now();let completedCycles=0;const legMetrics=[];
         for(let cycle=0;cycle<cycles;cycle++){this.check();legMetrics.push(await this.reach(group,scaled,info,true,started,cycle,cycles,true,true,cfg));this.check();legMetrics.push(await this.reach(group,scaled,info,false,started,cycle,cycles,true,true,{...cfg,phase:'lift'}));completedCycles++;onProgress({amplitude,slots:[...selected],cycles,done:completedCycles+'/'+cycles,active:true,results:[...results],...this.feedbackStats()});}
         const fullElapsed=this.now()-measureStart;if(!Number.isFinite(fullElapsed)||fullElapsed<=0||completedCycles!==cycles)throw Error('测速时间或反馈不完整，不能认定频率');
-        const result={amplitude,slots:[...selected],cycles,full_ms:fullElapsed/cycles,hz:cycles*1000/fullElapsed,elapsed_ms:fullElapsed,feedbackVerified:true,protocol:'scs-feedback-ensemble-v1',speed:1000,performance:{commandMs:legMetrics.reduce((n,l)=>n+l.command_ms,0),preflightMs:legMetrics.reduce((n,l)=>n+l.preflight_ms,0),feedbackWaitMs:legMetrics.reduce((n,l)=>n+l.feedback_wait_ms,0),INFO_calls:legMetrics.reduce((n,l)=>n+l.INFO_calls,0),POSALL_calls:legMetrics.reduce((n,l)=>n+l.POSALL_calls,0),legs:legMetrics},...this.feedbackStats()};
+        const result={amplitude,slots:[...selected],cycles,full_ms:fullElapsed/cycles,hz:cycles*1000/fullElapsed,elapsed_ms:fullElapsed,feedbackVerified:true,protocol:info.profile==='SCS'?'scs-feedback-ensemble-v1':'sts-feedback-ensemble-v1',family:info.profile,speed,speedUnit:profile.unit,performance:{commandMs:legMetrics.reduce((n,l)=>n+l.command_ms,0),preflightMs:legMetrics.reduce((n,l)=>n+l.preflight_ms,0),feedbackWaitMs:legMetrics.reduce((n,l)=>n+l.feedback_wait_ms,0),KEEP_calls:legMetrics.reduce((n,l)=>n+(l.KEEP_calls??0),0),INFO_calls:legMetrics.reduce((n,l)=>n+l.INFO_calls,0),POSALL_calls:legMetrics.reduce((n,l)=>n+l.POSALL_calls,0),legs:legMetrics},...this.feedbackStats()};
         await this.reach(group,scaled,info,false,started,cycles,cycles,true,true,{...cfg,phase:'midpoint'});
         results.push(result);onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length,active:false});
       }
       return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
     };
-    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('六台测速超时，已停止'));},45000);})]);}finally{clearTimeout(watchdog);this.deadline=null;}
+    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('六台测速超时，已停止'));},budget);})]);}finally{clearTimeout(watchdog);this.deadline=null;}
   }
   async prepare(roles){
       const info=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
@@ -4734,35 +4745,37 @@ class StrictActionExecutor{
     const legStarted=this.now();
     if(bench&&group.length>1&&info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
     const modern=bench&&info.bench_feedback==='1',cached=modern&&this.lastPositions?.positions.armed==='1'&&this.lastPositions.positions.bench_active==='1'&&this.now()-this.lastPositions.at<=100;
-    const before=cached?this.lastPositions.positions:await this.positions(slots,+info.range),speed=requestedSpeed??(bench?1000:(info.profile==='SCS'?200:1200)),goals=new Map(),arrivals=new Map();let legDeadline=Infinity,issuedAt=null,POSALL_calls=cached?0:1+(before.retries??0);
-    if(bench&&![400,600,800,1000].includes(speed)&&speed!==1000)throw Error('台架档位无效');
+    const profile=motionProfile(info,{requireBench:bench}),before=cached?this.lastPositions.positions:await this.positions(slots,+info.range),speed=requestedSpeed??(bench?profile.defaultBenchSpeed:profile.normalRawSpeed),goals=new Map(),arrivals=new Map();let legDeadline=Infinity,issuedAt=null,KEEP_calls=0,lastKeepAt=null,POSALL_calls=cached?0:1+(before.retries??0);
+    if(bench&&(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax))throw Error('台架档位无效');
     for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
       if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
-      const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??35):35;
-      if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,timeout:bench?1000:Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
+      const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
+      if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.family==='STS'?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
     if(modern&&before.armed!=='1')throw Error('台架已释放，停止当前档位');
     if(bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架已释放，停止当前档位');}
     if(bench&&group.length>1){
       if(slots.some(slot=>!Number.isInteger(slot.id)||slot.id<1||slot.id>6))throw Error('组合动作需要ID1–6');
       const targets=Array(6).fill(512);slots.forEach((slot,s)=>targets[slot.id-1]=before[s]);let mask=0;for(const [s,g]of goals){targets[slots[s].id-1]=g.pos;mask|=1<<(slots[s].id-1);}
-      const at=this.now();issuedAt=at;legDeadline=at+1000;for(const g of goals.values())g.at=at;
+      const at=this.now();issuedAt=at;legDeadline=at+Math.max(...[...goals.values()].map(g=>g.timeout));for(const g of goals.values())g.at=at;
       const lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' '+speed),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
       if(modern&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('组合控制状态未确认');
-      if(ack.readback!=='1'||+ack.count!==group.length||parseInt(ack.mask)!==mask||+ack.speed!==speed)throw Error('组合目标写入未完整确认');
-    }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+1000);await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');}
-    const feedbackStarted=this.now();
-    while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:35,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
+      if(ack.readback!=='1'||+ack.count!==group.length||parseInt(ack.mask)!==mask||+ack.speed!==speed)throw Error('组合目标写入未完整确认');if(profile.family==='STS'){const actual=+ack.actual_speed;if(!Number.isInteger(actual)||actual<50||actual>speed)throw Error('实际速度未确认');for(const g of goals.values())g.timeout=Math.min(20000,Math.max(1200,g.travel/actual*1000+1000));legDeadline=at+Math.max(...[...goals.values()].map(g=>g.timeout));}
+    }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+g.timeout);const reply=await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');if(bench&&profile.family==='STS'){const ack=actionKV(reply.find(l=>l.startsWith('OK BENCH MOVE ')));const actual=+ack.actual_speed;if(!Number.isInteger(actual)||actual<50||actual>speed)throw Error('实际速度未确认');g.timeout=Math.min(20000,Math.max(1200,g.travel/actual*1000+1000));legDeadline=at+g.timeout;}}
+    const feedbackStarted=this.now();lastKeepAt=issuedAt;
+    while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:profile.tolerance,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
+      if(goals.size&&bench&&profile.family==='STS'&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
       if(!goals.size&&bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架截止已释放，不能判定到位');if(this.now()>=legDeadline)throw Error('台架到位确认超时，已停止');}
       this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
-    return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
+    return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,KEEP_calls,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
   }
   async runServoGroups(file,slots,info){
     const groups=[];for(const e of [...file.events].sort((a,b)=>a.t_ms-b.t_ms)){let g=groups.at(-1);if(!g||g[0].t_ms!==e.t_ms){g=[];groups.push(g);}if(g.some(x=>x.slot===e.slot))throw Error('同一动作槽位重复');g.push(e);}
     const start=this.now(),quick=file.quickDemo===true;this.feedbackMetrics={start,samples:0};let watchdog;
-    const execute=async()=>{for(let i=0;i<groups.length;i++){const group=groups[i];this.check();if(file.fullStroke)await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:'lift'});this.check();await this.reach(group,slots,info,true,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null});this.check();await this.sleep(quick?40:Math.min(300,Math.max(120,Math.min(...group.map(e=>e.duration_ms)))));this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:file.fullStroke?'lift':null});if(file.fullStroke){this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:'midpoint'});}this.check();if(!quick)await this.sleep(120);this.check();}
+    const execute=async()=>{for(let i=0;i<groups.length;i++){const group=groups[i];this.check();if(file.fullStroke)await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'lift'});this.check();await this.reach(group,slots,info,true,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null)});this.check();await this.sleep(quick?40:Math.min(300,Math.max(120,Math.min(...group.map(e=>e.duration_ms)))));this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:file.fullStroke?'lift':null});if(file.fullStroke){this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'midpoint'});}this.check();if(!quick)await this.sleep(120);this.check();}
       this.progress({elapsed:this.now()-start,groupIndex:groups.length,total:groups.length,completed:true,feedback:true,...this.feedbackStats()});return {completed:true,...this.feedbackStats(),events:file.events.length*(file.fullStroke?4:2),elapsed_ms:this.now()-start,feedbackVerified:true,...(file.fullStroke?{protocol:'fullStroke-v1',fullStroke:true}:{}),...(file.validationOnly?{speed:file.validationSpeed}:{})};};
     if(!quick)return execute();
-    const budget=file.validationOnly?30000:file.fullStroke||file.wearDemo===true?15000:4500;this.deadline=start+budget;
+    const profile=motionProfile(info),dynamicBudget=file.validationOnly&&profile.family==='STS'?Math.min(180000,Math.max(30000,Math.ceil(slots.reduce((n,slot)=>n+3.5*(slot.high-slot.low)/file.validationSpeed*1000,0)+slots.length*2000))):30000;
+    const budget=file.validationOnly?dynamicBudget:file.fullStroke||file.wearDemo===true?15000:4500;this.deadline=start+budget;
     try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error(file.fullStroke||file.wearDemo===true?'完整动作未在规定时间内完成，已停止':'5秒展示未完成，已停止'));},budget);})]);}
     finally{clearTimeout(watchdog);this.deadline=null;}
 
@@ -4770,6 +4783,7 @@ class StrictActionExecutor{
 
 }
 
+if(typeof window!=='undefined')window.PianoMotionProfiles={resolve:motionProfile};
 const section=document.querySelector('#p-play');
 if(!section) return;
 const card=document.createElement('div'); card.className='card';card.id='strictActionCard';
@@ -4881,7 +4895,7 @@ window.pianoStrictTrainingActive=()=>executor.active;
 window.pianoStrictExecutor=executor;window.pianoStrictLoad=loadStrictActions;
 window.pianoStrictStop=()=>executor.stop();
 window.pianoStrictPlay=async(input)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');loadStrictActions(input);stopPreview();transport.identity=null;try{await executor.run(parsed,ROLES.slice());}finally{S.needArm=true;}};
-window.pianoStrictDemo=async(plan)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;try{return await executor.run(plan,ROLES.slice(),{internalSlots:true});}finally{S.needArm=true;}};
+window.pianoStrictDemo=async(plan,{speed=null}={})=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;try{return await executor.run(plan,ROLES.slice(),{internalSlots:true,demoSpeed:speed});}finally{S.needArm=true;}};
 window.pianoStrictValidation=async({speed,onProgress}={})=>{if(executor.active||executor.pending||S.playing||window.pianoFirmwareBusy?.()||window.pianoMountBusy?.())throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;const previous=executor.progress;executor.progress=p=>{previous(p);if(typeof onProgress==='function')onProgress(p);};try{return await executor.runValidation({speed},ROLES.slice());}finally{executor.progress=previous;S.needArm=true;}};
 
 window.pianoStrictSpeed=async(options,progress)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;try{return await executor.runSpeedTest(options,ROLES.slice(),progress);}finally{S.needArm=true;}};

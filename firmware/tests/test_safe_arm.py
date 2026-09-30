@@ -28,7 +28,7 @@ bool torque[6];int goals[6];int writes=0,enables=0,safeCount=0;
 int edgePosition=-1;
 bool hardwareOutside=false,prewriteHardwareOutside=false,configFailed=false;int configReads=0;
 bool slack=false,prewriteOutside=false,settleTransient=false,settlePersistent=false,settleOutside=false,engagementTransient=false,enableTransient=false,enablePersistent=false;int feedbackReads[6]={};
-bool autoEnable=false;int implicitEnables=0;bool missingAck=false;bool badGoal=false,badOff=false,drift=false,outside=false;int failedEnable=-1;
+bool autoEnable=false;int autoEnableId=-1;int implicitEnables=0;bool missingAck=false;bool badGoal=false,badOff=false,drift=false,outside=false;int failedEnable=-1;
 const Profile &profile(){return pf;}int posTol(){return pf.family==Family::SCS?6:24;}
 int lastError(){return 0;}
 bool readRegs(uint8_t id,uint8_t addr,uint8_t n,uint8_t *out){
@@ -38,14 +38,14 @@ bool readRegs(uint8_t id,uint8_t addr,uint8_t n,uint8_t *out){
  return true;
 }
 bool readFeedback(uint8_t id,Feedback &fb){int i=id-1;int n=++feedbackReads[i];fb.pos=edgePosition>=0?edgePosition:hardwareOutside||(prewriteHardwareOutside&&n>1)?1005:outside||(prewriteOutside&&n>1)||(settleOutside&&n>=4)?999:(drift&&torque[i]?481:((settleTransient&&n==4)||(engagementTransient&&n>=3&&n<=4)||(enableTransient&&n>=7&&n<=8)||(enablePersistent&&n>=7)||(settlePersistent&&n>=4)?390:(slack&&n>1?401:381)));return true;}
-bool moveTo(uint8_t id,uint16_t p,uint16_t,uint8_t){assert(!torque[id-1]);goals[id-1]=p;++writes;if(autoEnable&&pf.family==Family::SCS){torque[id-1]=true;++implicitEnables;}return !missingAck;}
+bool moveTo(uint8_t id,uint16_t p,uint16_t,uint8_t){assert(!torque[id-1]);goals[id-1]=p;++writes;if(autoEnable&&(autoEnableId<0||id==autoEnableId)){torque[id-1]=true;++implicitEnables;}return !missingAck;}
 bool setTorque(uint8_t id,bool on){if(on){assert(writes==6);assert(goals[id-1]==(edgePosition>=0?(edgePosition<g_slot[id-1].lo?g_slot[id-1].lo:(edgePosition>g_slot[id-1].hi?g_slot[id-1].hi:edgePosition)):(slack?401:381)));++enables;if(id==failedEnable)return false;}torque[id-1]=on;return true;}
 }
 void safe(){++scs::safeCount;g_armed=false;for(int i=0;i<6;++i)scs::torque[i]=false;}
 '''
 body+='\nuint16_t pressPos(int,uint8_t){return 800;}\n'+move_body
 tests=r'''
-void reset(){g_calibrated=true;g_armed=false;scs::pf={};scs::writes=0;scs::enables=0;scs::safeCount=0;fakeMs=0;scs::edgePosition=-1;scs::hardwareOutside=scs::prewriteHardwareOutside=false;scs::settleTransient=scs::settlePersistent=scs::settleOutside=scs::engagementTransient=scs::enableTransient=scs::enablePersistent=false;scs::slack=false;scs::prewriteOutside=false;memset(scs::feedbackReads,0,sizeof(scs::feedbackReads));scs::autoEnable=false;scs::implicitEnables=0;scs::missingAck=false;scs::badGoal=scs::badOff=scs::drift=scs::outside=false;scs::failedEnable=-1;for(int i=0;i<6;++i){g_slot[i].id=i+1;g_slot[i].lo=100;g_slot[i].hi=900;scs::torque[i]=false;scs::goals[i]=800;}}
+void reset(){g_calibrated=true;g_armed=false;scs::pf={};scs::writes=0;scs::enables=0;scs::safeCount=0;fakeMs=0;scs::edgePosition=-1;scs::hardwareOutside=scs::prewriteHardwareOutside=false;scs::settleTransient=scs::settlePersistent=scs::settleOutside=scs::engagementTransient=scs::enableTransient=scs::enablePersistent=false;scs::slack=false;scs::prewriteOutside=false;memset(scs::feedbackReads,0,sizeof(scs::feedbackReads));scs::autoEnableId=-1;scs::autoEnable=false;scs::implicitEnables=0;scs::missingAck=false;scs::badGoal=scs::badOff=scs::drift=scs::outside=false;scs::failedEnable=-1;for(int i=0;i<6;++i){g_slot[i].id=i+1;g_slot[i].lo=100;g_slot[i].hi=900;scs::torque[i]=false;scs::goals[i]=800;}}
 void off(){assert(!g_armed);for(bool on:scs::torque)assert(!on);}
 int main(){
  reset();assert(!moveRaw(1,381,600,30));g_armed=true;assert(!moveRaw(1,99,600,30));assert(!moveRaw(77,381,600,30));g_slot[0].lo=0;assert(!moveRaw(1,19,600,30));assert(scs::writes==0);
@@ -92,6 +92,9 @@ int main(){
  reset();g_slot[0].lo=1000;g_slot[0].hi=5;assert(!armAtCurrent(63));off();assert(scs::writes==0);
  reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;g_slot[0].lo=4090;g_slot[0].hi=5;assert(!armAtCurrent(63));off();assert(scs::writes==0);
  for(int range=1023;range<=4095;range+=3072)for(int n=1;n<=7;n++){reset();scs::pf.range=range;scs::pf.family=range==1023?scs::Family::SCS:scs::Family::STS;for(auto &sl:g_slot){sl.lo=381;sl.hi=381+n;}assert(armAtCurrent(63));}
+ reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::autoEnable=true;scs::autoEnableId=4;assert(armAtCurrent(63));assert(g_armed&&scs::implicitEnables==1&&scs::enables==5);for(int goal:scs::goals)assert(goal==381);
+ reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::autoEnable=true;assert(armPrepareCurrent(63));off();assert(scs::implicitEnables==6&&scs::enables==0);
+ reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::autoEnable=true;scs::drift=true;assert(!armAtCurrent(63));off();assert(strstr(armFailure(),"postwrite_moved"));
  reset();scs::configReads=0;ArmCheck merged;assert(inspectArmSlot(0,merged)&&scs::configReads==1&&merged.minimum==20&&merged.maximum==1003&&merged.responseLevel==1);scs::configFailed=true;assert(!inspectArmSlot(0,merged)&&!merged.limitsOk&&merged.responseLevel==-1);scs::configFailed=false;
  puts("actual armAtCurrent PASS: SCS/STS, merged SCS config read/failure, off before goals, all goals before enable, readback/profile/calibration/drift/partial-enable rollback");
 }

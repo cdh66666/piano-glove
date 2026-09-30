@@ -145,6 +145,8 @@ int posTol();
 // speed = 0 表示用舵机自身的最大速度。
 // 返回 false = 没收到回包；返回 true 但 lastError()!=0 = 舵机拒绝了这条指令。
 bool    moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc);
+// BENCH speed is normalized encoder counts/s; ordinary moveTo remains raw SDK units.
+bool    checkedBenchSpeed(uint8_t id,uint16_t countsPerSecond,uint16_t &raw,uint16_t *actual=nullptr);
 bool    setTorque(uint8_t id, bool on);
 bool    setId(uint8_t oldId, uint8_t newId);
 int     scan(uint8_t maxId, uint8_t *found, int cap);

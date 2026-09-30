@@ -1,5 +1,6 @@
 #include "glove.h"
 #include "cal_circle.h"
+#include "profile_limits.h"
 
 #include <Preferences.h>
 
@@ -470,7 +471,7 @@ bool inspectArmSlot(int s,ArmCheck &out){
 static int armFeedbackMargin(const Slot &sl){
  if(scs::profile().family!=scs::Family::SCS||sl.lo>sl.hi)return 0;
  const int span=sl.hi-sl.lo;
- int tol=scs::posTol();if(tol>6)tol=6;if(tol>span/4)tol=span/4;return tol;
+ int tol=scs::posTol();if(tol>(scs::profile().family==scs::Family::SCS?6:24))tol=scs::profile().family==scs::Family::SCS?6:24;if(tol>span/4)tol=span/4;return tol;
 }
 static bool armFeedbackAllowed(const Slot &sl,int pos,int range){
  if(pos<0||pos>range)return false;
@@ -507,7 +508,7 @@ static bool prepareArm(uint8_t mask,bool enable){
  if(!g_calibrated||calInvalidSlot()>=0)return armFail("calibration",calInvalidSlot());
  if(!motionCalibrationSupported())return armFail("wrapped_motion");
  uint16_t goals[SLOT_COUNT]={},hardwareLo[SLOT_COUNT]={},hardwareHi[SLOT_COUNT]={};
- // Check every selected axis before any position write can auto-enable an SCS servo.
+ // Check every selected axis before any position write can auto-enable a servo.
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;const Slot &sl=g_slot[s];uint8_t off=0xFF;scs::Feedback fb;
   if(!scs::readRegs(sl.id,scs::REG_TORQUE_EN,1,&off)||scs::lastError())return armFail("torque_off_read",s,off,0);
   if(off!=0)return armFail("torque_off_value",s,off,0);
@@ -535,28 +536,28 @@ static bool prepareArm(uint8_t mask,bool enable){
   if(boundedGoal<0)return armFail("target_intersection_empty",s);
   goals[s]=boundedGoal;
   const bool writeOk=scs::moveTo(sl.id,goals[s],g_speed,g_acc)&&!scs::lastError();const int writeError=scs::lastError();
-  // SC09 position writes have been observed to auto-enable. PREPARE requests off
+  // Both SCS and STS position writes have been observed to auto-enable. PREPARE requests off
  // immediately, then proves off/goal/current readback; it is not a never-enabled command.
-  if(big&&!enable&&(!scs::setTorque(sl.id,false)||scs::lastError()))return armFail("prepare_off_write",s);
+  if(!enable&&(!scs::setTorque(sl.id,false)||scs::lastError()))return armFail("prepare_off_write",s);
   uint8_t regs[4];if(!scs::readRegs(sl.id,scs::REG_TORQUE_EN,4,regs)||scs::lastError())return armFail("goal_read",s);
   const int goal=big?(regs[2]<<8)|regs[3]:regs[2]|(regs[3]<<8);if(goal!=goals[s])return armFail("goal_mismatch",s,goal,goals[s]);
-  if((!big||!enable)?regs[0]!=0:regs[0]>1)return armFail("goal_torque_changed",s,regs[0],!big||!enable?0:1);
+  if(!enable?regs[0]!=0:regs[0]>1)return armFail("goal_torque_changed",s,regs[0],!enable?0:1);
   if(!writeOk)return armFail("goal_write_unacknowledged",s,goal,goals[s],writeError);
-  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],big&&enable,"postwrite_feedback","postwrite_outside","postwrite_moved"))return false;
+  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],enable,"postwrite_feedback","postwrite_outside","postwrite_moved"))return false;
  }
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;
-  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],big&&enable,"current_read","current_outside","current_moved"))return false;
+  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],enable,"current_read","current_outside","current_moved"))return false;
  }
  if(!enable){g_armed=false;return true;}
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;
   uint8_t on=0;if(!scs::readRegs(g_slot[s].id,scs::REG_TORQUE_EN,1,&on)||scs::lastError())return armFail("pre_enable_read",s);
-  if(on>1||(!big&&on!=0))return armFail("pre_enable_value",s,on,0);
+  if(on>1)return armFail("pre_enable_value",s,on,1);
   if(on==0&&(!scs::setTorque(g_slot[s].id,true)||scs::lastError()))return armFail("enable_write",s);
  }
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;uint8_t on=0;scs::Feedback fb;
   if(!scs::readRegs(g_slot[s].id,scs::REG_TORQUE_EN,1,&on)||scs::lastError())return armFail("enable_read",s);
   if(on!=1)return armFail("enable_value",s,on,1);
-  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],big,"enabled_feedback","enabled_outside","enabled_moved"))return false;
+  if(!checkArmSettled(s,goals[s],hardwareLo[s],hardwareHi[s],true,"enabled_feedback","enabled_outside","enabled_moved"))return false;
  }
  g_armed=true;return true;
 }
@@ -604,46 +605,56 @@ const char *benchFailure(){return g_benchFailure;}
 void benchTick(){
  if(g_benchActive&&int32_t(millis()-g_benchDeadline)>=0){safe();Serial.println("BENCH_DONE reason=deadline torque=off armed=0");}
 }
-static bool benchValidate(uint8_t id,uint16_t pos,uint16_t speed){
+static uint16_t g_benchActualSpeed=0;
+uint16_t benchActualSpeed(){return g_benchActualSpeed;}
+static bool benchValidate(uint8_t id,uint16_t pos,uint16_t speed,uint16_t *rawSpeed=nullptr,uint16_t *actualSpeed=nullptr){
  g_benchFailure="none";
- if(scs::profile().family!=scs::Family::SCS||!scs::profile().probed||scs::profile().range!=1023){g_benchFailure="SCS_required";return false;}
- if(id<1||id>6||speed<50||speed>1000){g_benchFailure="id_or_speed_outside_bounds";return false;}
+ const bool big=scs::profile().family==scs::Family::SCS;const int range=big?1023:4095;
+ if((!big&&scs::profile().family!=scs::Family::STS)||!scs::profile().probed||scs::profile().range!=range){g_benchFailure="verified_profile_required";return false;}
+ if(id<1||id>6||speed<50||speed>(big?1000:8000)){g_benchFailure="id_or_speed_outside_bounds";return false;}
  if(!g_armed||!g_calibrated||calInvalidSlot()>=0||g_sweep||g_rate||g_auto||g_demo){g_benchFailure="not_armed_or_busy";return false;}
  const int s=slotOfId(id);ArmCheck row;
  if(s<0||!g_slot[s].valid||!motionCalibrationSupported()||!inspectArmSlot(s,row)||!row.registersOk||!row.feedbackOk||!row.limitsOk||row.torque!=1){g_benchFailure="feedback_or_torque_invalid";return false;}
  const auto &sl=g_slot[s];
- if(row.minimum>=row.maximum||pos>1023||!calcircle::contains(sl.lo,sl.hi,pos,1023)||pos<row.minimum||pos>row.maximum||!armFeedbackAllowed(sl,row.position,1023)||row.position<row.minimum||row.position>row.maximum){g_benchFailure="outside_calibrated_or_hardware_range";return false;}
+ if(row.minimum>=row.maximum||pos>range||!calcircle::contains(sl.lo,sl.hi,pos,range)||pos<row.minimum||pos>row.maximum||!armFeedbackAllowed(sl,row.position,range)||row.position<row.minimum||row.position>row.maximum){g_benchFailure="outside_calibrated_or_hardware_range";return false;}
+ uint16_t raw;if(!scs::checkedBenchSpeed(id,speed,raw,actualSpeed)){g_benchFailure="speed_phase_mode_or_resolution_unverified";return false;}
+ if(rawSpeed)*rawSpeed=raw;
  return true;
 }
 bool benchMove(uint8_t id,uint16_t pos,uint16_t speed){
- if(!benchValidate(id,pos,speed))return false;
- const uint8_t goal[6]={uint8_t(pos>>8),uint8_t(pos),0,0,uint8_t(speed>>8),uint8_t(speed)};
+ uint16_t raw,actualSpeed;if(!benchValidate(id,pos,speed,&raw,&actualSpeed))return false;
+ uint8_t payload[8];const uint8_t size=benchMotionPayload(scs::profile().family==scs::Family::SCS,pos,raw,0,payload);
  g_benchActive=true;g_benchDeadline=millis()+1200; // Autonomous cutoff; host silence cannot leave torque enabled.
- if(!scs::writeRegs(id,42,goal,6)||scs::lastError()){g_benchFailure="write_failed";safe();return false;}
- uint8_t actual[6]={};
- if(!scs::readRegs(id,42,6,actual)||scs::lastError()||memcmp(actual,goal,6)){g_benchFailure="goal_readback_failed";safe();return false;}
+ if(!scs::writeRegs(id,payload[0],payload+1,size-1)||scs::lastError()){g_benchFailure="write_failed";safe();return false;}
+ uint8_t actual[7]={};
+ if(!scs::readRegs(id,payload[0],size-1,actual)||scs::lastError()||memcmp(actual,payload+1,size-1)){g_benchFailure="goal_readback_failed";safe();return false;}
  benchTick();if(!g_benchActive){g_benchFailure="deadline";return false;}
+ g_benchActualSpeed=actualSpeed;
  return true;
 }
 bool benchGroup(uint8_t mask,const uint16_t positions[6],uint16_t speed){
  g_benchFailure="none";benchTick();
- if(!positions||!mask||(mask&~0x3Fu)||speed<50||speed>1000){g_benchFailure="group_input_outside_bounds";safe();return false;}
- for(int id=1;id<=6;++id)if(positions[id-1]>1023){g_benchFailure="group_input_outside_bounds";safe();return false;}
- scs::SyncItem items[6];int n=0;
- for(int id=1;id<=6;++id)if(mask&(1u<<(id-1))){if(!benchValidate(id,positions[id-1],speed)){safe();return false;}benchTick();if(!g_armed){g_benchFailure="deadline";return false;}items[n++]={uint8_t(id),positions[id-1],speed,0};}
+ if(!positions||!mask||(mask&~0x3Fu)||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){g_benchFailure="group_input_outside_bounds";safe();return false;}
+ for(int id=1;id<=6;++id)if(positions[id-1]>scs::profile().range){g_benchFailure="group_input_outside_bounds";safe();return false;}
+ scs::SyncItem items[6];int n=0;uint16_t minimumActual=65535;
+ for(int id=1;id<=6;++id)if(mask&(1u<<(id-1))){uint16_t raw,actualSpeed;if(!benchValidate(id,positions[id-1],speed,&raw,&actualSpeed)){safe();return false;}benchTick();if(!g_armed){g_benchFailure="deadline";return false;}items[n++]={uint8_t(id),positions[id-1],raw,0};if(actualSpeed<minimumActual)minimumActual=actualSpeed;}
  // All selected devices are verified before the single broadcast. Ordinary syncMove remains capped.
  benchTick();if(!g_armed){g_benchFailure="deadline";return false;}
  g_benchActive=true;g_benchDeadline=millis()+1200;
  scs::syncMove(items,n,true);
  if(scs::lastError()){g_benchFailure="group_write_failed";safe();return false;}
- for(int i=0;i<n;++i){const auto &v=items[i];const uint8_t goal[6]={uint8_t(v.pos>>8),uint8_t(v.pos),0,0,uint8_t(speed>>8),uint8_t(speed)};uint8_t actual[6]={};
-  if(!scs::readRegs(v.id,42,6,actual)||scs::lastError()||memcmp(actual,goal,6)){g_benchFailure="group_goal_readback_failed";safe();return false;}
+ for(int i=0;i<n;++i){const auto &v=items[i];uint8_t payload[8],actual[7]={};const uint8_t size=benchMotionPayload(scs::profile().family==scs::Family::SCS,v.pos,v.speed,v.acc,payload);
+  if(!scs::readRegs(v.id,payload[0],size-1,actual)||scs::lastError()||memcmp(actual,payload+1,size-1)){g_benchFailure="group_goal_readback_failed";safe();return false;}
   benchTick();if(!g_benchActive){g_benchFailure="deadline";return false;}
  }
+ g_benchActualSpeed=minimumActual;
  return true;
 }
 bool mountActive(){return g_mountActive;}
 uint8_t mountReadyMask(){return g_mountReady;}
+bool benchKeep(){benchTick();if(!g_benchActive||!g_armed)return false;g_benchDeadline=millis()+1200;return true;}
+int mountTarget(){return scs::profile().family==scs::Family::SCS?512:2048;}
+int mountSpeed(){return scs::profile().family==scs::Family::SCS?200:800;}
 int mountPosition(int id){return id>=1&&id<=6?g_mountPos[id-1]:-1;}
 const char *mountReason(){return g_mountReason;}
 static bool mountFail(const char *reason){safe();g_mountReason=reason;return false;}
@@ -654,7 +665,7 @@ static bool mountRead(int axis){
  if(!scs::readRegs(id,40,1,&on)||scs::lastError()||on!=1)return mountFail("holding_torque_missing");
  g_mountPos[axis]=fb.pos;
  const uint8_t bit=1u<<axis;
- if(abs(fb.pos-512)<=scs::posTol())g_mountReady|=bit;else g_mountReady&=uint8_t(~bit);
+ if(abs(fb.pos-mountTarget())<=scs::posTol())g_mountReady|=bit;else g_mountReady&=uint8_t(~bit);
  return true;
 }
 void mountTick(){
@@ -680,7 +691,8 @@ bool mountStart(){
  if(g_mountActive){g_mountReason="already_active";return false;}
  safe();g_mountReason="none";
  for(uint8_t id=1;id<=6;++id)scs::setTorque(id,false);
- if(scs::profile().family!=scs::Family::SCS||!scs::profile().probed||scs::profile().range!=1023)return mountFail("SCS_required");
+ const bool big=scs::profile().family==scs::Family::SCS;const int range=big?1023:4095;
+ if((!big&&scs::profile().family!=scs::Family::STS)||!scs::profile().probed||scs::profile().range!=range)return mountFail("verified_profile_required");
  uint16_t model=0;
  // Validate all six fixed addresses before any position write. Old travel calibration is irrelevant here.
  for(int axis=0;axis<6;++axis){
@@ -690,18 +702,20 @@ bool mountStart(){
   if(!actualModel||actualModel==0xFFFF||(model&&model!=actualModel))return mountFail("mixed_or_invalid_model");
   model=actualModel;
   if(!scs::readRegs(id,9,4,limits)||scs::lastError())return mountFail("hardware_limits_missing");
-  const uint16_t lo=(uint16_t(limits[0])<<8)|limits[1],hi=(uint16_t(limits[2])<<8)|limits[3];
-  if(lo>=hi||hi>1023||lo>512||hi<512)return mountFail("midpoint_outside_hardware_limits");
+  const uint16_t lo=servoWord(limits,big),hi=servoWord(limits+2,big);
+  if(lo>=hi||hi>range||lo>mountTarget()||hi<mountTarget())return mountFail("midpoint_outside_hardware_limits");
   if(!scs::readFeedback(id,fb)||scs::lastError()||!fb.ok||fb.pos<lo||fb.pos>hi)return mountFail("feedback_invalid");
   if(!scs::readRegs(id,40,1,&off)||scs::lastError()||off!=0)return mountFail("torque_off_unverified");
+  uint16_t raw;if(!scs::checkedBenchSpeed(id,mountSpeed(),raw))return mountFail("speed_phase_mode_or_resolution_unverified");
   g_mountLo[axis]=lo;g_mountHi[axis]=hi;g_mountPos[axis]=fb.pos;
  }
  invalidateCalibration(); // Persist before remounting: old limits can never resume on reconnect/reboot.
  g_mountReady=0;g_mountNext=0;g_mountActive=true;g_mountDeadline=millis()+3000;g_mountArrivalDeadline=millis()+4000;g_mountPollMs=millis();
  for(int axis=0;axis<6;++axis){
-  const uint8_t id=axis+1;uint8_t goal[6]={};
-  if(!scs::moveTo(id,512,200,0)||scs::lastError())return mountFail("midpoint_write_failed");
-  if(!scs::readRegs(id,42,6,goal)||scs::lastError()||goal[0]!=2||goal[1]!=0||goal[2]!=0||goal[3]!=0||goal[4]!=0||goal[5]!=200)return mountFail("midpoint_goal_unverified");
+  const uint8_t id=axis+1;uint8_t goal[7]={},payload[8];uint16_t raw;if(!scs::checkedBenchSpeed(id,mountSpeed(),raw))return mountFail("speed_config_changed");
+  const uint8_t size=benchMotionPayload(big,mountTarget(),raw,big?0:30,payload);
+  if(!scs::writeRegs(id,payload[0],payload+1,size-1)||scs::lastError())return mountFail("midpoint_write_failed");
+  if(!scs::readRegs(id,payload[0],size-1,goal)||scs::lastError()||memcmp(goal,payload+1,size-1))return mountFail("midpoint_goal_unverified");
   uint8_t on=0;if(!scs::readRegs(id,40,1,&on)||scs::lastError()||on>1)return mountFail("torque_read_failed");
   if(on==0&&(!scs::setTorque(id,true)||scs::lastError()))return mountFail("holding_torque_failed");
   if(!mountRead(axis))return false;
@@ -1057,8 +1071,56 @@ void setPressProfile(uint16_t speed, uint8_t acc) {
 
 // ---------------- NVS ----------------
 
+static char g_originFailure[96]="none";
+static uint32_t g_originEpoch=0;
+uint32_t originEpoch(){return g_originEpoch;}
+const char *originFailure(){return g_originFailure;}
+bool calOrigin(){
+ safe();
+ const auto &pf=scs::profile();
+ auto fail=[](const char*why,int id){snprintf(g_originFailure,sizeof(g_originFailure),"reason=%s id=%d motion=0 recapture_required=1",why,id);safe();return false;};
+ if(pf.family!=scs::Family::STS||!pf.probed||pf.range!=4095)return fail("verified_STS_required",0);
+ uint16_t offsets[6]={},model=0;
+ for(uint8_t id=1;id<=6;++id){
+  uint8_t off=255,identity[2]={},limits[4]={},old[2]={};uint16_t raw;scs::Feedback fb;
+  if(!scs::readRegs(id,40,1,&off)||scs::lastError()||off!=0)return fail("torque_off_unverified",id);
+  if(!scs::checkedBenchSpeed(id,1000,raw))return fail("phase_mode_resolution_unverified",id);
+  if(!scs::readRegs(id,3,2,identity)||scs::lastError())return fail("identity_missing",id);
+  const uint16_t m=uint16_t(identity[0])<<8|identity[1];if(!m||m==0xffff||(model&&model!=m))return fail("mixed_model",id);model=m;
+  if(!scs::readRegs(id,9,4,limits)||scs::lastError()||servoWord(limits,false)!=0||servoWord(limits+2,false)!=4095)return fail("full_hardware_limits_required",id);
+  if(!scs::readRegs(id,31,2,old)||scs::lastError())return fail("offset_backup_read_failed",id);
+  offsets[id-1]=servoWord(old,false);
+  if(!scs::readFeedback(id,fb)||scs::lastError()||!fb.ok||fb.pos<0||fb.pos>4095)return fail("feedback_invalid",id);
+ }
+ // Keep recoverable pre-change metadata before invalidating old travel or changing coordinates.
+ if(prefs.putBytes("origin_old",offsets,sizeof(offsets))!=sizeof(offsets))return fail("offset_backup_persist_failed",0);
+ prefs.putUShort("origin_model",model);prefs.putUChar("origin_mask",0);
+ const uint32_t epoch=g_originEpoch+1;
+ if(prefs.putUInt("origin_epoch",epoch)!=sizeof(epoch))return fail("origin_epoch_persist_failed",0);
+ g_originEpoch=epoch;
+ invalidateCalibration();
+ uint8_t completed=0;
+ for(uint8_t id=1;id<=6;++id){
+  const uint8_t center=128;uint8_t off=255,after[2]={};scs::Feedback fb;
+  const bool ack=scs::writeRegs(id,40,&center,1)&&!scs::lastError();
+  if(!ack)return fail("origin_write_unacknowledged",id);
+  const uint32_t started=millis();bool verified=false;
+  do{
+   const bool torqueRead=scs::readRegs(id,40,1,&off)&&!scs::lastError();
+   if(torqueRead&&off==1)return fail("origin_torque_on",id);
+   if(torqueRead&&off==0&&scs::readFeedback(id,fb)&&!scs::lastError()&&fb.ok&&abs(fb.pos-2048)<=24){verified=true;break;}
+   if(millis()-started>=200)break;
+   delay(5);
+  }while(millis()-started<=200);
+  if(!verified||!scs::readRegs(id,31,2,after)||scs::lastError())return fail("origin_readback_timeout",id);
+  completed|=1u<<(id-1);prefs.putUChar("origin_mask",completed);
+  Serial.printf("ORIGIN_SLOT id=%u old_offset=%u new_offset=%u pos=%d torque=0 verified=1 motion=0\n",id,offsets[id-1],servoWord(after,false),fb.pos);
+ }
+ strcpy(g_originFailure,"none");return true;
+}
 void load() {
   prefs.begin("pianoglove", false);
+  g_originEpoch=prefs.getUInt("origin_epoch",0);
   g_speed      = prefs.getUShort("speed", 1200);
   g_acc        = prefs.getUChar("acc", 30);
   g_calibrated = prefs.getBool("calib", false);
