@@ -4561,9 +4561,9 @@ class StrictActionExecutor{
       const {info,slots}=await this.prepare(roles),profile=motionProfile(info);if(demoSpeed!==null&&(!internalSlots||!file.benchQuick||!Number.isInteger(demoSpeed)||demoSpeed<profile.speedMin||demoSpeed>profile.speedMax))throw Error('展示速度超出当前型号范围');file={...file,runtimeSpeed:demoSpeed??profile.defaultBenchSpeed};
       if((file.validationOnly||file.validationSpeed!==undefined)&&validationSpeed===null)throw Error('档位验证只能从专用流程启动');
       if(validationSpeed!==null){if(!profile.stages.includes(validationSpeed)||!internalSlots)throw Error('档位验证参数无效');file={...file,validationOnly:true,validationSpeed,fullStroke:true,quickDemo:true,benchQuick:info.profile==='STS'||validationSpeed>200};}
-      if(file.benchQuick||file.fullStroke||profile.family==='STS'){
+      if(file.benchQuick||file.fullStroke||profile.family==='STS'||!internalSlots){
         if((file.benchQuick||file.fullStroke)&&(!internalSlots||file.quickDemo!==true))throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
-        for(const slot of slots){const {lo,hi}=motionBounds(slot,profile);slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
+        for(const slot of slots){const {lo,hi}=motionBounds(slot,profile);slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke||!internalSlots){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);slot.rest=slot.lift;}}
       }
       if(file.holdThumbSide||!internalSlots){const midpoint=Math.round((slots[0].low+slots[0].high)/2);slots[0]={...slots[0],holdMidpoint:true,midpoint,rest:midpoint,press:midpoint,lift:midpoint};}
       if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
@@ -4585,7 +4585,7 @@ class StrictActionExecutor{
       await this.command('ARM');
       const armed=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
       if(armed.armed!=='1')throw Error('使能未确认');
-      if((file.holdThumbSide||!internalSlots)&&!file.rhythmDemo)await this.reach([{slot:0,amplitude:1}],slots,info,false,runStarted,0,1,true,file.benchQuick===true,{speed:file.benchQuick?file.runtimeSpeed:null,phase:'midpoint'});
+      if(!internalSlots)await this.reach(slots.map((_,slot)=>({slot,amplitude:1})),slots,info,false,runStarted,0,1,true,false,{phase:'lift'});else if(file.holdThumbSide&&!file.rhythmDemo)await this.reach([{slot:0,amplitude:1}],slots,info,false,runStarted,0,1,true,file.benchQuick===true,{speed:file.benchQuick?file.runtimeSpeed:null,phase:'midpoint'});
       if(internalSlots)return file.rhythmDemo?await this.runRhythmDemo(file,slots,info,runStarted):await this.runServoGroups(file,slots,info);
       let targets=new Map(),positions=[],nextPoll=0,index=0;
       const range=Number(info.range),tol=info.profile==='SCS'?6:24,speed=info.profile==='SCS'?200:1200,start=this.now();
@@ -4631,7 +4631,8 @@ class StrictActionExecutor{
     const events=[];for(const e of file.events){if(e.t_ms+e.duration_ms>file.duration_ms)throw Error('动作超出曲目时长');events.push({t:e.t_ms,on:true,s:e.slot},{t:e.t_ms+e.duration_ms,on:false,s:e.slot});}
     events.sort((a,b)=>a.t-b.t||Number(a.on)-Number(b.on));const batches=[];for(const e of events){let batch=batches.at(-1);if(!batch||batch.t!==e.t){batch={t:e.t,events:[]};batches.push(batch);}if(batch.events.some(v=>v.s===e.s))throw Error('同指抬起与按下需要留出行程时间');batch.events.push(e);}
     if(batches.some((batch,i)=>batch.t-(i?batches[i-1].t:0)>1050))throw Error('片段停顿过长，请选连续的短乐句');
-    const used=new Set(file.events.map(e=>e.slot));slots=slots.map((slot,s)=>used.has(s)?slot:{...slot,lift:slot.midpoint,holdMidpoint:s===0});
+    // All five playing fingers rest at their lifted endpoint, including rests and unused fingers.
+    slots=slots.map((slot,s)=>s===0?{...slot,press:slot.midpoint,lift:slot.midpoint,rest:slot.midpoint,holdMidpoint:true}:slot);
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
       await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
@@ -4654,7 +4655,7 @@ class StrictActionExecutor{
           this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,pressedSlots:[...pressedSlots],...this.feedbackStats()});continue;}
         await this.sleep(4);
       }
-      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'midpoint'});
+      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
       await this.io.safe();this.feedbackArmedExpected=false;this.lastPositions=null;
       while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,pressedSlots:[],tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
       const scoreElapsed=this.now()-scoreStarted;
@@ -4776,8 +4777,8 @@ class StrictActionExecutor{
   async runServoGroups(file,slots,info){
     const groups=[];for(const e of [...file.events].sort((a,b)=>a.t_ms-b.t_ms)){let g=groups.at(-1);if(!g||g[0].t_ms!==e.t_ms){g=[];groups.push(g);}if(g.some(x=>x.slot===e.slot))throw Error('同一动作槽位重复');g.push(e);}
     const start=this.now(),quick=file.quickDemo===true;this.feedbackMetrics={start,samples:0};let watchdog;
-    const execute=async()=>{for(let i=0;i<groups.length;i++){const group=groups[i];this.check();if(file.fullStroke)await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'lift'});this.check();await this.reach(group,slots,info,true,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null)});this.check();await this.sleep(quick?40:Math.min(300,Math.max(120,Math.min(...group.map(e=>e.duration_ms)))));this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:file.fullStroke?'lift':null});if(file.fullStroke){this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'midpoint'});}this.check();if(!quick)await this.sleep(120);this.check();}
-      this.progress({elapsed:this.now()-start,groupIndex:groups.length,total:groups.length,completed:true,feedback:true,...this.feedbackStats()});return {completed:true,...this.feedbackStats(),events:file.events.length*(file.fullStroke?4:2),elapsed_ms:this.now()-start,feedbackVerified:true,...(file.fullStroke?{protocol:'fullStroke-v1',fullStroke:true}:{}),...(file.validationOnly?{speed:file.validationSpeed}:{})};};
+    const execute=async()=>{for(let i=0;i<groups.length;i++){const group=groups[i];this.check();if(file.fullStroke)await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'lift'});this.check();await this.reach(group,slots,info,true,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null)});this.check();await this.sleep(quick?40:Math.min(300,Math.max(120,Math.min(...group.map(e=>e.duration_ms)))));this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:file.fullStroke?'lift':null});if(file.fullStroke&&file.validationOnly){this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??(file.benchQuick?file.runtimeSpeed:null),phase:'midpoint'});}this.check();if(!quick)await this.sleep(120);this.check();}
+      this.progress({elapsed:this.now()-start,groupIndex:groups.length,total:groups.length,completed:true,feedback:true,...this.feedbackStats()});return {completed:true,...this.feedbackStats(),events:file.events.length*(file.fullStroke?(file.validationOnly?4:3):2),elapsed_ms:this.now()-start,feedbackVerified:true,...(file.fullStroke?{protocol:'fullStroke-v1',fullStroke:true}:{}),...(file.validationOnly?{speed:file.validationSpeed}:{})};};
     if(!quick)return execute();
     const profile=motionProfile(info),dynamicBudget=file.validationOnly&&profile.family==='STS'?Math.min(180000,Math.max(30000,Math.ceil(slots.reduce((n,slot)=>n+3.5*(slot.high-slot.low)/file.validationSpeed*1000,0)+slots.length*2000))):30000;
     const budget=file.validationOnly?dynamicBudget:file.fullStroke||file.wearDemo===true?15000:4500;this.deadline=start+budget;
