@@ -14,8 +14,8 @@
 
 桥把串口搬到 Python 进程里：网页只跟 http://127.0.0.1:8123 说 HTTP，
 由 Python 用 pyserial 去开真实串口。这样**任何能打开网页的东西**都能用，
-而且不用选口 —— 桥自己扫描、按芯片型号打分、逐个发 INFO 试探，
-谁回 OK INFO 就连谁；板子拔了再插也会自己连回来。
+而且不用选口 —— 桥自己扫描，仅对 10C4:EA60 CP210x 主控按 COM 数字顺序发 INFO 试探，
+首个可打开的同类板就保持连接；INFO 只识别固件，不决定是否断开。
 
 顺带还解决了两件事：
   1. 网页不用再弹「选择串口」对话框（Web Serial 每次都要弹，很烦）；
@@ -49,6 +49,9 @@ HTTP API（页面同源直接 fetch，不需要 CORS 头）
 跨站请求一律 403。这不是防黑客，是防「随手打开的某个网页偷偷驱动你的手套」。
 """
 
+from firmware_flash import FirmwareManager, exclusive
+from calibration_recordings import save_recording, read_recording
+
 import argparse
 import json
 import os
@@ -74,7 +77,7 @@ except ImportError:
 # 推荐串口：按芯片打分
 # ============================================================
 # 微雪那块 ESP32 主控板板载的是 CP2102（Silicon Labs），所以它分最高。
-# 但用户手上也常有 CH340 的杂牌板 / ESP32-S3 原生 USB，都给够高的分。
+# 其它芯片仅列出信息，不参与本项目自动或手动连接。
 VENDOR_HINTS = [
     ("10C4", 100, "Silicon Labs CP210x —— 微雪 ESP32 主板板载的 USB 转串口"),
     ("1A86", 92, "沁恒 CH340 / CH9102 USB 转串口"),
@@ -122,6 +125,16 @@ def score_port(device, desc, hwid):
     return 5, "非 USB 串口（最后才试）"
 
 
+def cp210x_target(hwid):
+    h = (hwid or '').upper()
+    return bool(re.search(r'(?:VID:PID=10C4:EA60|VID_10C4&PID_EA60)', h))
+
+
+def natural_port_key(entry):
+    match = re.fullmatch(r'COM([0-9]+)', entry['device'], re.I)
+    return (0, int(match.group(1))) if match else (1, entry['device'])
+
+
 def rank_ports(entries=None):
     """列出并排序串口。entries=None 时去问操作系统要。
 
@@ -134,8 +147,8 @@ def rank_ports(entries=None):
         sc, why = score_port(dev, desc, hwid)
         out.append({"device": dev, "desc": desc, "hwid": hwid,
                     "score": sc, "reason": why,
-                    "candidate": sc >= SCORE_PROBE_FLOOR})
-    out.sort(key=lambda e: (-e["score"], e["device"]))
+                    "candidate": cp210x_target(hwid), "eligible": cp210x_target(hwid)})
+    out.sort(key=natural_port_key)
     return out
 
 
@@ -160,6 +173,8 @@ class Bridge(object):
     """
 
     def __init__(self, url=None, baud=115200, auto=True):
+        self._maintenance_lock = threading.RLock()
+        self.firmware = FirmwareManager(self)
         self.url = url                 # 指定了口就一直用它
         self.baud = baud
         self.auto = auto and (url is None)
@@ -170,6 +185,7 @@ class Bridge(object):
         self.connected_at = 0.0
         self.reconnects = 0
         self.paused = False            # 用户按了「断开」就置位 —— 别立刻又给他连上
+        self.firmware_recognized = None
         self.probe_ok = None           # 探测命中的那个口（给 UI 显示「推荐」）
 
         self._log = deque(maxlen=LOG_MAX)   # [(seq, line)]
@@ -226,15 +242,17 @@ class Bridge(object):
 
     def _read_loop(self):
         buf = b""
+        ser = self.ser
         while not self._stop:
-            ser = self.ser
-            if ser is None or not self.connected:
+            if ser is None or ser is not self.ser or not self.connected:
                 return
             try:
-                chunk = ser.read(4096)
+                # Block only for the first byte; drain available bytes immediately.
+                # read(4096) waited the full serial timeout on every short response.
+                chunk = ser.read(max(1, min(4096, ser.in_waiting)))
             except Exception as e:
                 # 主动 close() 时 ser 已经关了，这里必然会抛 —— 那是正常收工，不是掉线
-                if self.connected:
+                if self.connected and ser is self.ser:
                     self._drop("串口读失败：" + str(e))
                 return
             if not chunk:
@@ -255,6 +273,7 @@ class Bridge(object):
         if was:
             self._push("<<桥>> 串口断开：" + why)
 
+    @exclusive
     def close(self):
         self.connected = False
         ser, self.ser = self.ser, None
@@ -263,11 +282,18 @@ class Bridge(object):
                 ser.close()
             except Exception:
                 pass
+        reader = self._reader
+        if reader and reader is not threading.current_thread():
+            reader.join(timeout=2)
+            if reader.is_alive():
+                raise RuntimeError("串口读线程未退出，拒绝重新打开")
+        self._reader = None
         self.port = None
         self.connected_at = 0.0        # 断了就别留着上次的时间戳，界面会照着它算「连了多久」
         with self._cv:
             self._cv.notify_all()
 
+    @exclusive
     def open(self, target=None, baud=None):
         """连一个口。返回 (ok, 说明)。"""
         target = target or self.url or self.port
@@ -288,6 +314,7 @@ class Bridge(object):
         self.connected = True
         self.connected_at = time.time()
         self.last_error = ""
+        self.firmware_recognized = None
         # 立刻起读线程，不在这里做 reset_input_buffer()。
         # 曾经这里 sleep 0.25 秒再把缓冲里那点字节读出来当「上电主动上报」，
         # 结果 reset_input_buffer() 先把它清掉了 —— 板子上电自己吐的 BOOT 行
@@ -298,6 +325,7 @@ class Bridge(object):
         return True, "已连接 " + target
 
     # ---------- 探测 ----------
+    @exclusive
     def probe(self, target, wait=1.6, use_cache=True):
         """给一个口发 INFO，看它回不回 OK INFO。会**真的开关串口**。
 
@@ -377,13 +405,14 @@ class Bridge(object):
         return False
 
     # ---------- 自动连接 ----------
+    @exclusive
     def autoconnect_once(self):
         """扫一遍，按推荐顺序逐个"开起来问一句"。返回 (ok, 说明)。
 
         为什么是"先开再问"而不是"先探再开"：
         探测和连接都要 open 一次串口，open 就复位。先探后连 = 复位两次，
         板子白等一轮启动；而且探测期间它还没启动完，很容易误判成"不是它"。
-        所以直接开，开完耐心问几次 INFO，答了就是它。
+        所以直接开；INFO 仅用于识别固件，未识别仍保持串口，避免反复复位。
         """
         if self.connected:
             return True, "已连接 " + str(self.port)
@@ -392,19 +421,10 @@ class Bridge(object):
         self._reload_ports()
         cands = [p for p in self.ports if p["candidate"]]
         if not cands:
-            # 兜底：只试「不是硬拉黑」的口（score > 0）。
-            #
-            # ⚠️ 这里曾经写的是 self.ports[:1] ——「全被拉黑了也试一个，别彻底放弃」。
-            # 听起来很稳妥，实际是个坑：主板自带的 COM1（ACPI\PNP0501，score -1000）
-            # 会被当成手套**连上**（打开它不报错），于是桥就再也不去找真板子了。
-            # 用户插上板子，界面显示"已连接 COM1"，然后什么都动不了 ——
-            # 比"没找到设备"难查一百倍。拉黑就该是真的拉黑。
-            cands = [p for p in self.ports if p.get("score", 0) > 0][:1]
-        if not cands:
-            return False, "没有发现任何串口 —— 板子插了吗？USB 线是数据线吗？"
+            return False, "没有发现 10C4:EA60 CP210x 主控 —— 请检查 USB 数据线"
         # 自己再排一次，不指望调用方给的是排好的 —— "推荐口优先"是这一步的核心承诺，
         # 不能因为上游哪天忘了 sort 就悄悄退化成"按枚举顺序碰运气"。
-        cands.sort(key=lambda p: (-p["score"], p["device"]))
+        cands.sort(key=natural_port_key)
         tried = []
         for p in cands:
             dev = p["device"]
@@ -418,28 +438,37 @@ class Bridge(object):
                 tried.append(dev + "(打不开)")
                 continue
             if self._wait_info():
+                self.firmware_recognized = True
                 self._probe_cache[dev] = (time.time(), True, "OK INFO")
                 self.probe_ok = dev
                 self._push("<<桥>> 自动连接 " + dev + "（" + short_reason(p) + "）")
                 return True, msg
-            self._probe_cache[dev] = (time.time(), False, "没有回应 INFO")
-            tried.append(dev + "(没回应INFO)")
-            self.close()
-        return False, "试过 " + " ".join(tried) + "，都没有回应 INFO"
+            if self.connected and self.port == dev:
+                self.firmware_recognized = False
+                self.probe_ok = dev
+                self._probe_cache[dev] = (time.time(), True, "串口已打开，固件未识别")
+                self.last_error = "已连接 " + dev + "；固件未识别（无有效 OK INFO），串口保持连接"
+                self._push("<<桥>> " + self.last_error)
+                return True, self.last_error
+            tried.append(dev + "(识别期间串口断开)")
+        return False, "试过 " + " ".join(tried) + "，没有可保持连接的 CP210x 串口"
 
     def _autoloop(self):
         """没连上就一直扫。用户主动断开（paused）时不扫 —— 否则「断开」按钮会当场失效：
         前脚断开，后脚这一轮循环又给连回去了（自测里那条断言就是这么照出来的）。"""
         if self.url:
             while not self._stop:
-                if not self.connected and not self.paused:
-                    self.open(self.url)
+                if not self.connected and not self.paused and not self.firmware.serialExclusive:
+                    try:
+                        self.open(self.url)
+                    except RuntimeError:
+                        pass  # Maintenance reserved the interface after the loop check.
                 time.sleep(1.0)
             return
         if not self.auto:
             return
         while not self._stop:
-            if not self.connected and not self.paused:
+            if not self.connected and not self.paused and not self.firmware.serialExclusive:
                 try:
                     self.autoconnect_once()
                 except Exception:
@@ -450,6 +479,7 @@ class Bridge(object):
                 time.sleep(1.0)
 
     # ---------- 写 ----------
+    @exclusive
     def _write(self, cmd):
         ser = self.ser
         if not self.connected or ser is None:
@@ -464,9 +494,11 @@ class Bridge(object):
             self._drop("写失败：" + str(e))
             return False
 
+    @exclusive
     def fire(self, cmd):
         return self._write(cmd)
 
+    @exclusive
     def fire_many(self, cmds):
         """把多条命令拼成**一个** buffer 写下去，返回实际写入的条数。
 
@@ -495,6 +527,7 @@ class Bridge(object):
             self._drop("写失败：" + str(e))
             return 0
 
+    @exclusive
     def send(self, cmd, timeout_ms=2500, quiet_ms=140, since=None):
         """发一条命令并收回复。
 
@@ -527,7 +560,22 @@ class Bridge(object):
                         first = time.time()
                     last = time.time()
                 now = time.time()
-                if got and (now - last) * 1000 >= quiet_ms:
+                # Explicit terminal replies avoid a quiet delay and incomplete multi-line scans.
+                command_words = str(cmd).strip().upper().split()
+                command_name = command_words[0] if command_words else ""
+                terminal = None
+                if command_name in ("INFO", "POSALL", "STATUS_ALL"):
+                    terminal = "OK " + command_name
+                elif command_name == "SCAN":
+                    terminal = "SCAN_END"
+                elif command_words[:2] == ["ARM", "CHECK"]:
+                    terminal = "OK ARM CHECK"
+                if terminal:
+                    complete = any(line == terminal or line.startswith(terminal + " ") or
+                                   line.startswith("ERR ") for line in got)
+                else:
+                    complete = bool(got) and (now - last) * 1000 >= quiet_ms
+                if complete:
                     break
                 if now >= deadline or (not got and now >= idle_giveup):
                     break
@@ -550,7 +598,9 @@ class Bridge(object):
             "fixed": self.url,
             "error": self.last_error,
             "recommended": self.probe_ok,
-            "ports": self.ports,
+            "firmwareRecognized": self.firmware_recognized,
+            "ports": [dict(p, selected=self.connected and p["device"] == self.port) for p in self.ports],
+            "selected": self.port if self.connected else None,
             "seq": self._seq,
             "connectedAt": self.connected_at,
         }
@@ -580,6 +630,7 @@ def make_handler(bridge):
     class Handler(BaseHTTPRequestHandler):
         server_version = "piano-glove-bridge"
         protocol_version = "HTTP/1.1"
+        disable_nagle_algorithm = True  # Short feedback replies must not wait for delayed ACK.
 
         # ---- 小工具 ----
         def _origin_ok(self):
@@ -659,6 +710,15 @@ def make_handler(bridge):
                 return self._json({"ok": False, "error": "跨站请求被拒绝"}, 403)
             u = urlparse(self.path)
             q = parse_qs(u.query)
+            if u.path == "/api/calibration/recording":
+                try:
+                    return self._json(read_recording((q.get("id") or [""])[0]))
+                except ValueError as e:
+                    return self._json({"ok":False,"error":str(e)},400)
+                except FileNotFoundError:
+                    return self._json({"ok":False,"error":"轨迹记录不存在"},404)
+            if u.path == "/api/firmware":
+                return self._json(bridge.firmware.status())
             if u.path == "/api/status":
                 return self._json(bridge.status())
             if u.path == "/api/ports":
@@ -682,6 +742,24 @@ def make_handler(bridge):
             u = urlparse(self.path)
             b = self._body()
             try:
+                if u.path in ("/api/firmware/build", "/api/firmware/flash"):
+                    origin = self.headers.get("Origin")
+                    port = self.server.server_address[1]
+                    if origin is not None and origin not in ("http://127.0.0.1:%s" % port, "http://localhost:%s" % port):
+                        return self._json({"ok": False, "error": "固件维护仅接受本调试页面同源请求"}, 403)
+                    try:
+                        return self._json(bridge.firmware.start(u.path.rsplit('/', 1)[1], b), 202)
+                    except ValueError as e:
+                        return self._json({"ok": False, "error": str(e)}, 400)
+                    except RuntimeError as e:
+                        return self._json({"ok": False, "error": str(e)}, 409)
+                if u.path == "/api/calibration/recording":
+                    try:
+                        return self._json(save_recording(b),201)
+                    except ValueError as e:
+                        return self._json({"ok":False,"error":str(e)},400)
+                if bridge.firmware.serialExclusive:
+                    return self._json({"ok": False, "error": "固件维护中：串口操作已锁定"}, 409)
                 if u.path == "/api/scan":
                     bridge._reload_ports()
                     ok, why = (None, "") if not b.get("probe") else bridge.autoconnect_once()
@@ -692,6 +770,9 @@ def make_handler(bridge):
                     baud = b.get("baud")
                     bridge.paused = False
                     if port:
+                        bridge._reload_ports()
+                        if not any(p['device'] == port and p['candidate'] for p in bridge.ports):
+                            return self._json({'ok': False, 'error': '仅支持 10C4:EA60 CP210x 主控串口'}, 400)
                         ok, msg = bridge.open(port, baud)
                         if ok:
                             bridge.probe_ok = port

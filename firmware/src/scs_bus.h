@@ -97,7 +97,9 @@ void    setEcho(bool on);          // 手动覆盖回显判定（诊断用）
 // 固件却报 OK —— 现象是「使能以后舵机锁死但一点也不动」，查了很久。
 uint8_t lastError();
 
-bool    ping(uint8_t id);
+bool    ping(uint8_t id, uint16_t timeoutMs = RESP_TIMEOUT_MS);
+void    setBusBaud(uint32_t baud);
+uint32_t busBaud();
 bool    readRegs(uint8_t id, uint8_t addr, uint8_t len, uint8_t *out,
                  uint16_t timeoutMs = RESP_TIMEOUT_MS);
 bool    writeRegs(uint8_t id, uint8_t addr, const uint8_t *data, uint8_t len);
@@ -148,7 +150,7 @@ bool    setId(uint8_t oldId, uint8_t newId);
 int     scan(uint8_t maxId, uint8_t *found, int cap);
 
 struct SyncItem { uint8_t id; uint16_t pos; uint16_t speed; uint8_t acc; };
-void    syncMove(const SyncItem *items, int n);   // 一帧同时更新多个舵机
+void    syncMove(const SyncItem *items, int n, bool benchRaw=false);   // 一帧同时更新多个舵机
 
 // 一次 SYNC_READ 读回 n 个舵机的当前位置。
 // ids[] 必须互不相同；pos[] 与 ids[] 一一对应，读不到的置 0xFFFF。
@@ -157,6 +159,7 @@ void    syncMove(const SyncItem *items, int n);   // 一帧同时更新多个舵
 // 为什么不用 for 循环逐个 readRegs：读 6 个舵机要 6 次往返（≈10 ms），
 // 做速度实测时这个开销会直接吃掉测量精度。SYNC_READ 一帧问、6 条回包，
 // 1 Mbps 下总共不到 1 ms。
+uint16_t positionReadBudget(int count);
 int     syncReadPos(const uint8_t *ids, int n, uint16_t *pos,
                     uint16_t timeoutMs = RESP_TIMEOUT_MS);
 

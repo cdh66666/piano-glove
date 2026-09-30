@@ -1,0 +1,432 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-09-30",
+  "songs": [
+    {
+      "id": "1003497",
+      "name": "南瓜布吉舞 · 节选",
+      "title": "南瓜布吉舞",
+      "style": "切分 · 双指和弦",
+      "version": 1,
+      "tempo_bpm": 74.99999989999999,
+      "duration_ms": 6400,
+      "fullStroke": true,
+      "source": {
+        "file": "1003497_9_7-1. 南瓜布吉舞_五线谱_带指法_黑键标.pdf",
+        "sha256": "928dcac2fe48733ffdf34cfed7995bf020eb163b44b52f7242d7dc87cc1d32e6",
+        "page": 1,
+        "measures": [
+          3,
+          4
+        ],
+        "hand": "right",
+        "verification": "manual_visual_review",
+        "note": "保留选段起音比例、休止与原印指法；演示变速，不是全曲或原速演奏。动作按下窗另留回程时间。",
+        "image_crop_pdf_points": [
+          [
+            397,
+            127,
+            560,
+            172
+          ],
+          [
+            44,
+            249,
+            246,
+            301
+          ]
+        ]
+      },
+      "events": [
+        {
+          "t_ms": 0,
+          "finger": 1,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 800,
+          "finger": 2,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 800,
+          "finger": 3,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 1600,
+          "finger": 1,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 2,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 2400,
+          "finger": 2,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 3,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 2400,
+          "finger": 3,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 3,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3200,
+          "finger": 1,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3600,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3600,
+          "finger": 3,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4400,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 1.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4400,
+          "finger": 3,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 1.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4800,
+          "finger": 1,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 4,
+          "source_beat": 2,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 5600,
+          "finger": 2,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 4,
+          "source_beat": 3,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 5600,
+          "finger": 3,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 4,
+          "source_beat": 3,
+          "finger_source": "printed_on_source_pdf"
+        }
+      ],
+      "image": "assets/score-excerpts/pumpkin-boogie.png",
+      "image_caption": "原谱右手：上图第3小节，下图第4小节。",
+      "hand": "right",
+      "rhythmDemo": true,
+      "benchQuick": true,
+      "quickDemo": true
+    },
+    {
+      "id": "1007271",
+      "name": "波尔卡舞曲 · 节选",
+      "title": "波尔卡舞曲",
+      "style": "长短音 · 休止",
+      "version": 1,
+      "tempo_bpm": 37.499999949999996,
+      "duration_ms": 6400,
+      "fullStroke": true,
+      "source": {
+        "file": "1007271_9_78. 波尔卡舞曲_五线谱_带指法_黑键标.pdf",
+        "sha256": "a3988a77c61b5bce5ae7ce5c05704b8d2b6ca60559336112d18e425586998a09",
+        "page": 1,
+        "measures": [
+          1,
+          2
+        ],
+        "hand": "right",
+        "verification": "manual_visual_review",
+        "note": "保留选段起音比例、休止与原印指法；演示变速，不是全曲或原速演奏。动作按下窗另留回程时间。",
+        "image_crop_pdf_points": [
+          38,
+          150,
+          372,
+          231
+        ]
+      },
+      "events": [
+        {
+          "t_ms": 0,
+          "finger": 2,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 1,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 800,
+          "finger": 4,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 1,
+          "source_beat": 0.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 1200,
+          "finger": 3,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 1,
+          "source_beat": 0.75,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 1600,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 1,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 2400,
+          "finger": 2,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 1,
+          "source_beat": 1.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3200,
+          "finger": 3,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 2,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4800,
+          "finger": 4,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 1600,
+          "source_measure": 2,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        }
+      ],
+      "image": "assets/score-excerpts/polka.png",
+      "image_caption": "原谱右手第1–2小节，2/4拍。",
+      "hand": "right",
+      "rhythmDemo": true,
+      "benchQuick": true,
+      "quickDemo": true
+    },
+    {
+      "id": "969886",
+      "name": "阿拉伯风 · 节选",
+      "title": "阿拉伯风",
+      "style": "快速跨指 · 跑动",
+      "version": 1,
+      "tempo_bpm": 37.499999949999996,
+      "duration_ms": 6400,
+      "fullStroke": true,
+      "source": {
+        "file": "969886_9_阿拉伯风_五线谱_带指法_黑键标注.pdf",
+        "sha256": "d242ec9e28dd011b3fbb100c75b01b7b23e5db469444b5431bf21653a341189d",
+        "page": 1,
+        "measures": [
+          3,
+          4
+        ],
+        "hand": "right",
+        "verification": "manual_visual_review",
+        "note": "保留选段起音比例、休止与原印指法；演示变速，不是全曲或原速演奏。动作按下窗另留回程时间。",
+        "image_crop_pdf_points": [
+          212,
+          82,
+          385,
+          142
+        ]
+      },
+      "events": [
+        {
+          "t_ms": 0,
+          "finger": 1,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 3,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 400,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 3,
+          "source_beat": 0.25,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 800,
+          "finger": 3,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 3,
+          "source_beat": 0.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 1200,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 3,
+          "source_beat": 0.75,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 1600,
+          "finger": 1,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 3,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3200,
+          "finger": 1,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 3600,
+          "finger": 2,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0.25,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4000,
+          "finger": 3,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0.5,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4400,
+          "finger": 4,
+          "duration_ms": 400,
+          "amplitude": 1,
+          "score_duration_ms": 400,
+          "source_measure": 4,
+          "source_beat": 0.75,
+          "finger_source": "printed_on_source_pdf"
+        },
+        {
+          "t_ms": 4800,
+          "finger": 5,
+          "duration_ms": 800,
+          "amplitude": 1,
+          "score_duration_ms": 800,
+          "source_measure": 4,
+          "source_beat": 1,
+          "finger_source": "printed_on_source_pdf"
+        }
+      ],
+      "image": "assets/score-excerpts/arabesque.png",
+      "image_caption": "原谱右手第3–4小节，2/4拍。",
+      "hand": "right",
+      "rhythmDemo": true,
+      "benchQuick": true,
+      "quickDemo": true
+    }
+  ]
+}

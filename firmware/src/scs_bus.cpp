@@ -1,4 +1,5 @@
 #include "scs_bus.h"
+#include "profile_limits.h"
 
 namespace scs {
 
@@ -187,10 +188,14 @@ void drain(uint16_t ms) {
   }
 }
 
-bool ping(uint8_t id) {
+static uint32_t g_busBaud=BUS_BAUD;
+uint32_t busBaud(){return g_busBaud;}
+void setBusBaud(uint32_t baud) { if(baud==g_busBaud)return;g_busBaud=baud;bus.flush(); bus.updateBaudRate(baud); while(bus.available()) bus.read(); }
+
+bool ping(uint8_t id, uint16_t timeoutMs) {
   uint8_t r[RESP_BUF];
   int     rl = 0;
-  if (!sendRecv(id, INST_PING, nullptr, 0, r, rl, true)) return false;
+  if (!sendRecv(id, INST_PING, nullptr, 0, r, rl, true, timeoutMs)) return false;
   return rl >= 6;
 }
 
@@ -214,45 +219,30 @@ bool writeRegs(uint8_t id, uint8_t addr, const uint8_t *data, uint8_t len) {
 }
 
 bool readFeedback(uint8_t id, Feedback &fb, uint16_t timeoutMs) {
-  uint8_t d[PRES_BLOCK_LEN];
-  if (!readRegs(id, REG_PRES_POS_L, PRES_BLOCK_LEN, d, timeoutMs)) {
+  uint8_t d[PRES_BLOCK_LEN]={0};
+  const bool big=profile().family==Family::SCS;
+  if (!readRegs(id, REG_PRES_POS_L, big?11:PRES_BLOCK_LEN, d, timeoutMs)) {
     fb.ok = false;
     return false;
   }
   // 56..57 位置 / 58..59 速度 / 60..61 负载 / 62 电压 / 63 温度
   // 64..65 保留 / 66 运动中 / 67..68 保留 / 69..70 电流
-  fb.pos     = (int16_t)((uint16_t)d[0] | ((uint16_t)d[1] << 8));
-  fb.speed   = (int16_t)((uint16_t)d[2] | ((uint16_t)d[3] << 8));
-  fb.load    = (int16_t)((uint16_t)d[4] | ((uint16_t)d[5] << 8));
+  const auto decodeWord=[big](const uint8_t *p)->int16_t{return servoWord(p,big);};
+  fb.pos     = decodeWord(d);
+  fb.speed   = decodeWord(d+2);
+  fb.load    = decodeWord(d+4);
   fb.voltage = d[6];
   fb.temp    = d[7];
   fb.moving  = d[10];
-  fb.current = (int16_t)((uint16_t)d[13] | ((uint16_t)d[14] << 8));
+  fb.current = big?0:decodeWord(d+13);
   fb.mode    = 0;
   fb.ok      = true;
   return true;
 }
 
 bool moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc) {
-  // 写 ACC(41) 起 7 字节：ACC + 目标位置 + 运行时间 + 运行速度
-  //
-  // ⚠️ INST_WRITE 的参数里**第一个字节必须是起始寄存器地址**。
-  // 这里曾经漏掉它，于是舵机把 ACC 的值（默认 30）当成了地址，
-  // 收到一条"往寄存器 30 写 6 字节"的指令 —— 越界/受保护，舵机回了个错误包，
-  // 而 sendRecv 只看到"有回包"就返回成功。现象就是：
-  // 使能之后舵机确实锁死了（TORQUE 是另一条正确的写指令），但按下去一点都不动。
-  uint8_t p[8];
-  p[0] = REG_ACC;                               // ← 起始寄存器地址，漏了必然不动
-  p[1] = acc;
-  p[2] = (uint8_t)(pos & 0xFF);
-  p[3] = (uint8_t)(pos >> 8);
-  p[4] = 0;
-  p[5] = 0;                                     // 运行时间 0 = 不用时间控制
-  p[6] = (uint8_t)(speed & 0xFF);
-  p[7] = (uint8_t)(speed >> 8);
-  uint8_t r[RESP_BUF];
-  int     rl = 0;
-  return sendRecv(id, INST_WRITE, p, 8, r, rl, true);
+  uint8_t p[8];const uint8_t size=motionPayload(profile().family==Family::SCS,pos,speed,acc,p);
+  uint8_t r[RESP_BUF];int rl=0;return sendRecv(id,INST_WRITE,p,size,r,rl,true);
 }
 
 bool setTorque(uint8_t id, bool on) {
@@ -279,32 +269,42 @@ int scan(uint8_t maxId, uint8_t *found, int cap) {
   return n;
 }
 
-void syncMove(const SyncItem *items, int n) {
-  if (n <= 0) return;
-  if (n > 8) n = 8;
-  uint8_t p[2 + 8 * 8];
-  int     k = 0;
-  p[k++] = REG_ACC;                             // 起始地址
-  p[k++] = 7;                                   // 每个舵机写 7 字节
-  for (int i = 0; i < n; ++i) {
-    p[k++] = items[i].id;
-    p[k++] = items[i].acc;
-    p[k++] = (uint8_t)(items[i].pos & 0xFF);
-    p[k++] = (uint8_t)(items[i].pos >> 8);
-    p[k++] = 0;
-    p[k++] = 0;
-    p[k++] = (uint8_t)(items[i].speed & 0xFF);
-    p[k++] = (uint8_t)(items[i].speed >> 8);
+void syncMove(const SyncItem *items, int n, bool benchRaw) {
+  if(n<=0)return;
+  if(n>8)n=8;
+  const bool scs=profile().family==Family::SCS;
+  if(benchRaw){uint8_t seen=0;if(!scs||n>6){g_lastErr=255;return;}for(int i=0;i<n;++i){const auto &v=items[i];if(v.id<1||v.id>6||v.pos>1023||v.speed<50||v.speed>1000||(seen&(1u<<(v.id-1)))){g_lastErr=255;return;}seen|=1u<<(v.id-1);}}
+  uint8_t p[2+8*8];int k=0;p[k++]=scs?42:41;p[k++]=scs?6:7;
+  for(int i=0;i<n;++i){
+    uint8_t data[8];uint8_t size;
+    if(benchRaw){data[0]=42;data[1]=items[i].pos>>8;data[2]=items[i].pos;data[3]=data[4]=0;data[5]=items[i].speed>>8;data[6]=items[i].speed;size=7;}
+    else size=motionPayload(scs,items[i].pos,items[i].speed,items[i].acc,data);
+    p[k++]=items[i].id;for(int j=1;j<size;++j)p[k++]=data[j];
   }
-  uint8_t r[RESP_BUF];
-  int     rl = 0;
-  sendRecv(BROADCAST_ID, INST_SYNC_WRITE, p, (uint8_t)k, r, rl, false);
+  uint8_t r[RESP_BUF];int rl=0;sendRecv(BROADCAST_ID,INST_SYNC_WRITE,p,(uint8_t)k,r,rl,false);
 }
+
+uint16_t positionReadBudget(int n){return profile().family==Family::SCS?(uint16_t)(n*RESP_TIMEOUT_MS):8;}
 
 int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
   if (n <= 0) return 0;
   if (n > 16) n = 16;
   for (int i = 0; i < n; ++i) pos[i] = 0xFFFF;
+  if(profile().family==Family::SCS){
+    // SCSCL SDK provides per-ID READ; do not assume STS broadcast SYNC_READ support.
+    int got=0;const uint32_t start=millis();
+    for(int i=0;i<n;++i){
+      const uint32_t used=millis()-start;if(used>=timeoutMs)break;
+      uint16_t remaining=(uint16_t)(timeoutMs-used);
+      const uint16_t budget=remaining<RESP_TIMEOUT_MS?remaining:RESP_TIMEOUT_MS;
+      uint8_t d[2];
+      if(readRegs(ids[i],REG_PRES_POS_L,2,d,budget)&&lastError()==0){
+        const uint16_t value=servoWord(d,true);
+        if(value<=profile().range){pos[i]=value;++got;}
+      }
+    }
+    return got;
+  }
 
   uint8_t p[2 + 16];
   int     k = 0;
@@ -363,36 +363,12 @@ const Profile &profile() { return g_profile; }
 void           setProfile(const Profile &p) { g_profile = p; }
 
 bool probeProfile(uint8_t id, Profile &out) {
-  uint8_t d[2];
-
-  // 型号号（3..4）—— 只打出来给人看，判断不用它：
-  // 飞特各型号的型号号没有公开对照表，靠它猜不如直接看量程。
-  if (!readRegs(id, REG_MODEL_L, 2, d)) return false;
-  const uint16_t model = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
-
-  if (!readRegs(id, REG_MIN_ANGLE_L, 2, d)) return false;
-  const uint16_t minAng = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
-
-  if (!readRegs(id, REG_MAX_ANGLE_L, 2, d)) return false;
-  const uint16_t maxAng = (uint16_t)d[0] | ((uint16_t)d[1] << 8);
-
-  Profile p;
-  p.model  = model;
-  p.minAng = minAng;
-  p.maxAng = maxAng;
-  p.probed = true;
-
-  /* 量程上限就是分辨率的答案：STS 出厂 4095，SCS 出厂 1023。
-     灰区放在 2048 —— 万一有人把 Max Angle Limit 改小了，
-     12 位的舵机也不会被误判成 10 位（宁可判宽也不要判窄：
-     判成 4095 而实际是 1023 时，最多是限位松一点；
-     反过来会让整段行程被砍掉 3/4，直接不能用）。 */
-  if (maxAng > 2048)       { p.family = Family::STS; p.range = 4095; }
-  else if (maxAng >= 128)  { p.family = Family::SCS; p.range = 1023; }
-  else                     return false;   // 读到 0 之类 = 这张表不适用，保持原值
-
-  out = p;
-  return true;
+  uint8_t m[2],lo[2],hi[2];
+  if(!readRegs(id,REG_MODEL_L,2,m)||!readRegs(id,REG_MIN_ANGLE_L,2,lo)||!readRegs(id,REG_MAX_ANGLE_L,2,hi))return false;
+  const uint16_t raw=(uint16_t(m[0])<<8)|m[1];if(raw==0||raw==0xffff)return false;
+  uint16_t mn=0,mx=0;const int kind=identifyLimitEndian(lo,hi,mn,mx);if(!kind)return false;
+  Profile p;p.family=kind==1?Family::STS:Family::SCS;p.range=kind==1?4095:1023;
+  p.model=raw;p.minAng=mn;p.maxAng=mx;p.probed=true;out=p;return true;
 }
 
 int posTol() {

@@ -1713,6 +1713,7 @@ let bridgeWatch = null, attachPending = false;
 async function onBridgeUp(st){
   const fresh = T.attachBridge(st);
   refreshChips();
+  if(st.firmwareRecognized===false){stopPolling();scanUI("bad",(st.port||"")+"已连接 · 固件未识别",st.error||"未收到有效 INFO 应答，请更新主控固件。");return;}
   if(!fresh) return;
   scanUI("ok", "已连接 " + (T.portName || ""), "串口开在本机的 bridge 里，页面只发 HTTP。");
   $("#bridgeDown").style.display = "none";
@@ -1725,6 +1726,13 @@ async function onBridgeUp(st){
 }
 /* 桥在但没连上串口 —— 把原因摊开说，别让人干等 */
 function onBridgeWaiting(st){
+  if(st.auto===false&&!st.connected){
+    scanUI("bad", "串口尚未连接", "日常调试点击“重新扫描并连接”；烧录只需 USB，无需先连接调试。");
+    $("#connMsg").className="msg";$("#connMsg").textContent="自动连接已关闭，不会自行试探串口。";
+    const desc=document.querySelector('#p-connect .card:first-child .desc');if(desc)desc.textContent='主控 USB 接好后，日常调试点击“重新扫描并连接”。烧录无需先连接调试。';
+    const hint=document.querySelector('#p-connect .card:first-child > p.hint');if(hint)hint.textContent='烧录时断开舵机动力电源、摘下手套，仅保留主控 USB。正常动作调试再按操作要求接通动力电源。';
+    return;
+  }
   const ports = st.ports || [];
   renderPorts(ports);
   const cand = ports.filter(p => p.candidate);
@@ -4330,7 +4338,7 @@ goto(location.hash.slice(1) || "connect");
 if(SIM_ENABLED){
   /* 只有自测会走到这 —— 界面上没有引导，也不该有 */
   logLine("自测模式（?sim=1）：串口由页面内置的假固件顶替，数字不代表实机。", "sys");
-}else{
+}else if(new URLSearchParams(location.search).get('simple')!=='1'){
   (async () => {
     scanUI("", "正在检查本地串口服务…", "");
     const st = await T.detectBridge();
@@ -4348,5 +4356,622 @@ if(SIM_ENABLED){
   })();
 }
 </script>
+
+<!-- BEGIN PIANO_GLOVE_SIMPLE_MODE 20260929 -->
+<style>
+body.pg-simple main{max-width:900px;margin:0 auto}
+body.pg-simple main>.simple-only{padding:0 16px}
+body.pg-simple .topbar .t2{display:none}
+body.pg-simple .stepno{display:none}
+body.pg-simple .simple-extra{display:none!important}
+body.pg-simple #tabbar{grid-template-columns:repeat(5,minmax(0,1fr))}
+body.pg-simple #tabbar button[data-p="assign"],body.pg-simple #tabbar button[data-p="log"]{display:none}
+#simpleModeTools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+#simpleModeTools span{font-size:13px;color:var(--sub)}
+#simpleEmergencyStop{color:#bd2636;font-weight:800}
+
+.simple-only{display:none}
+body.pg-simple .simple-only{display:block}
+body.pg-simple #p-test .tw th:first-child,body.pg-simple #p-test .tw th:nth-child(3),body.pg-simple #p-test .tw th:last-child,
+body.pg-simple #testBody2 td:first-child,body.pg-simple #testBody2 td:nth-child(3),body.pg-simple #testBody2 td:last-child{display:none}
+body.pg-simple #slotBody{font-variant-numeric:tabular-nums}
+body.pg-simple .card{padding:20px;margin-bottom:14px}
+body.pg-simple button{min-height:40px}
+body.pg-simple #simpleEmergencyStop{background:#fff1f1;border-radius:9px}
+</style>
+<script>
+(function installSimpleMode(){
+  if(new URLSearchParams(location.search).get('simple') !== '1') return;
+  const q = s => document.querySelector(s);
+  const mark = el => { if(el) el.classList.add('simple-extra'); };
+  const card = s => mark(q(s)?.closest('.card'));
+  const row = s => mark(q(s)?.closest('.row'));
+  const edits = [];
+  function copy(sel, text){
+    const el=q(sel); if(!el) return;
+    edits.push({el, old:el.innerHTML, text});
+  }
+  // Keep the same controls and event handlers; only presentation is switched.
+  card('#infoKv'); card('#latBody'); card('#rtBody');
+  ['#portWrap','#cMode','#cFingers','#btnCalClear','#btnCalAlign','#btnMaxSpeed','#midiStat','#handSvg'].forEach(s=>mark(q(s)));
+  ['#calSecs','#selMap','#nLow','#fSpeed','#avAttack','#avLead'].forEach(row);
+  mark(q('#avNet')); mark(q('#speedHint'));
+  mark(q('#slotBody')?.closest('.tw')); mark(q('#slotBars'));
+  q('#slotBars')?.nextElementSibling?.classList.add('simple-extra');
+  q('#btnCalAlign')?.closest('.row')?.nextElementSibling?.classList.add('simple-extra');
+  // The current thumb role stays visible; changing the mapping is an engineering task.
+  mark(q('#roleBox'));
+  const roleNote=document.createElement('p');roleNote.className='simple-only hint';
+  roleNote.textContent='先确认按钮名称与实际运动手指一致，尤其拇指按压和侧摆。方向或对应关系不符时先停止，再打开工程设置处理。';
+  q('#roleBox')?.after(roleNote);
+  q('#p-play')?.querySelectorAll('p.hint').forEach(el=>{
+    if(!/断电|校准|完整行程|急停/.test(el.textContent)) mark(el);
+  });
+  copy('#p-connect .card:first-child h2','连接手套');
+  copy('#p-connect .card:first-child .desc','连接 USB 数据线与舵机电源，等待上方显示“已连接”。');
+  copy('#p-cal .card:first-child h2','检查手套');
+  copy('#p-cal .card:first-child .desc','先检查六个关节是否在线；已经完成的编号无需再做。');
+  copy('#p-cal .card:nth-child(2) .desc','只在首次使用、装配改变或行程异常时校准。开始后按下方提示轻缓活动六个关节。');
+  copy('#p-cal .card:nth-child(3) h2','拇指起始位置');
+  copy('#p-cal .card:nth-child(3) .desc','需要调整拇指摆放时使用。滑动后点“试这个位置”会真的运动，合适后保存。');
+  copy('#p-test .card:first-child h2','逐根试动作');
+  copy('#testBody > p.hint','“按一下”会到达校准的最深处后松开。先检查行程和方向，手感不适立即停止。方向调整在工程设置。');
+  copy('#cal2Body > p.hint:last-child','采样时轻缓活动：拇指下压与松开、拇指侧摆与摆回、四指弯曲与伸直。只在舒适的机械范围内活动，不强拉；六路都要采样，异常或幅度不足先不要保存。');
+  q('#midiPanel')?.querySelectorAll('p.hint').forEach(el=>{
+    if(el.textContent.includes('为什么结束必须断电')) edits.push({el,old:el.innerHTML,text:'奏完失能会先让拇指侧摆回位，再卸力。摘戴前确认已经卸力；急停直接卸力，下次必须点击开始才重新使能。'});
+    else if(el.textContent.includes('手指行程时间不用填')) edits.push({el,old:el.innerHTML,text:'播放速度改变节奏；100% 幅度使用全部校准行程。“自测”会实际运动，请先确认安全。跟随 MIDI 力度改变按压深度，不代表真实压力测量。'});
+  });
+  copy('#p-play .card:first-child h2','选择曲目并演奏');
+  copy('#p-play .card:first-child .desc','选内置曲目，或导入 MIDI。文件载入后才会出现播放控制；点击开始才运动。指法由软件分配。');
+  const tools=document.createElement('div');tools.id='simpleModeTools';
+  tools.innerHTML='<span id="simpleModeLabel">日常使用 · 按需操作，不自动运动</span><button type="button" id="simpleEngineering" class="ghost" aria-expanded="false">工程设置</button>';
+  q('.topbar').appendChild(tools);
+  const stop=document.createElement('button');stop.type='button';stop.id='simpleEmergencyStop';
+  stop.textContent='■ 停止';stop.setAttribute('aria-label','停止全部动作');
+  stop.title='调用现有停止按钮；不适时同时切断动力电源';
+  // Reuse the existing stop path so playback scheduling also stops.
+  stop.onclick=()=>q('#btnStop').click();
+  q('#tabbar').appendChild(stop);
+  const notice=document.createElement('p');notice.className='simple-only hint';
+  notice.textContent='有不适立即点底部“停止”，必要时切断动力电源。重新连接后，不会由简洁模式自动启动动作。';
+  q('main').prepend(notice);
+  function apply(simple){
+    document.body.classList.toggle('pg-simple',simple);
+    edits.forEach(x=>{x.el.innerHTML=simple?x.text:x.old;});
+    q('#simpleEngineering').textContent=simple?'工程设置':'返回日常使用';
+    q('#simpleEngineering').setAttribute('aria-expanded',String(!simple));
+    q('#simpleModeLabel').textContent=simple?'日常使用 · 按需操作，不自动运动':'工程设置 · 编号、参数、测速和日志';
+    if(simple && ['assign','log'].includes(location.hash.slice(1))) goto('connect');
+  }
+  q('#simpleEngineering').onclick=()=>apply(!document.body.classList.contains('pg-simple'));
+  apply(true);
+})();
+</script>
+<!-- END PIANO_GLOVE_SIMPLE_MODE -->
+
+
+<!-- BEGIN STRICT_ACTION_JSON_PREVIEW v1 -->
+<style>
+#strictActionTableWrap{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+#strictActionTable{width:100%;font-variant-numeric:tabular-nums}
+#strictActionTable tr[data-active="true"]{background:#e6f0ff;font-weight:700}
+#strictActionFile{max-width:100%}
+#strictActionProgress{width:100%;height:12px}
+#strictActionWarnings{white-space:pre-line}
+</style>
+<script>
+(function installStrictActionPreview(){
+'use strict';
+// Candidate file format only. Pure parsing: no transport, timers or motion.
+const FINGER_TO_SLOT = Object.freeze({ 1: 0, 2: 2, 3: 3, 4: 4, 5: 5 });
+const MAX_DURATION_MS = 300000;
+const MAX_EVENTS = 2000;
+
+function exactKeys(value, keys, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} 必须是对象`);
+  const actual = Object.keys(value);
+  if (actual.length !== keys.length || actual.some(k => !keys.includes(k))) {
+    throw new Error(`${label} 只允许且必须包含 ${keys.join(', ')}`);
+  }
+}
+
+/** Parse explicit fingering and timing. No automatic fingering is generated. */
+function parseActionFile(input) {
+  if (typeof input === 'string' && input.length > 1000000) throw new Error('动作文件过大，最多 100 万字符');
+  const source = typeof input === 'string' ? JSON.parse(input) : input;
+  exactKeys(source, ['version', 'name', 'events'], '文件');
+  if (source.version !== 1) throw new Error('version 必须为数字 1');
+  if (typeof source.name !== 'string' || !source.name.trim() || source.name.length > 100) throw new Error('name 必须为 1–100 字符的非空名称');
+  if (!Array.isArray(source.events) || source.events.length === 0 || source.events.length > MAX_EVENTS) throw new Error(`events 必须包含 1–${MAX_EVENTS} 个明确指法事件`);
+  const events = source.events.map((event, index) => {
+    const label = `events[${index}]`;
+    exactKeys(event, ['t_ms', 'finger', 'duration_ms'], label);
+    if (!Number.isFinite(event.t_ms) || event.t_ms < 0) throw new Error(`${label}.t_ms 必须为非负有限数字`);
+    if (!Number.isFinite(event.duration_ms) || event.duration_ms <= 0) throw new Error(`${label}.duration_ms 必须为正有限数字`);
+    if (!Number.isInteger(event.finger) || event.finger < 1 || event.finger > 5) throw new Error(`${label}.finger 必须为 1–5 的整数`);
+    if (event.t_ms + event.duration_ms > MAX_DURATION_MS) throw new Error(`动作总时长不能超过 ${MAX_DURATION_MS / 1000} 秒；请拆分文件`);
+    return { t_ms: event.t_ms, finger: event.finger, duration_ms: event.duration_ms, slot: FINGER_TO_SLOT[event.finger], source_index: index };
+  }).sort((a, b) => a.t_ms - b.t_ms || a.finger - b.finger);
+  const previousEnd = new Map();
+  for (const event of events) {
+    if (previousEnd.has(event.finger) && event.t_ms < previousEnd.get(event.finger)) throw new Error(`手指 ${event.finger} 的动作时间重叠（原事件 ${event.source_index}）`);
+    previousEnd.set(event.finger, event.t_ms + event.duration_ms);
+  }
+  const duration_ms = Math.max(...events.map(e => e.t_ms + e.duration_ms));
+  const warnings = ['候选格式，尚未确认甲方认可；解析通过不等于硬件安全或实际动作通过。', '执行前须确认拇指按压仍为 slot 0，侧摆为 slot 1；角色若对调，应停止并重新核对映射。'];
+  if (duration_ms > 30000) warnings.push('文件超过 30 秒，交付演示建议拆成较短段落。');
+  for (let finger = 1; finger <= 5; finger++) {
+    const same = events.filter(e => e.finger === finger);
+    if (same.some((e, i) => i > 0 && e.t_ms - (same[i - 1].t_ms + same[i - 1].duration_ms) < 500)) {
+      warnings.push(`手指 ${finger} 的松开间隔不足 500 ms，必须按实机校准确认，不代表安全动作。`);
+    }
+  }
+  return { version: 1, name: source.name.trim(), events, duration_ms, warnings };
+}
+
+// Strict, single-hand action execution. No device access until run() is called.
+function actionKV(line){return Object.fromEntries(String(line).split(/\s+/).filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1)];}));}
+function actionGate(info, rows, roles){
+  const range=+info.range;
+  if(info.fw!=='PIANO_GLOVE_2'||info.ver!=='2.2.4'||!((info.profile==='STS'&&range===4095)||(info.profile==='SCS'&&range===1023))) throw Error('仅允许经核对的 PIANO_GLOVE_2 / 2.2.4：STS 4095 或 SCS 1023');
+  if(info.calibrated!=='1'||info.armed!=='0'||+info.online!==6||['auto_active','enroll_active','sweep'].some(k=>info[k]!=='0')) throw Error('先停止当前动作，并确认六路在线、已校准且未使能');
+  if(roles.join(',')!=='press,latch,press,press,press,press') throw Error('拇指角色与动作文件映射不符');
+  if(rows.length!==6||new Set(rows.map(r=>+r.slot)).size!==6||new Set(rows.map(r=>+r.id)).size!==6) throw Error('需要六路唯一槽位与舵机 ID');
+  const ordered=Array(6),outside=[];
+  for(const r of rows){
+    const s=+r.slot,lo=+r.min,hi=+r.max,rest=+r.standby,pos=+r.pos;
+    const wrap=lo>hi,span=wrap?range+1-lo+hi:hi-lo,inside=p=>wrap?p>=lo||p<=hi:p>=lo&&p<=hi;
+    if(wrap)throw Error('跨零动作路径尚未实测，校准记录可保存，请先核对舵机位置模式。');
+    if(!Number.isInteger(s)||s<0||s>5||!Number.isInteger(+r.id)||+r.id<1||+r.id>253||r.online!=='1'||r.valid!=='1'||![lo,hi,rest,pos].every(Number.isFinite)||lo<0||lo>range||hi<0||hi>range||span<=0||span>range*.9||!inside(rest)||!['min','max'].includes(r.press)) throw Error('槽位 '+s+' 的反馈或校准无效');
+    const requiredCounts=Math.ceil((s===1?30:60)*.65*(range+1)/(info.profile==='SCS'?300:360));
+    if(span<requiredCounts)throw Error('活动幅度不足，请重新校准完整舒适行程。');
+    if(!Number.isInteger(pos)||pos<0||pos>range)throw Error('未读到有效位置，请保持连接。');
+    const startTolerance=info.profile==='SCS'?Math.min(6,Math.floor(span/4)):0;
+    if(pos<lo-startTolerance||pos>hi+startTolerance)outside.push(s);
+    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:35,tolerance:Math.min(info.profile==='SCS'?6:24,Math.floor(span/4))};
+  }
+  if(outside.length){const labels=['拇指按压','拇指侧摆','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
+  return ordered;
+}
+class StrictActionExecutor{
+  constructor(io,{now=()=>performance.now(),sleep=ms=>new Promise(r=>setTimeout(r,ms)),progress=()=>{}}={}){this.io=io;this.now=now;this.sleep=sleep;this.progress=progress;this.active=false;this.cancelled=false;this.generation=0;this.pending=0;this.deadline=null;}
+  async stop(){this.cancelled=true;await this.io.safe();}
+  check(){if(this.deadline!==null&&this.now()>=this.deadline){this.cancelled=true;throw Error('完整动作未在规定时间内完成，已停止');}if(this.cancelled) throw Error('已停止，不自动恢复');}
+  async command(cmd){
+    this.check();const generation=this.generation;this.pending++;let lines;try{lines=await this.io.send(cmd);if(generation!==this.generation||this.cancelled){await this.io.safe();throw Error('已停止，不自动恢复');}this.check();}finally{this.pending--;}
+    if(Array.isArray(lines)&&lines.some(l=>l.startsWith('BENCH_DONE')))throw Error('台架安全截止已释放，动作未完成');
+    if(!Array.isArray(lines)||lines.some(l=>l.startsWith('ERR'))||!lines.some(l=>l.startsWith('OK ')))throw Error('命令失败：'+cmd+' '+(lines||[]).join(' '));
+    if(cmd==='ARM')this.feedbackArmedExpected=true;
+    return lines;
+  }
+  async run(file,roles,{internalSlots=false,validationSpeed=null}={}){
+    if(this.active||this.pending)throw Error('已有动作正在执行或正在停止');
+    this.active=true;this.cancelled=false;const runStarted=this.now();this.deadline=file.rhythmDemo?runStarted+10000:null;this.feedbackMetrics=null;this.lastPositions=null;this.feedbackRetries=0;this.feedbackArmedExpected=false;this.generation++;
+    try{
+      const {info,slots}=await this.prepare(roles);
+      if((file.validationOnly||file.validationSpeed!==undefined)&&validationSpeed===null)throw Error('档位验证只能从专用流程启动');
+      if(validationSpeed!==null){if(![200,400,600,800,1000].includes(validationSpeed)||!internalSlots||info.profile!=='SCS')throw Error('档位验证参数无效');file={...file,validationOnly:true,validationSpeed,fullStroke:true,quickDemo:true,benchQuick:validationSpeed>200};}
+      if(file.benchQuick||file.fullStroke){
+        if(!internalSlots||file.quickDemo!==true||info.profile!=='SCS')throw Error('高速展示仅支持已识别的SCS短演示');
+        for(const slot of slots){const lo=slot.low+6,hi=slot.high-6;if(lo>=hi)throw Error('校准行程不足以保留端点余量');slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
+      }
+      if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
+      const map={1:0,2:2,3:3,4:4,5:5};
+      const events=[];
+      if(!Array.isArray(file.events)||!file.events.length)throw Error('没有动作');
+      for(const e of file.events){
+        if(!Number.isFinite(e.t_ms)||e.t_ms<0||!Number.isFinite(e.duration_ms))throw Error('动作时值无效');
+        if(internalSlots&&(!Number.isInteger(e.slot)||e.slot<0||e.slot>5))throw Error('动作槽位必须为0–5');
+        if((file.benchQuick||file.fullStroke)&&e.amplitude!==1)throw Error('高速全幅演示幅度必须为100%');
+        if(e.duration_ms<(internalSlots&&file.quickDemo?40:120)||e.duration_ms>4000)throw Error('每次按住须在 120–4000 ms 内；请在训练器调整时值');
+        const slot=internalSlots?e.slot:map[e.finger];if(!Number.isInteger(slot))throw Error('指法无效');
+        events.push({t:e.t_ms,on:true,s:slot},{t:e.t_ms+e.duration_ms,on:false,s:slot});
+      }
+      events.sort((a,b)=>a.t-b.t||Number(a.on)-Number(b.on));
+      // Reject crowded schedules before ARM; never reassign fingers or alter times.
+      const lastEnd=new Map();
+      for(const e of file.events){const key=internalSlots?e.slot:e.finger;if(lastEnd.has(key)&&e.t_ms-lastEnd.get(key)<(internalSlots&&file.quickDemo?0:120))throw Error('同指松开间隔不足 120 ms');lastEnd.set(key,e.t_ms+e.duration_ms);}
+      await this.command('ARM');
+      const armed=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
+      if(armed.armed!=='1')throw Error('使能未确认');
+      if(internalSlots)return file.rhythmDemo?await this.runRhythmDemo(file,slots,info,runStarted):await this.runServoGroups(file,slots,info);
+      let targets=new Map(),positions=[],nextPoll=0,index=0;
+      const range=Number(info.range),tol=info.profile==='SCS'?6:24,speed=info.profile==='SCS'?200:1200,start=this.now();
+      while(index<events.length||targets.size){
+        this.check();let now=this.now(),elapsed=now-start;
+        // Read every 40 ms, including while waiting for the next note.
+        if(now>=nextPoll){
+          const line=(await this.command('POSALL')).find(l=>l.startsWith('OK POSALL '));
+          positions=(line||'').split(/\s+/).slice(2,8).map(Number);
+          if(positions.length!==6||positions.some(p=>!Number.isInteger(p)||p<0||p>range))throw Error('位置反馈丢失，执行已中止');
+          positions.forEach((p,s)=>{if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
+          now=this.now();elapsed=now-start;nextPoll=now+40;
+          for(const [s,g] of targets){if(Math.min(Math.abs(positions[s]-g.pos),range+1-Math.abs(positions[s]-g.pos))<=slots[s].arrivalTolerance)targets.delete(s);else if(now-g.at>g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+slots[s].arrivalTolerance+'，已停止');}
+        }
+        // Off events always sort before on at the same timestamp; no events are skipped.
+        if(index<events.length&&events[index].t<=elapsed){
+          const e=events[index++];
+          if(elapsed-e.t>180)throw Error('执行延迟超过 180 ms，已停止；不会追赶旧动作');
+          const unfinished=targets.has(e.s);
+          if(e.on&&unfinished)throw Error('上一动作未到位，禁止继续按下');
+          const target=e.on?slots[e.s].press:slots[e.s].rest;
+          await this.command('MOVE '+slots[e.s].id+' '+target+' '+speed+' 30');
+          targets.set(e.s,{pos:target,at:this.now(),timeout:Math.min(6000,Math.max(1200,Math.abs(positions[e.s]-target)/speed*1000+1000))});
+          this.progress({elapsed:Math.min(this.now()-start,file.duration_ms),index,total:events.length});
+          if(!e.on&&unfinished)throw Error('按下未完成，已发松开并中止');
+          continue;
+        }
+        await this.sleep(8);
+      }
+      return {completed:true,events:events.length};
+    }finally{
+      // Also sends SAFE after any outstanding ARM/MOVE returns following a stop.
+      this.cancelled=true;this.deadline=null;this.generation++;
+      try{await this.io.safe();}finally{this.active=false;}
+    }
+  }
+
+  async runRhythmDemo(file,slots,info,lifecycleStarted=this.now()){
+    if(info.profile!=='SCS'||info.bench_group!=='1'||!file.fullStroke||!file.benchQuick||!file.quickDemo)throw Error('节奏展示需要已更新同步控制的SCS固件');
+    if(file.events.some(e=>![0,2,3,4,5].includes(e.slot)))throw Error('节奏曲目仅支持五根手指，拇指侧摆保持休止');
+    if(!Number.isFinite(file.duration_ms)||file.duration_ms<=0||file.duration_ms>9000)throw Error('节奏片段最多9秒');
+    const events=[];for(const e of file.events){if(e.t_ms+e.duration_ms>file.duration_ms)throw Error('动作超出曲目时长');events.push({t:e.t_ms,on:true,s:e.slot},{t:e.t_ms+e.duration_ms,on:false,s:e.slot});}
+    events.sort((a,b)=>a.t-b.t||Number(a.on)-Number(b.on));const batches=[];for(const e of events){let batch=batches.at(-1);if(!batch||batch.t!==e.t){batch={t:e.t,events:[]};batches.push(batch);}if(batch.events.some(v=>v.s===e.s))throw Error('同指抬起与按下需要留出行程时间');batch.events.push(e);}
+    if(batches.some((batch,i)=>batch.t-(i?batches[i-1].t:0)>1050))throw Error('片段停顿过长，请选连续的短乐句');
+    const used=new Set(file.events.map(e=>e.slot));slots=slots.map((slot,s)=>used.has(s)?slot:{...slot,lift:slot.midpoint});
+    const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
+    const execute=async()=>{
+      await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:1000,phase:'lift'});
+      const scoreStarted=this.now(),pending=new Map();let index=0,nextPoll=0,nextInfo=0,positions=slots.map(slot=>slot.lift);
+      while(index<batches.length||pending.size){
+        this.check();let now=this.now(),elapsed=now-scoreStarted;
+        if(now>=nextPoll){positions=await this.positions(slots,+info.range);now=this.now();elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);if(Math.abs(positions[slot]-goal.pos)<=35)pending.delete(slot);}
+          this.progress({elapsed,index,groupIndex:index,total:batches.length,positions,targets:[...pending].map(([slot,g])=>({slot,pos:g.pos})),feedback:true,rhythm:true,...this.feedbackStats()});}
+        if(info.bench_feedback==='1'&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('节奏展示已被安全释放，请重新开始');
+        if(info.bench_feedback!=='1'&&now>=nextInfo){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('节奏展示已被安全释放，请重新开始');now=this.now();elapsed=now-scoreStarted;nextInfo=now+200;}
+        if(index<batches.length&&elapsed>=batches[index].t){const batch=batches[index];if(elapsed-batch.t>100)throw Error('节奏延迟超过100毫秒，已停止，不追赶旧动作');
+          for(const e of batch.events)if(pending.has(e.s))throw Error('ID '+slots[e.s].id+' 上一动作未到位，节奏过快');
+          const targets=Array(6).fill(512);slots.forEach((slot,s)=>{if(slot.id<1||slot.id>6)throw Error('节奏展示需要ID1–6');targets[slot.id-1]=positions[s];});let mask=0;for(const e of batch.events){targets[slots[e.s].id-1]=e.on?slots[e.s].press:slots[e.s].lift;mask|=1<<(slots[e.s].id-1);}
+          const at=this.now(),lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' 1000'),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
+          if(info.bench_feedback==='1'&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('节奏控制状态未确认');
+          if(ack.readback!=='1'||+ack.count!==batch.events.length||parseInt(ack.mask)!==mask||+ack.speed!==1000)throw Error('节奏组合写入未完整确认');
+          if(this.now()-scoreStarted-batch.t>100)throw Error('节奏写入延迟超过100毫秒，已停止');
+          for(const e of batch.events)pending.set(e.s,{pos:targets[slots[e.s].id-1],at});index++;nextPoll=0;
+          this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,...this.feedbackStats()});continue;}
+        await this.sleep(4);
+      }
+      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:1000,phase:'midpoint'});
+      await this.io.safe();this.feedbackArmedExpected=false;this.lastPositions=null;
+      while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
+      const scoreElapsed=this.now()-scoreStarted;
+      return {completed:true,feedbackVerified:true,fullStroke:true,protocol:'rhythm-fullStroke-v1',duration_ms:file.duration_ms,score_elapsed_ms:scoreElapsed,elapsed_ms:this.now()-started,events:events.length,...this.feedbackStats()};
+    };
+    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('节奏展示超过10秒，已停止'));},Math.max(1,10000-(this.now()-started)));})]);}finally{clearTimeout(watchdog);this.deadline=null;}
+  }
+  async runValidation({speed}={},roles){
+    if(![200,400,600,800,1000].includes(speed))throw Error('请选择200、400、600、800或1000档位');
+    const plan={quickDemo:true,fullStroke:true,events:Array.from({length:6},(_,slot)=>({slot,t_ms:slot*100,duration_ms:60,amplitude:1}))};
+    return this.run(plan,roles,{internalSlots:true,validationSpeed:speed});
+  }
+  async runSpeedTest(options,roles,onProgress=()=>{}){
+    if(this.active||this.pending)throw Error('已有动作正在执行或正在停止');
+    const selected=options?.slots??[0,1,2,3,4,5],requestedAmplitudes=options?.amplitudes,amplitudes=requestedAmplitudes??[1],cycles=options?.cycles??3;
+    if(!Array.isArray(selected)||!selected.length||selected.some(s=>!Number.isInteger(s)||s<0||s>5)||new Set(selected).size!==selected.length||!Array.isArray(amplitudes)||!amplitudes.length||amplitudes.some(a=>!Number.isFinite(a)||a<=0||a>1)||!Number.isInteger(cycles)||cycles<2||cycles>10)throw Error('测速参数无效');
+    this.active=true;this.cancelled=false;this.deadline=null;this.feedbackMetrics=null;this.lastPositions=null;this.feedbackRetries=0;this.feedbackArmedExpected=false;this.generation++;const results=[];
+    try{
+      const {info,slots}=await this.prepare(roles);
+      const initial=actionKV((await this.command('RATE')).find(l=>l.startsWith('OK RATE ')));if(initial.active!=='0')throw Error('先停止当前测速');
+      if(info.profile==='SCS')return await this.runScsSpeedTest({selected,amplitudes,cycles},slots,info,onProgress);
+      if(requestedAmplitudes===undefined)amplitudes.splice(0,amplitudes.length,.25,.5,1);
+      const mask='0x'+selected.reduce((m,s)=>m|(1<<s),0).toString(16);
+      for(const amplitude of amplitudes){
+        await this.command('RATE '+mask+' 0 30 '+Math.round(amplitude*100)+' '+cycles);
+        const start=this.now();let state;
+        do{this.check();await this.sleep(80);const lines=await this.command('RATE');if(lines.some(l=>l.startsWith('RATE_FAILED')))throw Error('测速未到位，已停止');state=actionKV(lines.find(l=>l.startsWith('OK RATE ')));onProgress({amplitude,slots:selected,cycles,done:state.done,active:state.active==='1',results:[...results]});if(this.now()-start>45000)throw Error('测速超时，已停止');}while(state.active==='1');
+        const full=+state.full_ms,hz=+state.hz;
+        if(state.valid!=='1'||+state.lost!==0||state.done!==cycles+'/'+cycles||!Number.isFinite(full)||full<=0||!Number.isFinite(hz)||hz<=0)throw Error('测速反馈不完整，不能认定频率');
+        results.push({amplitude,slots:[...selected],cycles,full_ms:full,hz,feedbackVerified:true});onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length});
+      }
+      return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
+    }finally{this.cancelled=true;this.deadline=null;this.generation++;try{await this.io.safe();}finally{this.active=false;}}
+  }
+  async runScsSpeedTest({selected,amplitudes,cycles},slots,info,onProgress){
+    if(selected.length!==6)throw Error('SCS测速需要六台舵机一起');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
+    const base=slots.map(slot=>{const lo=slot.low+6,hi=slot.high-6;if(lo>=hi)throw Error('校准行程不足以保留端点余量');const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
+    const started=this.now(),results=[];let watchdog;this.deadline=started+45000;this.feedbackMetrics={start:started,samples:0};
+    const execute=async()=>{
+      await this.command('ARM');if(actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO '))).armed!=='1')throw Error('使能未确认');
+      for(const amplitude of amplitudes){
+        this.check();const scaled=base.map(slot=>({...slot,press:Math.round(slot.lift+(slot.press-slot.lift)*amplitude),measurementTolerance:amplitude<1?Math.max(6,Math.min(35,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):35}));
+        if(scaled.some(slot=>Math.abs(slot.press-slot.lift)<4))throw Error('测速幅度过小，无法区分反馈噪声');
+        const group=selected.map(slot=>({slot,amplitude:1})),cfg={speed:1000,scaledTolerance:true};
+        await this.reach(group,scaled,info,false,started,0,cycles,true,true,{...cfg,phase:'lift'});
+        const measureStart=this.now();let completedCycles=0;const legMetrics=[];
+        for(let cycle=0;cycle<cycles;cycle++){this.check();legMetrics.push(await this.reach(group,scaled,info,true,started,cycle,cycles,true,true,cfg));this.check();legMetrics.push(await this.reach(group,scaled,info,false,started,cycle,cycles,true,true,{...cfg,phase:'lift'}));completedCycles++;onProgress({amplitude,slots:[...selected],cycles,done:completedCycles+'/'+cycles,active:true,results:[...results],...this.feedbackStats()});}
+        const fullElapsed=this.now()-measureStart;if(!Number.isFinite(fullElapsed)||fullElapsed<=0||completedCycles!==cycles)throw Error('测速时间或反馈不完整，不能认定频率');
+        const result={amplitude,slots:[...selected],cycles,full_ms:fullElapsed/cycles,hz:cycles*1000/fullElapsed,elapsed_ms:fullElapsed,feedbackVerified:true,protocol:'scs-feedback-ensemble-v1',speed:1000,performance:{commandMs:legMetrics.reduce((n,l)=>n+l.command_ms,0),preflightMs:legMetrics.reduce((n,l)=>n+l.preflight_ms,0),feedbackWaitMs:legMetrics.reduce((n,l)=>n+l.feedback_wait_ms,0),INFO_calls:legMetrics.reduce((n,l)=>n+l.INFO_calls,0),POSALL_calls:legMetrics.reduce((n,l)=>n+l.POSALL_calls,0),legs:legMetrics},...this.feedbackStats()};
+        await this.reach(group,scaled,info,false,started,cycles,cycles,true,true,{...cfg,phase:'midpoint'});
+        results.push(result);onProgress({amplitude,results:[...results],completed:results.length===amplitudes.length,active:false});
+      }
+      return {completed:true,results,feedbackRetries:this.feedbackRetries??0};
+    };
+    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('六台测速超时，已停止'));},45000);})]);}finally{clearTimeout(watchdog);this.deadline=null;}
+  }
+  async prepare(roles){
+      const info=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));
+      const rows=(await this.command('STATUS_ALL')).filter(l=>l.startsWith('SLOT ')).map(actionKV);
+      const slots=actionGate(info,rows,roles);
+      const checks=(await this.command('ARM CHECK')).filter(l=>l.startsWith('ARM_CHECK_SLOT ')).map(actionKV);
+      if(checks.length!==6||new Set(checks.map(r=>+r.slot)).size!==6)throw Error('六台舵机准备检查未完整收到，请保持连接后再开始');
+      for(let slot=0;slot<6;slot++){const check=checks.find(r=>+r.slot===slot),row=rows.find(r=>+r.slot===slot),low=+check?.min,high=+check?.max;
+        if(!check||+check.id!==slots[slot].id||check.ok!=='1'||check.torque!=='0'||!Number.isInteger(low)||!Number.isInteger(high)||low<0||high>+info.range||low>=high)throw Error('ID '+slots[slot].id+' 的准备状态未确认，请保持手不动后再开始');
+        const lo=Math.max(+row.min,low),hi=Math.min(+row.max,high);
+        const startTolerance=info.profile==='SCS'?Math.min(6,Math.floor((hi-lo)/4)):0;
+        if(lo>=hi||!Number.isInteger(+check.pos)||+check.pos<low||+check.pos>high||+check.pos<lo-startTolerance||+check.pos>hi+startTolerance)throw Error('ID '+slots[slot].id+' 当前超出可控制范围，请轻轻回到已标红行程内');
+        if(slots[slot].rest<lo||slots[slot].rest>hi)throw Error('ID '+slots[slot].id+' 自然放松位置超出硬件控制范围，需调整安装位置');
+        slots[slot].press=Math.max(lo,Math.min(hi,slots[slot].press));slots[slot].low=lo;slots[slot].high=hi;
+      }
+      await this.positions(slots,+info.range);
+      return {info,slots};
+  }
+  async positions(slots,range){
+    let line,state,positions,retries=0;
+    for(let attempt=0;attempt<2;attempt++){
+      line=(await this.command('POSALL')).find(l=>l.startsWith('OK POSALL '));state=actionKV(line);positions=(line||'').split(/\s+/).slice(2,8).map(Number);
+      if(state.armed==='0'&&this.feedbackArmedExpected)throw Error('位置反馈显示已释放，执行已停止');
+      const complete=positions.length===6&&positions.every(p=>Number.isInteger(p)&&p>=0&&p<=range);
+      if(complete)break;
+      if(attempt===1||state.armed==='0')throw Error('位置反馈丢失，已停止');
+      this.feedbackRetries=(this.feedbackRetries??0)+1;retries++;this.check();
+    }
+    positions.forEach((p,s)=>{if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
+    Object.defineProperties(positions,{armed:{value:state.armed},bench_active:{value:state.bench_active},retries:{value:retries}});this.lastPositions={positions,at:this.now()};
+    if(this.feedbackMetrics)this.feedbackMetrics.samples++;
+    return positions;
+  }
+  feedbackStats(){const m=this.feedbackMetrics,elapsed=m?this.now()-m.start:0;return {feedbackRetries:this.feedbackRetries??0,feedbackSamples:m?.samples??0,feedbackHz:elapsed>0?Math.round(m.samples*10000/elapsed)/10:0};}
+  async reach(group,slots,info,on,start,index,total,quick=false,bench=false,{speed:requestedSpeed=null,phase=null,scaledTolerance=false}={}){
+    const legStarted=this.now();
+    if(bench&&group.length>1&&info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
+    const modern=bench&&info.bench_feedback==='1',cached=modern&&this.lastPositions?.positions.armed==='1'&&this.lastPositions.positions.bench_active==='1'&&this.now()-this.lastPositions.at<=100;
+    const before=cached?this.lastPositions.positions:await this.positions(slots,+info.range),speed=requestedSpeed??(bench?1000:(info.profile==='SCS'?200:1200)),goals=new Map(),arrivals=new Map();let legDeadline=Infinity,issuedAt=null,POSALL_calls=cached?0:1+(before.retries??0);
+    if(bench&&![400,600,800,1000].includes(speed)&&speed!==1000)throw Error('台架档位无效');
+    for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
+      if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
+      const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??35):35;
+      if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,timeout:bench?1000:Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
+    if(modern&&before.armed!=='1')throw Error('台架已释放，停止当前档位');
+    if(bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架已释放，停止当前档位');}
+    if(bench&&group.length>1){
+      if(slots.some(slot=>!Number.isInteger(slot.id)||slot.id<1||slot.id>6))throw Error('组合动作需要ID1–6');
+      const targets=Array(6).fill(512);slots.forEach((slot,s)=>targets[slot.id-1]=before[s]);let mask=0;for(const [s,g]of goals){targets[slots[s].id-1]=g.pos;mask|=1<<(slots[s].id-1);}
+      const at=this.now();issuedAt=at;legDeadline=at+1000;for(const g of goals.values())g.at=at;
+      const lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' '+speed),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
+      if(modern&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('组合控制状态未确认');
+      if(ack.readback!=='1'||+ack.count!==group.length||parseInt(ack.mask)!==mask||+ack.speed!==speed)throw Error('组合目标写入未完整确认');
+    }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+1000);await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');}
+    const feedbackStarted=this.now();
+    while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:35,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
+      if(!goals.size&&bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架截止已释放，不能判定到位');if(this.now()>=legDeadline)throw Error('台架到位确认超时，已停止');}
+      this.progress({elapsed:now-start,index,groupIndex:index,total,slots:group.map(e=>e.slot),on,state:phase??(on?'press':'release'),phase:phase??(on?'press':'release'),speed,positions,...this.feedbackStats(),targets:group.map(e=>({slot:e.slot,pos:phase==='lift'?slots[e.slot].lift:phase==='midpoint'?slots[e.slot].midpoint:on?Math.round(slots[e.slot].rest+(slots[e.slot].press-slots[e.slot].rest)*(e.amplitude??1)):slots[e.slot].rest})),feedback:true});if(goals.size)await this.sleep(quick?1:30);}
+    return {phase:phase??(on?'press':'lift'),elapsed_ms:this.now()-legStarted,preflight_ms:issuedAt-legStarted,command_ms:feedbackStarted-issuedAt,feedback_wait_ms:this.now()-feedbackStarted,INFO_calls:bench&&!modern?2:0,POSALL_calls,arrivals:[...arrivals.values()].sort((a,b)=>a.id-b.id)};
+  }
+  async runServoGroups(file,slots,info){
+    const groups=[];for(const e of [...file.events].sort((a,b)=>a.t_ms-b.t_ms)){let g=groups.at(-1);if(!g||g[0].t_ms!==e.t_ms){g=[];groups.push(g);}if(g.some(x=>x.slot===e.slot))throw Error('同一动作槽位重复');g.push(e);}
+    const start=this.now(),quick=file.quickDemo===true;this.feedbackMetrics={start,samples:0};let watchdog;
+    const execute=async()=>{for(let i=0;i<groups.length;i++){const group=groups[i];this.check();if(file.fullStroke)await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:'lift'});this.check();await this.reach(group,slots,info,true,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null});this.check();await this.sleep(quick?40:Math.min(300,Math.max(120,Math.min(...group.map(e=>e.duration_ms)))));this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:file.fullStroke?'lift':null});if(file.fullStroke){this.check();await this.reach(group,slots,info,false,start,i,groups.length,quick,file.benchQuick===true,{speed:file.validationSpeed??null,phase:'midpoint'});}this.check();if(!quick)await this.sleep(120);this.check();}
+      this.progress({elapsed:this.now()-start,groupIndex:groups.length,total:groups.length,completed:true,feedback:true,...this.feedbackStats()});return {completed:true,...this.feedbackStats(),events:file.events.length*(file.fullStroke?4:2),elapsed_ms:this.now()-start,feedbackVerified:true,...(file.fullStroke?{protocol:'fullStroke-v1',fullStroke:true}:{}),...(file.validationOnly?{speed:file.validationSpeed}:{})};};
+    if(!quick)return execute();
+    const budget=file.validationOnly?30000:file.fullStroke||file.wearDemo===true?15000:4500;this.deadline=start+budget;
+    try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error(file.fullStroke||file.wearDemo===true?'完整动作未在规定时间内完成，已停止':'5秒展示未完成，已停止'));},budget);})]);}
+    finally{clearTimeout(watchdog);this.deadline=null;}
+
+  }
+
+}
+
+const section=document.querySelector('#p-play');
+if(!section) return;
+const card=document.createElement('div'); card.className='card';card.id='strictActionCard';
+card.innerHTML=`<h2>带指法动作 JSON</h2>
+<p class="desc">导入训练器导出的 JSON，保留文件里指定的每根手指和时值。加载只预览；只有点击“开始手套训练”并通过检查才运动。不会覆盖下方 MIDI。</p>
+<label for="strictActionFile">选择动作文件（.json）</label>
+<input type="file" id="strictActionFile" accept=".json,application/json">
+<div id="strictActionStatus" class="msg" role="status" aria-live="polite">尚未载入。无需连接硬件即可预览。</div>
+<div id="strictActionContent" hidden>
+  <div id="strictActionWarnings" class="msg warn"></div>
+  <div id="strictActionTableWrap"><table id="strictActionTable"><thead><tr><th>序号</th><th>手指</th><th>开始 / 秒</th><th>持续 / 秒</th></tr></thead><tbody></tbody></table></div>
+  <div class="row"><button type="button" id="strictActionPreviewStart" class="primary">播放预览（不驱动手套）</button><button type="button" id="strictActionPreviewStop" class="ghost">停止预览</button></div>
+  <progress id="strictActionProgress" value="0" max="1" aria-label="动作预览进度"></progress>
+  <div id="strictActionTime" class="hint">0.00 秒</div>
+  <div class="row"><button type="button" id="strictActionHardwareStart" class="primary">开始手套训练</button></div>
+  <p class="hint">训练使用每指完整校准行程，未加琴音；开始前必须确认穿戴与行程舒适。仅支持已核对的 2.2.4 / STS 固件；角色、校准、反馈或时序异常立即停止，不丢事件继续。遇到不适切断动力电源。原 MIDI 按钮仍只执行 MIDI。</p>
+</div>`;
+section.prepend(card);
+const el=id=>document.getElementById(id);
+const names={1:'拇指',2:'食指',3:'中指',4:'无名指',5:'小指'};
+let parsed=null, rows=[], frame=0, started=0, loadGeneration=0;
+function stopPreview(){
+  if(frame) cancelAnimationFrame(frame);
+  frame=0;
+  rows.forEach(row=>row.dataset.active='false');
+  el('strictActionPreviewStart').disabled=!parsed;
+}
+function paint(ms){
+  el('strictActionProgress').max=parsed.duration_ms;
+  el('strictActionProgress').value=Math.min(ms,parsed.duration_ms);
+  el('strictActionTime').textContent=(ms/1000).toFixed(2)+' / '+(parsed.duration_ms/1000).toFixed(2)+' 秒 · 仅屏幕预览';
+  rows.forEach((row,i)=>{const e=parsed.events[i];row.dataset.active=String(ms>=e.t_ms && ms<e.t_ms+e.duration_ms);});
+}
+function tick(now){
+  if(!parsed) return;
+  const ms=Math.min(now-started,parsed.duration_ms);
+  paint(ms);
+  if(ms>=parsed.duration_ms){stopPreview();return;}
+  frame=requestAnimationFrame(tick);
+}
+function loadStrictActions(input){
+  if(S.playing||executor.active) throw Error('请先停止当前训练，再导入新的动作文件。');
+    const next=parseActionFile(input);
+    stopPreview();parsed=next;
+    const body=el('strictActionTable').tBodies[0];body.replaceChildren();
+    rows=parsed.events.map((e,i)=>{
+      const row=document.createElement('tr');
+      [i+1,names[e.finger],(e.t_ms/1000).toFixed(3),(e.duration_ms/1000).toFixed(3)].forEach(v=>{const td=document.createElement('td');td.textContent=String(v);row.appendChild(td);});
+      body.appendChild(row);return row;
+    });
+    el('strictActionStatus').className='msg ok';
+    el('strictActionStatus').textContent=parsed.name+' · '+parsed.events.length+' 个事件 · '+(parsed.duration_ms/1000).toFixed(3)+' 秒 · 仅加载，未运动';
+    el('strictActionWarnings').textContent=['文件没有音高，不合成或猜测琴音；指法与时值不自动重分配。',...parsed.warnings.slice(1)].join('\n');
+    el('strictActionContent').hidden=false;
+    el('strictActionPreviewStart').disabled=false;
+    paint(0);
+  return parsed;
+}
+el('strictActionFile').addEventListener('change',async event=>{
+  const generation=++loadGeneration;
+  stopPreview();parsed=null;rows=[];el('strictActionContent').hidden=true;
+  const file=event.target.files[0];if(!file){el('strictActionStatus').textContent='尚未载入。';return;}
+  try{
+    if(S.playing) throw new Error('请先停止正在进行的演奏，再导入动作文件。');
+    if(file.size>1000000) throw new Error('动作文件过大，最多 100 万字节。');
+    const text=await file.text();if(generation!==loadGeneration) return;
+    loadStrictActions(text);
+  }catch(error){
+    parsed=null;rows=[];
+    el('strictActionStatus').className='msg err';
+    el('strictActionStatus').textContent='无法载入：'+error.message;
+    el('strictActionContent').hidden=true;
+  }
+});
+el('strictActionPreviewStart').addEventListener('click',()=>{
+  if(!parsed) return;
+  if(S.playing){el('strictActionStatus').textContent='请先停止现有演奏，再播放屏幕预览。';return;}
+  stopPreview();started=performance.now();el('strictActionPreviewStart').disabled=true;frame=requestAnimationFrame(tick);
+});
+el('strictActionPreviewStop').addEventListener('click',()=>{stopPreview();if(parsed)paint(0);});
+window.addEventListener('pagehide',stopPreview);
+
+const transport={
+  identity:null,
+  async request(path,body){
+    const options=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
+    const pending=fetch(T.base+path,options).then(async r=>{if(!r.ok)throw Error('串口桥 HTTP '+r.status);return r.json();});
+    let timer,timedOut=false;
+    try{return await Promise.race([pending,new Promise((_,reject)=>{timer=setTimeout(()=>{timedOut=true;reject(Error('串口桥超时，请确认动力停止'));},Math.max(1200,(body?.timeoutMs||650)+400));})]);}
+    finally{clearTimeout(timer);if(timedOut&&body&&/^(ARM|MOVE|BENCH)/.test(body.cmd||''))pending.finally(()=>transport.safe().catch(()=>{})).catch(()=>{});}
+  },
+  async identify(){
+    const st=await this.request('/api/status');
+    if(!st.connected||!st.connectedAt)throw Error('串口未连接；禁止自动恢复动作');
+    const id=st.port+':'+st.connectedAt;
+    if(this.identity&&this.identity!==id)throw Error('串口已重连；本次执行终止，请重新核对');
+    this.identity=id;
+  },
+  async send(cmd){await this.identify();if(executor.cancelled)throw Error('执行已取消');const j=await this.request('/api/send',{cmd,timeoutMs:(cmd==='ARM'||/^RATE /.test(cmd))?2500:650,quietMs:(cmd==='STATUS_ALL'||cmd==='ARM CHECK')?180:8});if(!j.ok)throw Error(j.error||'串口命令失败');return j.lines;},
+  async safe(){
+    await this.identify();
+    await this.request('/api/fire',{cmd:'SAFE'});
+    const j=await this.request('/api/send',{cmd:'SAFE',timeoutMs:650,quietMs:8});
+    if(!j.ok||!j.lines?.some(l=>l.startsWith('OK SAFE ')))throw Error('停止未确认，请立即切断动力电源');
+  }
+};
+const executor=new StrictActionExecutor(transport,{progress:p=>{if(parsed)paint(p.elapsed);document.dispatchEvent(new CustomEvent('delivery:progress',{detail:p}));}});
+window.pianoStrictTrainingActive=()=>executor.active;
+window.pianoStrictExecutor=executor;window.pianoStrictLoad=loadStrictActions;
+window.pianoStrictStop=()=>executor.stop();
+window.pianoStrictPlay=async(input)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');loadStrictActions(input);stopPreview();transport.identity=null;try{await executor.run(parsed,ROLES.slice());}finally{S.needArm=true;}};
+window.pianoStrictDemo=async(plan)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;try{return await executor.run(plan,ROLES.slice(),{internalSlots:true});}finally{S.needArm=true;}};
+window.pianoStrictValidation=async({speed,onProgress}={})=>{if(executor.active||executor.pending||S.playing||window.pianoFirmwareBusy?.()||window.pianoMountBusy?.())throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;const previous=executor.progress;executor.progress=p=>{previous(p);if(typeof onProgress==='function')onProgress(p);};try{return await executor.runValidation({speed},ROLES.slice());}finally{executor.progress=previous;S.needArm=true;}};
+
+window.pianoStrictSpeed=async(options,progress)=>{if(executor.active||S.playing||window.pianoFirmwareBusy?.()||(window.pianoMountBusy?.()||window.pianoValidationBusy?.()))throw Error('请先停止当前动作或等待烧录完成');if(T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接手套并等待待发送动作完成');stopPreview();transport.identity=null;try{return await executor.runSpeedTest(options,ROLES.slice(),progress);}finally{S.needArm=true;}};
+window.PianoDeliveryHooks={send:(cmd,timeoutMs=2500,quietMs=140)=>T.send(cmd,timeoutMs,quietMs),getState:()=>({connected:T.connected,mode:T.mode,identity:T.portName+':'+T.bridge?.connectedAt,info:S.info,slots:S.slots,playing:S.playing,roles:ROLES.slice()}),refresh:async()=>{await refreshInfo();await refreshSlots(true);},stopLegacy:async()=>{clearInterval(calTimer);T._q.length=0;if(T._qTimer){clearTimeout(T._qTimer);T._qTimer=null;}stopPlay(true);}};
+
+// Only the local score trainer may load a file. No message can start execution.
+const scoreTrainerOrigins=new Set(['http://127.0.0.1:8772','http://localhost:8772']);
+window.addEventListener('message',event=>{
+  if(!scoreTrainerOrigins.has(event.origin)||!event.source||event.data?.type!=='PIANO_SCORE_ACTIONS') return;
+  try{
+    if(S.playing||executor.active) throw Error('请先停止当前训练，再导入新的动作文件。');
+    loadStrictActions(event.data.actions);
+    document.dispatchEvent(new CustomEvent('delivery:import',{detail:event.data.actions}));
+    ++loadGeneration; // Prevent an older pending local file read overwriting this import.
+    goto('play');
+    event.source.postMessage({type:'PIANO_SCORE_ACTIONS_LOADED'},event.origin);
+  }catch(error){
+    el('strictActionStatus').className='msg err';
+    el('strictActionStatus').textContent='训练器文件未载入：'+error.message;
+    event.source.postMessage({type:'PIANO_SCORE_ACTIONS_ERROR',error:error.message},event.origin);
+  }
+});
+
+function hardwareStatus(text,error=false){el('strictActionStatus').className='msg '+(error?'err':'ok');el('strictActionStatus').textContent=text;}
+el('strictActionHardwareStart').disabled=false;
+el('strictActionHardwareStart').textContent='开始手套训练';
+el('strictActionHardwareStart').addEventListener('click',async()=>{
+  if(!parsed)return;
+  if(executor.active)return;
+  try{
+    if(S.playing||T.mode!=='bridge'||!T.connected||T._q.length)throw Error('先连接串口桥并停止现有演奏；不支持模拟页面或待发送动作');
+    stopPreview();transport.identity=null;
+    hardwareStatus('正在核对固件、校准、角色与反馈；未通过则拒绝运动。');
+    el('strictActionFile').disabled=true;el('strictActionHardwareStart').disabled=true;
+    await executor.run(parsed,ROLES.slice());
+    hardwareStatus('动作文件执行结束，已确认 SAFE 停止。');
+  }catch(error){hardwareStatus(error.message,true);}
+  finally{el('strictActionFile').disabled=false;el('strictActionHardwareStart').disabled=false;S.needArm=true;}
+});
+const hardwareStop=document.createElement('button');hardwareStop.type='button';hardwareStop.id='strictActionHardwareStop';hardwareStop.className='danger';hardwareStop.textContent='停止手套训练';
+el('strictActionHardwareStart').after(hardwareStop);
+hardwareStop.addEventListener('click',()=>{if(executor.active)executor.stop().then(()=>hardwareStatus('已请求停止；不会自动继续')).catch(e=>hardwareStatus(e.message,true));});
+const stopIds=new Set(['demoStop','strictActionHardwareStop','btnStop','btnSafe','simpleEmergencyStop']);
+// Keep the legacy MIDI/calibration/ID controls from racing this independent executor.
+document.addEventListener('click',event=>{
+  if(!executor.active)return;
+  const control=event.target.closest('button,input,select,label');if(!control)return;
+  if(control.id==='demoStop')return;
+  if(stopIds.has(control.id)){event.preventDefault();event.stopImmediatePropagation();executor.stop().then(()=>hardwareStatus('已请求停止；不会自动继续')).catch(e=>hardwareStatus(e.message,true));return;}
+  event.preventDefault();event.stopImmediatePropagation();
+},true);
+document.addEventListener('keydown',event=>{
+  if(!executor.active||event.key==='Tab'||stopIds.has(event.target.id))return;
+  event.preventDefault();event.stopImmediatePropagation();
+  if(event.key==='Escape')executor.stop().catch(e=>hardwareStatus(e.message,true));
+},true);
+window.addEventListener('pagehide',()=>{
+  if(!executor.active)return;
+  executor.cancelled=true;
+  fetch(T.base+'/api/fire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:'SAFE'}),keepalive:true}).catch(()=>{});
+});
+
+})();
+</script>
+<!-- END STRICT_ACTION_JSON_PREVIEW -->
+
+
+<!-- MAIN_CONTROLLER_FIRMWARE -->
+<style>#mainFirmware .fw-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}#fwLog{white-space:pre-wrap;max-height:180px;overflow:auto;font-size:12px;background:#f3f5f8;padding:12px;border-radius:8px}#fwProgress{width:100%;height:12px}#mainFirmware label{display:block;margin:12px 0}#fwStatus{white-space:pre-wrap}</style>
+<script>
+(()=>{
+if(new URLSearchParams(location.search).get('simple')==='1')return;
+const q=id=>document.getElementById(id),card=document.createElement('div');card.className='card';card.id='mainFirmware';
+card.innerHTML=`<h2>主控固件</h2><p class="desc">更新手套主控程序：先断开舵机动力电源、摘下手套，仅保留主控 USB 接线。</p><p id="fwVersion" class="hint">正在读取固件信息…</p><div class="fw-actions"><select id="fwPort" aria-label="主控USB串口"></select><button id="fwRefresh">刷新</button><button id="fwBuild">仅编译</button><button id="fwFlash" class="primary">烧录主控</button></div><label><input id="fwPowerOff" type="checkbox"> 我已断开动力电源、未穿戴手套，主控 USB 已接好</label><p class="hint">固定微雪 ESP32 板型 · 烧录速率 230400 · 不清空校准 · 完成后不自动运动</p><progress id="fwProgress" max="100" value="0"></progress><p id="fwStatus" class="msg" role="status" aria-live="polite">等待固件服务</p><details><summary>编译与烧录日志</summary><pre id="fwLog">尚无日志</pre></details>`;
+q('p-connect').append(card);
+let status=null,requesting=false,polling=false,lastActionError='';
+const moving=()=>S.playing||!!window.pianoStrictTrainingActive?.()||!!window.pianoMountBusy?.();
+const locked=()=>requesting||!!status?.busy;
+function render(){const busy=locked(),motion=moving();q('fwBuild').disabled=busy||motion||!status||status.available===false;q('fwFlash').disabled=busy||motion||!status||status.available===false||!q('fwPort').value||!q('fwPowerOff').checked;q('fwPort').disabled=busy;q('fwPowerOff').disabled=busy;q('fwRefresh').disabled=requesting;q('fwVersion').textContent=`版本：${status?.version||'待读取'} · 板型：${status?.board||'微雪 ESP32（固定）'}`;if(motion&&!busy)q('fwStatus').textContent='请先停止演奏或手套训练，再编译或烧录。';}
+function paint(data){status=data;if(T.bridge?.auto===false&&!T.bridge.connected)onBridgeWaiting(T.bridge);const previous=q('fwPort').value;const ports=Array.isArray(data.ports)?data.ports:[];q('fwPort').replaceChildren(new Option('选择主控 USB 串口',''),...ports.map(p=>{const value=typeof p==='string'?p:p.port||p.device||p.name;const option=new Option(typeof p==='string'?p:(p.label||p.description||value)+' · '+value,value);if(typeof p==='object'&&p.eligible===false)option.disabled=true;return option;}));if([...q('fwPort').options].some(o=>o.value===previous))q('fwPort').value=previous;else if(ports.length===1)q('fwPort').selectedIndex=1;const pct=Number(data.progress);if(Number.isFinite(pct))q('fwProgress').value=Math.max(0,Math.min(100,pct));else q('fwProgress').removeAttribute('value');const state=data.state||'待机';const labels={idle:'等待操作',running:'处理中',built:'编译完成，未烧录',verified:'烧录及回读验证完成',failed:'失败',written_unverified:'已写入，回读未验证',queued:'准备中',build:'正在编译',identify:'核对主控身份',write:'正在写入',verify:'校验写入内容',readback:'读取主控状态',complete:'已完成'};let text=data.busy?`进行中：${labels[data.phase]||data.phase||state}`:`状态：${labels[state]||state}`;if(data.error)text+='\n失败：'+(typeof data.error==='string'?data.error:JSON.stringify(data.error));if(data.verified===true)text+='\n写入完成，主控回读已验证；未启动任何动作。';else if(data.verified!==true&&(data.written===true||data.uploadDone===true||['written_unverified','verify_failed'].includes(state)))text+='\n写入结果不等于回读通过：主控尚未验证，请查看日志。';if(data.available===false)text+='\n固件工具尚未就绪，无法开始。';if(lastActionError)text+='\n上次操作未完成：'+lastActionError;q('fwStatus').textContent=text;q('fwLog').textContent=Array.isArray(data.log)?data.log.map(x=>typeof x==='string'?x:JSON.stringify(x)).join('\n'):String(data.log||'尚无日志');render();}
+async function api(path,body){const r=await fetch(path,body===undefined?{cache:'no-store'}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw Error(j.error||j.message||`请求失败 ${r.status}`);return j;}
+async function refresh(){if(polling)return;polling=true;try{paint(await api('/api/firmware'));}catch(e){q('fwStatus').textContent='固件服务不可用：'+e.message;status=null;render();}finally{polling=false;}}
+async function run(flash){if(locked()||moving())return;if(flash&&(!q('fwPowerOff').checked||!q('fwPort').value))return;lastActionError='';requesting=true;render();try{if(flash){T._q.length=0;if(T._qTimer){clearTimeout(T._qTimer);T._qTimer=null;}stopPlay(true);}const data=await api('/api/firmware/'+(flash?'flash':'build'),flash?{port:q('fwPort').value}:{});if(data&&'busy'in data)paint(data);await refresh();}catch(e){lastActionError=e.message;q('fwStatus').textContent='未完成：'+e.message;}finally{requesting=false;render();}}
+q('fwRefresh').onclick=()=>{lastActionError='';return refresh();};q('fwBuild').onclick=()=>run(false);q('fwFlash').onclick=()=>run(true);q('fwPort').onchange=render;q('fwPowerOff').onchange=render;
+document.addEventListener('click',e=>{if(!locked())return;const control=e.target.closest('button,input,select');if(control&&!card.contains(control)&&!['btnStop','btnSafe','simpleEmergencyStop','strictActionHardwareStop'].includes(control.id)){e.preventDefault();e.stopImmediatePropagation();}},true);
+window.pianoFirmwareBusy=locked;setInterval(()=>{render();refresh();},1500);refresh();
+})();
+</script>
+<!-- END MAIN_CONTROLLER_FIRMWARE -->
+
+<link rel="stylesheet" href="/delivery-shell.css"><script src="/delivery-shell.js"></script><script src="/delivery-demo.js"></script><link rel="stylesheet" href="/delivery-mount.css"><script src="/delivery-mount.js"></script><link rel="stylesheet" href="/delivery-validation.css"><script src="/delivery-validation.js"></script>
 </body>
 </html>

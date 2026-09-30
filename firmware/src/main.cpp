@@ -1,3 +1,4 @@
+#include "cal_circle.h"
 // 钢琴手套 · 主控固件（自研 PIANO_GLOVE_2）
 //
 // 设计目标：
@@ -14,9 +15,11 @@
 
 #include "glove.h"
 #include "scs_bus.h"
+#include "enroll_flow.h"
+#include "profile_limits.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.2.3"
+#define FW_VER "2.2.4"
 // 2.2.0: 型号 / 位置量程改成**从舵机读回来**（STS3032 + SC09 双适配）；
 //        新增 POSALL 一帧读回全部槽位位置（演奏闭环的心跳）。
 // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
@@ -73,62 +76,169 @@ static uint32_t g_rxDrop;
 
 // ---------------------------------------------------------------- ENROLL 状态机
 
-static bool        g_enroll        = false;
-static uint8_t     g_enrollNext    = 1;
-static const char *g_enrollPhase   = "OFF";
-static uint32_t    g_enrollTickMs  = 0;
-
-static void enrollTick(uint32_t now) {
-  if (!g_enroll) return;
-  if (now - g_enrollTickMs < 500) return;
-  g_enrollTickMs = now;
-
-  uint8_t     found[12];
-  const int   c = scs::scan(10, found, 12);
-
-  if (c == 0) {                                  // 总线是空的
-    if (strcmp(g_enrollPhase, "ASSIGNED") == 0) {
-      ++g_enrollNext;
-      if (g_enrollNext > glove::SLOT_COUNT) {
-        g_enrollPhase = "DONE";
-        g_enroll      = false;
-        sayf("ENROLL DONE assigned=%d", glove::SLOT_COUNT);
-        return;
-      }
+static EnrollFlow g_enrollFlow;
+static bool g_enroll=false;
+static bool g_enrollAutomaticBoot=false;
+static uint8_t g_enrollBootReadyStable=0;
+static void probeAndReport(uint8_t id);
+static uint8_t g_enrollNext=1;
+static const char *g_enrollPhase="OFF";
+static const uint32_t ENROLL_BAUDS[]={1000000,500000,250000,128000,115200};
+static uint8_t g_enrollScanId=1,g_enrollBaudIndex=0,g_enrollLockedScans=0;
+static uint32_t g_enrollSeen=0,g_enrollLockedBaud=0,g_enrollFoundBaud=0;
+static uint32_t g_enrollStartBaud=scs::BUS_BAUD;
+static uint16_t g_enrollModel=0;
+static const char *g_enrollReason="none",*g_enrollStep="idle";
+static int g_enrollModelRaw=-1,g_enrollMaxRaw=-1;
+static bool enrollFail(const char *reason,const char *step){
+ g_enrollReason=reason;g_enrollStep=step;
+ sayf("ENROLL DIAG reason=%s step=%s model_raw=%d max_raw=%d baud=%u",reason,step,g_enrollModelRaw,g_enrollMaxRaw,(unsigned)scs::busBaud());
+ return false;
+}
+static scs::Family g_enrollFamily=scs::Family::UNKNOWN;
+static void enrollSync(){g_enroll=g_enrollFlow.active();g_enrollNext=g_enrollFlow.next;g_enrollPhase=g_enrollFlow.name();}
+static void enrollStop(){
+  const uint32_t restore=g_enrollLockedBaud?g_enrollLockedBaud:(g_enroll?g_enrollStartBaud:scs::busBaud());
+  g_enrollFlow.stop();enrollSync();g_enrollAutomaticBoot=false;g_enrollBootReadyStable=0;
+  scs::setBusBaud(restore);
+  glove::safe();g_enrollScanId=1;g_enrollSeen=0;g_enrollBaudIndex=0;g_enrollLockedScans=0;
+}
+static bool enrollStart(bool automaticBoot=false){
+ if(g_enroll)return false;
+ enrollStop();
+ g_enrollReason="none";g_enrollStep="scanning";g_enrollModelRaw=-1;g_enrollMaxRaw=-1;
+ g_enrollStartBaud=scs::busBaud();
+ g_enrollLockedBaud=0;g_enrollModel=0;g_enrollFamily=scs::Family::UNKNOWN;g_enrollFoundBaud=0;
+ g_enrollFlow.start();enrollSync();g_enrollAutomaticBoot=automaticBoot;return true;
+}
+static uint8_t freshFixedDevices(){
+ uint8_t live=0;
+ for(uint8_t id=1;id<=6;++id){
+  scs::Feedback fb;
+  if(scs::ping(id,8)&&!scs::lastError()&&scs::readFeedback(id,fb,8)&&!scs::lastError()&&fb.ok&&fb.pos>=0&&fb.pos<=scs::profile().range)live|=uint8_t(1u<<(id-1));
+ }
+ return live;
+}
+static bool g_bootEnrollmentChecked=false;
+static void bootCheckEnrollment(){
+ if(g_bootEnrollmentChecked)return;
+ g_bootEnrollmentChecked=true;
+ // Fresh fixed-address reads, independent of saved mapping and cached onlineMask.
+ const uint8_t live=freshFixedDevices();
+ if(live!=0x3F)enrollStart(true);
+ sayf("BOOT DEVICES live_mask=0x%02X ready=%d enrollment=%s motion=0",live,live==0x3F,g_enrollPhase);
+}
+static bool enrollIdentity(uint8_t id,scs::Profile &p){
+  uint8_t m[2],lo[2],hi[2];
+  g_enrollModelRaw=-1;g_enrollMaxRaw=-1;
+  if(!scs::readRegs(id,3,2,m))return enrollFail("read_model_failed","read_reg3");
+  const uint16_t raw=(uint16_t(m[0])<<8)|m[1];g_enrollModelRaw=raw;
+  if(raw==0 || raw==0xffff)return enrollFail("model_invalid","identify");
+  if(!scs::readRegs(id,9,2,lo))return enrollFail("read_limit_failed","read_reg9");
+  if(!scs::readRegs(id,11,2,hi))return enrollFail("read_limit_failed","read_reg11");
+  g_enrollMaxRaw=(uint16_t(hi[0])<<8)|hi[1];
+  uint16_t mn=0,mx=0;const int kind=identifyLimitEndian(lo,hi,mn,mx);
+  if(!kind)return enrollFail("family_ambiguous_limits","identify");
+  p.family=kind==1?scs::Family::STS:scs::Family::SCS;p.range=kind==1?4095:1023;
+  p.model=raw;p.minAng=mn;p.maxAng=mx;p.probed=true;return true;
+}
+static bool enrollRename(uint8_t from,uint8_t to){
+  scs::Profile p;uint8_t torque=255;
+  if(!enrollIdentity(from,p))return false;
+  if(g_enrollModel && (p.model!=g_enrollModel||p.family!=g_enrollFamily)){g_enrollFlow.conflict();return enrollFail("mixed_model","compare_model");}
+  if(!g_enrollModel){g_enrollModel=p.model;g_enrollFamily=p.family;scs::setProfile(p);glove::saveProfile();}
+  if(!scs::setTorque(from,false))return enrollFail("torque_write_failed","disable_torque");
+  if(!scs::readRegs(from,40,1,&torque)||torque!=0)return enrollFail("torque_off_unverified","verify_torque");
+  if(from==to){ // A partial prior session may already have isolated this physical slot.
+    if(!scs::ping(to,5))return enrollFail("existing_id_missing","verify_existing");
+    scs::Profile after;
+    return enrollIdentity(to,after)&&after.model==g_enrollModel&&after.family==g_enrollFamily;
+  }
+  if(scs::ping(to,5))return enrollFail("target_id_present","before_write");
+  // SDK: STS LOCK=55, SCSCL LOCK=48. ID=5 and TORQUE=40 are common one-byte registers.
+  const uint8_t lock=p.family==scs::Family::SCS?48:55,z=0,o=1;
+  if(!scs::writeRegs(from,lock,&z,1))return enrollFail("unlock_failed","unlock");
+  delay(10);
+  scs::writeRegs(from,5,&to,1); // ID-write ACK may use the new address; verify both addresses below.
+  delay(300);
+  if(scs::ping(from,5))return enrollFail("old_id_remains","verify_id");
+  if(!scs::ping(to,5))return enrollFail("new_id_missing","verify_id");
+  if(!scs::writeRegs(to,lock,&o,1))return enrollFail("relock_failed","relock");
+  scs::Profile after;
+  return enrollIdentity(to,after)&&after.model==g_enrollModel&&after.family==g_enrollFamily;
+}
+static void enrollTick(uint32_t now){
+  (void)now;if(!g_enroll)return;
+  glove::markCommand();
+  uint8_t baudIndex=g_enrollBaudIndex;
+  if(g_enrollLockedBaud){
+    uint8_t locked=0;while(ENROLL_BAUDS[locked]!=g_enrollLockedBaud)++locked;
+    baudIndex=g_enrollBaudIndex==0?locked:(g_enrollBaudIndex-1<locked?g_enrollBaudIndex-1:g_enrollBaudIndex);
+  }
+  const uint32_t baud=ENROLL_BAUDS[baudIndex];
+  scs::setBusBaud(baud);
+  if(scs::ping(g_enrollScanId,5)){
+    if(g_enrollLockedBaud && baud!=g_enrollLockedBaud){
+      scs::Profile candidate;
+      if(!enrollIdentity(g_enrollScanId,candidate))g_enrollFlow.fail();
+      else if(candidate.model!=g_enrollModel || candidate.family!=g_enrollFamily)g_enrollFlow.conflict();
+      else g_enrollFlow.phase=EnrollFlow::PAUSED_BAUD;
+      sayf("ENROLL PAUSED different_baud=%u id=%u action=match_bus_baud_then_restart",(unsigned)baud,g_enrollScanId);
+    } else if(g_enrollFoundBaud && g_enrollFoundBaud!=baud){g_enrollFlow.conflict();}
+    g_enrollFoundBaud=baud;g_enrollSeen|=1ul<<g_enrollScanId;
+  }
+  // Always restore locked bus between incremental probes, including before SAFE.
+  if(g_enrollLockedBaud)scs::setBusBaud(g_enrollLockedBaud);
+  if(!g_enrollFlow.active()){enrollSync();glove::safe();sayf("ENROLL STATUS active=0 next=%u count=%u phase=%s enroll_flow=3",g_enrollNext,g_enrollFlow.count,g_enrollPhase);return;}
+  if(++g_enrollScanId<=20)return;
+  g_enrollScanId=1;
+  if(!g_enrollLockedBaud&&g_enrollBaudIndex==0&&g_enrollFlow.phase==EnrollFlow::WAIT_FIRST&&g_enrollSeen&&!(g_enrollSeen&(g_enrollSeen-1))){
+    uint8_t candidate=1;while(!(g_enrollSeen&(1ul<<candidate)))++candidate;
+    scs::Profile identity;
+    if(candidate<=20&&enrollIdentity(candidate,identity))g_enrollLockedBaud=g_enrollFoundBaud;
+  }
+  // Confirm the locked bus after each fast ID1..20 scan. Only every eighth
+  // idle round searches the other supported bauds; writes/verification never
+  // wait behind alternate-baud scans.
+  if(g_enrollLockedBaud&&g_enrollBaudIndex==0){
+    const bool idle=g_enrollSeen==g_enrollFlow.expected&&
+      (g_enrollFlow.phase==EnrollFlow::WAIT_NEXT||g_enrollFlow.phase==EnrollFlow::WAIT_FIRST);
+    if(!idle||++g_enrollLockedScans<8)g_enrollBaudIndex=sizeof(ENROLL_BAUDS)/sizeof(ENROLL_BAUDS[0])-1;
+    else g_enrollLockedScans=0;
+  }
+  if(++g_enrollBaudIndex<sizeof(ENROLL_BAUDS)/sizeof(ENROLL_BAUDS[0]))return;
+  g_enrollBaudIndex=0;
+  const auto before=g_enrollFlow.phase;
+  // Main USB may boot before the separately powered servo bus. Only automatic
+  // boot preparation can accept an already complete bus without renumbering.
+  if(g_enrollAutomaticBoot&&g_enrollFlow.count==0&&(before==EnrollFlow::WAIT_EMPTY||before==EnrollFlow::WAIT_FIRST)){
+    g_enrollBootReadyStable=g_enrollSeen==0x7E?g_enrollBootReadyStable+1:0;
+    if(g_enrollBootReadyStable>=2){
+      const uint32_t liveBaud=g_enrollFoundBaud?g_enrollFoundBaud:scs::busBaud();
+      scs::setBusBaud(liveBaud);probeAndReport(1);
+      if(freshFixedDevices()!=0x3F){g_enrollBootReadyStable=0;g_enrollSeen=0;g_enrollFoundBaud=0;return;}
+      enrollStop();scs::setBusBaud(liveBaud);
+      sayf("ENROLL READY active=0 count=6 phase=OFF boot_auto=1 motion=0");return;
     }
-    g_enrollPhase = "WAIT_EMPTY";
-    return;
+    if(g_enrollSeen==0x7E){g_enrollSeen=0;g_enrollFoundBaud=0;return;} // Await second complete scan; do not classify six additions as conflict.
   }
-  if (c > 1) {                                   // 多个舵机同时在线
-    g_enrollPhase = "CONFLICT";
-    return;
+  const char *previousScanReason=g_enrollFlow.reason;
+  const bool rename=g_enrollFlow.observe(g_enrollSeen,millis());
+  if(!strcmp(g_enrollFlow.reason,"none")&&!strcmp(g_enrollReason,"expected_missing_retry")){g_enrollReason="none";g_enrollStep="scanning";}
+  if(strcmp(g_enrollFlow.reason,"none")){
+    g_enrollReason=g_enrollFlow.reason;g_enrollStep="scan_validation";
+    if(strcmp(previousScanReason,g_enrollFlow.reason)||before!=g_enrollFlow.phase)sayf("ENROLL SCAN reason=%s seen=0x%08lX expected=0x%08lX missing_scans=%u phase=%s",g_enrollReason,(unsigned long)g_enrollFlow.lastSeen,(unsigned long)g_enrollFlow.lastExpected,g_enrollFlow.missingScans,g_enrollFlow.name());
   }
-
-  const uint8_t cur  = found[0];
-  const int     slot = (int)g_enrollNext - 1;      // 第 N 轮 -> 槽位 N-1
-
-  // ⚠️ 这里**必须**用 setMap(slot, id) 明确"这一轮填哪个槽位"，
-  //    不能用 glove::remapId() —— 那个是给 SETID 命令用的
-  //    （"某块舵机的号变了，把指向它的槽位跟着改"）。
-  //
-  //    编号流程里每轮插上的都是**新的出厂舵机，出厂号全是 1**，
-  //    于是第 2 轮就会调 remapId(1, 2)，把**第 1 轮已经填好的槽位 0**
-  //    （它也存着 1）一起改成 2 —— 结果 6 轮跑完得到 [2,2,3,4,5,6]，
-  //    槽位 0 和槽位 1 指向同一块舵机，id=1 那块永远不动。
-  //    界面还会显示"编号完成"，一点错都看不出来。（这个坑踩过）
-  if (cur == g_enrollNext) {                       // 正好是目标号，不用改号
-    glove::setMap(slot, g_enrollNext);             // 但映射无论如何都要写
-    g_enrollPhase = "ASSIGNED";
-    sayf("ENROLL ASSIGNED id=%u slot=%d (号已正确)", (unsigned)g_enrollNext, slot);
-    return;
+  if(rename){
+    if(g_enrollFlow.count==0&&g_enrollFlow.phase==EnrollFlow::VERIFY_ASSIGN)glove::invalidateCalibration();
+    if(!g_enrollLockedBaud)g_enrollLockedBaud=g_enrollFoundBaud;
+    scs::setBusBaud(g_enrollLockedBaud);
+    if(!enrollRename(g_enrollFlow.from,g_enrollFlow.to)||!glove::setMap(g_enrollFlow.slot,g_enrollFlow.to)){if(g_enrollFlow.active())g_enrollFlow.fail();}
+    else sayf("ENROLL ASSIGNED id=%u slot=%u was=%u verifying=1",g_enrollFlow.to,g_enrollFlow.slot,g_enrollFlow.from);
   }
-  if (scs::setId(cur, g_enrollNext)) {
-    glove::setMap(slot, g_enrollNext);
-    g_enrollPhase = "ASSIGNED";
-    sayf("ENROLL ASSIGNED id=%u slot=%d was=%u", (unsigned)g_enrollNext, slot, (unsigned)cur);
-  } else {
-    g_enrollPhase = "FAILED";
-  }
+  g_enrollSeen=0;g_enrollFoundBaud=0;enrollSync();
+  if(!g_enroll)glove::safe();
+  if(before!=g_enrollFlow.phase)sayf("ENROLL STATUS active=%d next=%u count=%u phase=%s enroll_flow=3 baud=%u model=%u",g_enroll?1:0,g_enrollNext,g_enrollFlow.count,g_enrollPhase,(unsigned)g_enrollLockedBaud,g_enrollModel);
 }
 
 // ---------------------------------------------------------------- 槽位行输出
@@ -143,27 +253,27 @@ static void printSlotLine(int s, const scs::Feedback *fb) {
   if (on) {
     snprintf(b, sizeof(b),
              "SLOT slot=%d name=%s id=%u online=1 pos=%d speed=%d load=%d voltage_raw=%u "
-             "temperature=%u current=%d min=%u standby=%u max=%u valid=%d press=%s",
+             "temperature=%u current=%d min=%u standby=%u max=%u valid=%d press=%s wrap=%d",
              s, glove::name(s), (unsigned)sl.id, (int)fb->pos, (int)fb->speed, (int)fb->load,
              (unsigned)fb->voltage, (unsigned)fb->temp, (int)fb->current,
              (unsigned)sl.lo, (unsigned)sl.standby, (unsigned)sl.hi,
-             sl.valid ? 1 : 0, (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min");
+             sl.valid ? 1 : 0, (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min", sl.lo>sl.hi?1:0);
   } else {
     snprintf(b, sizeof(b),
-             "SLOT slot=%d name=%s id=%u online=0 min=%u standby=%u max=%u valid=%d press=%s",
+             "SLOT slot=%d name=%s id=%u online=0 min=%u standby=%u max=%u valid=%d press=%s wrap=%d",
              s, glove::name(s), (unsigned)sl.id,
              (unsigned)sl.lo, (unsigned)sl.standby, (unsigned)sl.hi,
-             sl.valid ? 1 : 0, (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min");
+             sl.valid ? 1 : 0, (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min", sl.lo>sl.hi?1:0);
   }
   sayf("%s", b);
 }
 
 static void printCalLine(int s) {
   const glove::Slot &sl = glove::slot(s);
-  sayf("CAL slot=%d name=%s id=%u min=%u standby=%u max=%u valid=%d press=%s",
+  sayf("CAL slot=%d name=%s id=%u min=%u standby=%u max=%u valid=%d press=%s wrap=%d",
        s, glove::name(s), (unsigned)sl.id, (unsigned)sl.lo, (unsigned)sl.standby,
        (unsigned)sl.hi, sl.valid ? 1 : 0,
-       (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min");
+       (sl.dir == glove::DIR_PRESS_MAX) ? "max" : "min", sl.lo>sl.hi?1:0);
 }
 
 // ---------------------------------------------------------------- 命令实现
@@ -195,8 +305,8 @@ static void probeAndReport(uint8_t id) {
 static void cmdInfo() {
   const scs::Profile &pf = scs::profile();
   sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=PIANO_GLOVE_A50528 ip=192.168.4.1 "
-       "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=10 "
-       "enroll_phase=%s online=%d sweep=%d ver=%s",
+       "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=20 "
+       "enroll_phase=%s enroll_flow=3 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1",
        FW_ID, scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0,
        glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
        g_enroll ? 1 : 0, (unsigned)g_enrollNext, g_enrollPhase,
@@ -302,6 +412,10 @@ static void cmdCal(const int n, char **t) {
     if (s < 0 || s >= glove::SLOT_COUNT) {
       errf("CAL CAPTURE usage_slot_MIN_STANDBY_MAX");
       return;
+    }
+    const int mn=atoi(t[3]),st=atoi(t[4]),mx=atoi(t[5]);
+    if(!calcircle::valid(mn,st,mx,scs::profile().range)){
+      errf("CAL CAPTURE invalid_circular_range");return;
     }
     if (!glove::refresh(s)) {
       errf("CAL CAPTURE servo_read_failed");
@@ -437,7 +551,15 @@ static void cmdSweep(const int n, char **t) {
   const unsigned speed = (n >= 6) ? (unsigned)atol(t[5]) : 0;
   const unsigned acc   = (n >= 7) ? (unsigned)atol(t[6]) : 0;
 
-  if (freq == 0 || freq > 20000 || depth == 0 || depth > 100 || dur == 0) {
+  if (freq == 0) {
+    glove::safe();
+    okf("SWEEP freq_mhz=0 stopped=1 torque=off armed=0");
+    return;
+  }
+  if (!glove::calibrated() || glove::calInvalidSlot() >= 0) {
+    errf("SWEEP calibration_incomplete"); return;
+  }
+  if (freq > 20000 || depth == 0 || depth > 100 || dur == 0) {
     errf("SWEEP bad_args");
     return;
   }
@@ -503,21 +625,37 @@ static void cmdSetId(const int n, char **t) {
   }
 }
 
+static bool servoDiag(uint8_t id){
+ if(id<1||id>6||scs::profile().family!=scs::Family::SCS){errf("DIAG SCS_id1to6_required");return false;}
+ uint8_t d[67]={};
+ for(uint8_t start=0;start<67;start+=16){
+  const uint8_t n=start+16<=67?16:67-start;
+  if(!scs::readRegs(id,start,n,d+start)||scs::lastError()){errf("DIAG read_failed id=%u start=%u error=%u",id,start,scs::lastError());return false;}
+  char hex[33];for(uint8_t i=0;i<n;++i)snprintf(hex+2*i,3,"%02X",d[start+i]);
+  sayf("DIAG_RAW id=%u start=%u length=%u hex=%s",id,start,n,hex);
+ }
+ const auto be=[&](int a)->uint16_t{return (uint16_t(d[a])<<8)|d[a+1];};
+ sayf("DIAG_SCS id=%u min=%u max=%u max_torque=%u phase=%u P=%u D=%u punch=%u dead_positive=%u dead_negative=%u hold_torque=%u protection_time=%u overload_torque=%u lock=%u",id,be(9),be(11),be(16),d[18],d[21],d[22],be(24),d[26],d[27],d[37],d[38],d[39],d[48]);
+ sayf("DIAG_FEEDBACK id=%u torque=%u goal=%u time=%u speed=%u position_raw=%u speed_raw=%u load_raw=%u voltage_raw=%u temperature=%u async=%u status=%u moving=%u",id,d[40],be(42),be(44),be(46),be(56),be(58),be(60),d[62],d[63],d[64],d[65],d[66]);
+ okf("DIAG id=%u raw_count=67 read_only=1",id);return true;
+}
 static void cmdLine(char *raw) {
   char  buf[256];
   strncpy(buf, raw, sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = 0;
 
-  char *t[8];
+  char *t[16];
   int   n = 0;
   char *p = buf;
-  while (*p && n < 8) {
+  while (*p && n < int(sizeof(t)/sizeof(t[0]))) {
     while (*p == ' ' || *p == '\t') ++p;
     if (!*p) break;
     t[n++] = p;
     while (*p && *p != ' ' && *p != '\t') ++p;
     if (*p) *p++ = 0;
   }
+  while (*p == ' ' || *p == '\t') ++p;
+  if (*p) { glove::safe(); errf("COMMAND too_many_arguments"); return; }
   if (n == 0) return;
 
   glove::markCommand();          // 让后台轮询让出总线，别和前台命令抢
@@ -527,6 +665,49 @@ static void cmdLine(char *raw) {
   v[sizeof(v) - 1] = 0;
   for (char *q = v; *q; ++q) *q = (char)toupper((unsigned char)*q);
 
+  glove::mountTick();
+  if(glove::mountActive()&&strcmp(v,"MOUNT")&&strcmp(v,"DIAG")&&strcmp(v,"INFO")&&strcmp(v,"STATUS")&&strcmp(v,"STATUS_ALL")&&strcmp(v,"POSALL")&&strcmp(v,"SAFE")&&strcmp(v,"DISARM")&&strcmp(v,"BUSINFO")){errf("MOUNT active_STOP_first");return;}
+  glove::benchTick();
+  if(glove::benchActive()&&strcmp(v,"BENCH")&&strcmp(v,"DIAG")&&strcmp(v,"INFO")&&strcmp(v,"STATUS")&&strcmp(v,"STATUS_ALL")&&strcmp(v,"POSALL")&&strcmp(v,"SAFE")&&strcmp(v,"DISARM")&&strcmp(v,"BUSINFO")){errf("BENCH active_wait_deadline_or_SAFE");return;}
+  // Enrollment exclusively owns bus writes; status and emergency stop remain available.
+  if (g_enroll && strcmp(v,"INFO") && strcmp(v,"STATUS") && strcmp(v,"STATUS_ALL") &&
+      strcmp(v,"ENROLL") && strcmp(v,"MOUNT") && strcmp(v,"SAFE") && strcmp(v,"DISARM") && strcmp(v,"BUSINFO")) {
+    errf("ENROLL active_stop_first"); return;
+  }
+  if(!strcmp(v,"MOUNT")){
+    const char *action=n>=2?t[1]:"STATUS";
+    if(!strcasecmp(action,"START")){
+      if(glove::mountActive()){errf("MOUNT already_active");return;}
+      enrollStop();if(!glove::mountStart()){errf("MOUNT %s",glove::mountReason());return;}
+      okf("MOUNT START active=1 target=512 speed=200 watchdog_ms=3000 ready_mask=0x%02X",glove::mountReadyMask());return;
+    }
+    if(!strcasecmp(action,"KEEP")){if(!glove::mountKeep()){errf("MOUNT inactive reason=%s",glove::mountReason());return;}okf("MOUNT KEEP active=1 watchdog_ms=3000");return;}
+    if(!strcasecmp(action,"STOP")){if(!glove::mountStop()){errf("MOUNT STOP active=0 release_unverified");return;}okf("MOUNT STOP active=0 torque=off verified=1");return;}
+    if(!strcasecmp(action,"STATUS")){
+      for(int id=1;id<=6;++id)sayf("MOUNT_SLOT id=%d pos=%d ready=%d",id,glove::mountPosition(id),(glove::mountReadyMask()>>(id-1))&1);
+      okf("MOUNT STATUS active=%d target=512 ready_mask=0x%02X ready=%d reason=%s",glove::mountActive(),glove::mountReadyMask(),glove::mountActive()&&glove::mountReadyMask()==0x3F,glove::mountReason());return;
+    }
+    errf("MOUNT usage_START_KEEP_STOP_STATUS");return;
+  }
+  if(!strcmp(v,"DIAG")){if(n!=2){errf("DIAG usage_id1to6");return;}const int id=atoi(t[1]);if(id<1||id>6){errf("DIAG id_outside1to6");return;}servoDiag(id);return;}
+  if(!strcmp(v,"BENCH")){
+    if(n>=2&&!strcasecmp(t[1],"GROUP")){
+      if(n!=10){glove::safe();errf("BENCH GROUP usage_mask_p1_p2_p3_p4_p5_p6_speed");return;}
+      char *end=nullptr;const unsigned long mask=strtoul(t[2],&end,0);
+      if(!end||*end||!mask||mask>0x3F){glove::safe();errf("BENCH GROUP mask_outside1to63");return;}
+      uint16_t positions[6];for(int id=0;id<6;++id){const long pos=strtol(t[id+3],&end,10);if(!end||*end||pos<0||pos>1023){glove::safe();errf("BENCH GROUP target_outside_bounds id=%d",id+1);return;}positions[id]=uint16_t(pos);}
+      const long speed=strtol(t[9],&end,10);if(!end||*end||speed<50||speed>1000){glove::safe();errf("BENCH GROUP speed_outside50to1000");return;}
+      if(!glove::benchGroup(uint8_t(mask),positions,uint16_t(speed))){errf("BENCH GROUP %s",glove::benchFailure());return;}
+      glove::benchTick();
+      if(!glove::armed()||!glove::benchActive()){errf("BENCH GROUP deadline");return;}
+      okf("BENCH GROUP mask=0x%02lX speed=%ld readback=1 count=%d cutoff_ms=1200 armed=1 bench_active=1",mask,speed,bitcount(uint8_t(mask)));return;
+    }
+    if(n!=5||strcasecmp(t[1],"MOVE")){errf("BENCH usage_MOVE_id_position_speed");return;}
+    const int id=atoi(t[2]),pos=atoi(t[3]),speed=atoi(t[4]);
+    if(id<1||id>6||pos<0||pos>1023||speed<50||speed>1000){errf("BENCH input_outside_bounds");return;}
+    if(!glove::benchMove(id,pos,speed)){errf("BENCH %s",glove::benchFailure());return;}
+    okf("BENCH MOVE id=%d pos=%d speed=%d readback=1 cutoff_ms=1200",id,pos,speed);return;
+  }
   // ---- 全局 ----
   if (strcmp(v, "INFO") == 0)     { cmdInfo(); return; }
   if (strcmp(v, "HELP") == 0) {
@@ -550,6 +731,14 @@ static void cmdLine(char *raw) {
     okf("ECHO enabled=%d echo_bytes=%u", scs::stats().echo ? 1 : 0,
         (unsigned)scs::stats().echoBytes);
     return;
+  }
+  if (strcmp(v,"MODEL") == 0) {
+    const int id=n>=2?atoi(t[1]):0;
+    if(id<1||id>20){errf("MODEL usage_id1to20");return;}
+    uint8_t m[2],lo[2],hi[2];
+    if(!scs::readRegs(id,3,2,m)){errf("MODEL id=%d step=read_reg3",id);return;}
+    if(!scs::readRegs(id,9,2,lo)||!scs::readRegs(id,11,2,hi)){errf("MODEL id=%d step=read_limits model_b0=%u model_b1=%u",id,m[0],m[1]);return;}
+    okf("MODEL id=%d model_b0=%u model_b1=%u min_b0=%u min_b1=%u max_b0=%u max_b1=%u baud=%u",id,m[0],m[1],lo[0],lo[1],hi[0],hi[1],(unsigned)scs::busBaud());return;
   }
   if (strcmp(v, "PROFILE") == 0) {
     /* PROFILE             查当前用的是什么
@@ -626,10 +815,10 @@ static void cmdLine(char *raw) {
       slotOf[n] = s;
       ++n;
     }
-    if (n == 0) { okf("POSALL -1 -1 -1 -1 -1 -1 online=0"); return; }
+    if (n == 0) { glove::benchTick();okf("POSALL -1 -1 -1 -1 -1 -1 online=0 armed=%d bench_active=%d",glove::armed()?1:0,glove::benchActive()?1:0); return; }
 
     uint16_t pos[glove::SLOT_COUNT];
-    scs::syncReadPos(ids, n, pos, 8);
+    scs::syncReadPos(ids, n, pos, scs::positionReadBudget(n));
 
     char buf[80];
     int  k = 0;
@@ -640,7 +829,8 @@ static void cmdLine(char *raw) {
       if (k >= 0 && k < (int)sizeof(buf) - 1)
         k += snprintf(buf + k, sizeof(buf) - (size_t)k, "%s%d", k ? " " : "", (int)pv);
     }
-    okf("POSALL %s", buf);
+    glove::benchTick();
+    okf("POSALL %s armed=%d bench_active=%d", buf,glove::armed()?1:0,glove::benchActive()?1:0);
     return;
   }
 
@@ -708,16 +898,19 @@ static void cmdLine(char *raw) {
     //   一次完整行程 = 最小 → 最大 → 最小。跑完自动打 RATE_DONE。
     if (n < 2) {
       // 不带参数 = 查状态
-      okf("RATE active=%d done=%u/%u half_ms=%.1f slow_ms=%.1f lost=%u",
+      okf("RATE active=%d done=%u/%u half_ms=%.1f slow_ms=%.1f lost=%u valid=%d full_ms=%.1f hz=%.2f",
           glove::rateActive() ? 1 : 0, (unsigned)glove::rateDone(),
           (unsigned)glove::rateCycles(), glove::rateHalfUs() / 1000.0f,
-          glove::rateSlowUs() / 1000.0f, (unsigned)glove::rateLost());
+          glove::rateSlowUs() / 1000.0f, (unsigned)glove::rateLost(), !glove::rateActive() && glove::rateDone()==glove::rateCycles() && glove::rateLost()==0, glove::rateHalfUs()/500.0f, glove::rateHalfUs() && !glove::rateLost() ? 500000.0f/glove::rateHalfUs() : 0.0f);
       return;
     }
     if (strcasecmp(t[1], "STOP") == 0) {
       glove::rateStop();
       okf("RATE stopped");
       return;
+    }
+    if (!glove::calibrated() || glove::calInvalidSlot() >= 0) {
+      errf("RATE calibration_incomplete"); return;
     }
     const uint8_t  mask  = parseMask(t[1]);
     if (mask == 0) { errf("RATE no_slot_selected_or_offline"); return; }
@@ -740,21 +933,29 @@ static void cmdLine(char *raw) {
     return;
   }
   if (strcmp(v, "ARM") == 0) {
-    if (!glove::calibrated()) { errf("ARM calibration_incomplete"); return; }
-    glove::setArmed(true);
-    glove::torqueAll(true);
+    if(n>=2&&strcasecmp(t[1],"CHECK")==0){
+      const auto &pf=scs::profile();
+      for(int s=0;s<glove::SLOT_COUNT;++s){glove::ArmCheck row;const bool pass=glove::inspectArmSlot(s,row);const auto &sl=glove::slot(s);
+        Serial.printf("ARM_CHECK_SLOT slot=%d id=%u ok=%d pos=%d torque=%d goal=%d min=%d max=%d register_error=%d feedback_error=%d limit_error=%d response_level=%d response_error=%d\n",s,sl.id,pass,row.position,row.torque,row.goal,row.minimum,row.maximum,row.registerError,row.feedbackError,row.limitError,row.responseLevel,row.responseError);
+      }
+      okf("ARM CHECK armed=%d profile=%s range=%u read_only=1",glove::armed(),pf.family==scs::Family::SCS?"SCS":"STS",pf.range);return;
+    }
+    if(n>=2&&strcasecmp(t[1],"PREPARE")==0){if(!glove::armPrepareCurrent()){errf("ARM PREPARE %s torque_off_requested",glove::armFailure());return;}okf("ARM PREPARE armed=0 goals_verified=1");return;}
+    if (!glove::calibrated() || glove::calInvalidSlot() >= 0) { errf("ARM calibration_incomplete"); return; }
+    if (!glove::armAtCurrent()) {
+      errf("ARM safe_prepare_failed %s torque_off_requested",glove::armFailure());
+      return;
+    }
     okf("ARM armed=1");
     return;
   }
   if (strcmp(v, "DISARM") == 0) {
-    glove::setArmed(false);
-    glove::torqueAll(false);
+    enrollStop();
     okf("DISARM armed=0");
     return;
   }
   if (strcmp(v, "SAFE") == 0) {
-    glove::sweepStop();
-    glove::safe();
+    enrollStop();
     okf("SAFE torque=off armed=0");
     return;
   }
@@ -816,9 +1017,8 @@ static void cmdLine(char *raw) {
       const int s = glove::slotOfId((uint8_t)id);
       if (s >= 0 && glove::slot(s).valid) {
         const int a0 = (int)glove::slot(s).lo, a1 = (int)glove::slot(s).hi;
-        const int lo = (a0 < a1) ? a0 : a1;
-        const int hi = (a0 < a1) ? a1 : a0;
-        if (pos < lo || pos > hi) {
+        const int lo = a0, hi = a1;
+        if (!calcircle::contains(lo,hi,pos,scs::profile().range)) {
           errf("MOVE out_of_cal_range id=%d pos=%d allowed=%d..%d add_FORCE_to_override",
                id, pos, lo, hi);
           return;
@@ -841,7 +1041,7 @@ static void cmdLine(char *raw) {
     return;
   }
   if (strcmp(v, "DEMO") == 0) {
-    if (!glove::armed() || !glove::calibrated()) { errf("DEMO arm_and_calibrate_first"); return; }
+    if (!glove::armed() || !glove::calibrated() || glove::calInvalidSlot() >= 0) { errf("DEMO arm_and_calibrate_first"); return; }
     glove::demoStart();
     okf("DEMO start");
     return;
@@ -856,28 +1056,24 @@ static void cmdLine(char *raw) {
       for (char *q = a; *q; ++q) *q = (char)toupper((unsigned char)*q);
     }
     if (strcmp(a, "START") == 0) {
-      g_enroll       = true;
-      g_enrollNext   = 1;
-      g_enrollPhase  = "WAIT_EMPTY";
-      g_enrollTickMs = 0;
-      okf("ENROLL START active=1 next=1 temp=10 phase=WAIT_EMPTY requirement=%s",
-          "first_1_to_10_then_add_id1_as_2_to_6_then_10_to_1");
+      if (!enrollStart()) { errf("ENROLL already_active"); return; }
+      okf("ENROLL START active=1 next=1 temp=20 phase=WAIT_EMPTY requirement=%s",
+          "append_one_id1_or_permuted_1to6_as_20to15_then_finalize_1to6");
       return;
     }
     if (strcmp(a, "STOP") == 0) {
-      g_enroll      = false;
-      g_enrollPhase = "OFF";
+      enrollStop();
       okf("ENROLL STOP");
       return;
     }
     if (strcmp(a, "RESET") == 0) {
-      g_enrollNext  = 1;
-      g_enrollPhase = g_enroll ? "WAIT_EMPTY" : "OFF";
+      enrollStop();
+      g_enrollFlow.next=1; enrollSync();
       okf("ENROLL RESET next=1");
       return;
     }
-    okf("ENROLL STATUS active=%d next=%u phase=%s", g_enroll ? 1 : 0, (unsigned)g_enrollNext,
-        g_enrollPhase);
+    okf("ENROLL STATUS active=%d next=%u count=%u phase=%s enroll_flow=3 baud=%u model=%u reason=%s step=%s model_raw=%d max_raw=%d seen=0x%08lX expected=0x%08lX missing_scans=%u", g_enroll ? 1 : 0, (unsigned)g_enrollNext,g_enrollFlow.count,
+        g_enrollPhase,(unsigned)g_enrollLockedBaud,g_enrollModel,g_enrollReason,g_enrollStep,g_enrollModelRaw,g_enrollMaxRaw,(unsigned long)g_enrollFlow.lastSeen,(unsigned long)g_enrollFlow.lastExpected,g_enrollFlow.missingScans);
     return;
   }
 
@@ -901,7 +1097,6 @@ void setup() {
   Serial.begin(115200);
   delay(60);
   Serial.println();
-  sayf("READY FW=%s ver=%s boot_motion=0 torque=off", FW_ID, FW_VER);
   sayf("READY bus_baud=%u rx=%d tx=%d resp_timeout_ms=%u",
        (unsigned)scs::BUS_BAUD, scs::RX_PIN, scs::TX_PIN, (unsigned)scs::RESP_TIMEOUT_MS);
   scs::begin();
@@ -922,18 +1117,28 @@ void setup() {
     else     sayf("PROFILE_AUTO skipped=no_servo_answered keep=%s range=%u",
                   scs::familyName(scs::profile().family), (unsigned)scs::profile().range);
   }
+  // Profile/register layout is now resolved. Actually request torque-off before ready.
+  glove::safe();
+  bootCheckEnrollment(); // Once per power-on; STOP and reconnect never restart enrollment.
+  sayf("READY FW=%s ver=%s boot_motion=0 torque=off_requested", FW_ID, FW_VER);
   sayf("READY BUS echo=%d echo_bytes=%u uart_rx_buf=%u (echo=1 说明 TX/RX 并联，属正常)",
        scs::stats().echo ? 1 : 0, (unsigned)scs::stats().echoBytes,
        (unsigned)UART_RX_BUF);
 }
 
 void loop() {
+  glove::mountTick();
+  glove::benchTick();
   while (Serial.available()) {
+    glove::mountTick();
+    glove::benchTick();
     const char c = (char)Serial.read();
     if (c == '\r' || c == '\n') {
       if (g_rxLen > 0) {
         g_rx[g_rxLen] = 0;
         cmdLine(g_rx);
+        glove::mountTick();
+        glove::benchTick();
         g_rxLen = 0;
       }
     } else if (g_rxLen < (int)sizeof(g_rx) - 1) {
@@ -947,6 +1152,6 @@ void loop() {
   }
 
   const uint32_t now = millis();
-  glove::tick();
+  if(!g_enroll)glove::tick(); // Enrollment has exclusive ownership of the servo bus.
   enrollTick(now);
 }

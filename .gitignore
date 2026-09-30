@@ -98,3 +98,11 @@ desktop.ini
 *.code-workspace
 .cache/
 *.log
+
+# Local generated tests and device-specific state
+*.obj
+*.exe
+firmware/tests/*_generated.cpp
+host/calibration-resume.json
+host/calibration_recordings/
+host/web_piano_glove.before-*.html

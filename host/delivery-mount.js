@@ -1,0 +1,33 @@
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.PianoMount=api;api.init(root);}})(typeof window!=='undefined'?window:globalThis,function(){
+'use strict';
+const fields=line=>Object.fromEntries(String(line).split(/\s+/).filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1)];}));
+function controller(h,{setTimer=setTimeout,clearTimer=clearTimeout,period=600,onState=()=>{}}={}){
+ let phase='idle',busy=false,message='先摘下手套，拆下六个舵机臂。',identity=null,token=0,timer=null,inFlight=null,ready=false;
+ const snapshot=()=>({phase,busy,message,ready}),paint=()=>onState(snapshot());
+ function connected(){const s=h.getState();if(!s.connected)throw Error('连接已断开，中位安装已停止；重新连接后再开始');if(identity!==null&&s.identity!==identity)throw Error('设备已重连，中位安装已停止；重新确认拆臂后再开始');return s;}
+ async function send(cmd){connected();const lines=await h.send(cmd,2500,/^MOUNT (START|STATUS)$/.test(cmd)?180:8);if(!Array.isArray(lines)||lines.some(l=>/^ERR /.test(l)))throw Error((lines||[]).join(' ')||'未收到安装回复');return lines;}
+ async function release(){const verified=lines=>{const row=fields(lines?.find(l=>/^OK MOUNT STOP(?: |$)/.test(l))||'');return row.active==='0'&&row.torque==='off'&&row.verified==='1';};try{if(!verified(await h.send('MOUNT STOP',2500,8)))throw Error('六台力矩关闭未回读确认');}catch(first){try{const lines=await h.send('SAFE',2500,8),row=fields(lines?.find(l=>/^OK SAFE /.test(l))||'');if(row.armed!=='0')throw Error('SAFE 未确认');if(!verified(await h.send('MOUNT STOP',2500,8)))throw Error('六台力矩关闭仍未回读确认');}catch(last){throw Error('停止未确认，请立即断开舵机电源。'+last.message);}}}
+
+ function parseStatus(lines){const line=lines.find(l=>/^OK MOUNT STATUS(?: |$)/.test(l));if(!line)throw Error('未收到安装状态，请停止后重新连接');const state=fields(line),rows=lines.filter(l=>/^MOUNT_SLOT /.test(l)).map(fields);state.verifiedReady=state.ready==='1'&&state.ready_mask==='0x3F'&&state.target==='512'&&rows.length===6&&new Set(rows.map(r=>+r.id)).size===6&&rows.every(r=>Number.isInteger(+r.id)&&+r.id>=1&&+r.id<=6&&r.ready==='1'&&Number.isInteger(+r.pos)&&Math.abs(+r.pos-512)<=6);return state;}
+ async function stop(reason='已停止安装，舵机已释放。',{waitPending=true}={}){
+  ++token;ready=false;clearTimer(timer);timer=null;const active=busy;phase='stopping';message='正在释放舵机…';paint();
+  try{if(active){await release();if(waitPending&&inFlight)await inFlight.catch(()=>{});await release();}phase='idle';message=reason;}
+  catch(e){phase='error';message=e.message;throw e;}finally{busy=phase==='error';if(!busy)identity=null;paint();}
+ }
+ async function poll(myToken){if(myToken!==token||!busy)return;try{await send('MOUNT KEEP');if(myToken!==token)return;const state=parseStatus(await send('MOUNT STATUS'));if(myToken!==token)return;if(state.active!=='1')throw Error('中位保持已停止；确认拆臂后重新开始');ready=state.verifiedReady;phase=ready?'ready':'centering';message=ready?'六台已到中位。按图装回舵机臂，再点击安装完成。':'六台正在移动到中位，请暂时不要安装。';paint();timer=setTimer(()=>{inFlight=poll(myToken);},period);}catch(e){if(myToken===token)await stop(e.message,{waitPending:false}).catch(()=>{});}}
+ async function start(confirmed){if(!confirmed)throw Error('先摘下手套并拆下六个舵机臂，再勾选确认');if(busy)throw Error('正在安装，请先停止');if(h.otherBusy?.())throw Error('先停止当前动作或等待烧录完成');const state=connected();identity=state.identity;busy=true;ready=false;phase='centering';message='正在校准安装位置…';const myToken=++token;paint();
+  try{inFlight=send('MOUNT START');const lines=await inFlight;if(myToken!==token){await release();return;}if(!lines.some(l=>/^OK MOUNT START(?: |$)/.test(l)))throw Error('安装启动未确认，请检查六台舵机连接');h.invalidateCalibration?.();await poll(myToken);}catch(e){if(myToken===token){await stop(e.message).catch(()=>{});throw e;}}
+ }
+ async function finish(){if(!busy||!ready)throw Error('六台尚未到位，请等待中位校准完成');const fresh=parseStatus(await send('MOUNT STATUS'));if(!fresh.verifiedReady||fresh.active!=='1')throw Error('中位保持未确认，请先停止并重新校准安装位置');await stop('安装完成，已释放；接下来做行程校准。');h.onComplete?.();}
+ return {start,finish,stop,state:snapshot};
+}
+function init(root){if(!root.document||!root.PianoDeliveryHooks)return;const d=root.document;let visible=false;const dialog=d.createElement('dialog');dialog.className='mountDialog';dialog.innerHTML='<div class="mountHeader"><h2>舵机臂中位安装</h2><button class="mountClose" type="button" aria-label="关闭">×</button></div><img src="assets/servo-arm-mount-reference.jpg" alt="舵机臂中位安装参考图"><label class="mountConfirm"><input type="checkbox"> 已摘下手套，并拆下六个舵机臂</label><p class="mountStatus" role="status" aria-live="polite">先拆下六个舵机臂，再校准中位。</p><div class="mountActions"><button class="mountStop" type="button">■ 停止并释放</button><button class="mountStart" type="button" disabled>校准安装位置</button><button class="mountFinish" type="button" disabled>安装完成 → 行程校准</button></div>';d.body.append(dialog);
+ const find=s=>dialog.querySelector(s),ctl=controller({...root.PianoDeliveryHooks,invalidateCalibration:()=>root.PianoDeliveryDemo?.invalidateCalibration?.(),otherBusy:()=>root.pianoStrictTrainingActive?.()||root.pianoFirmwareBusy?.()||root.PianoDeliveryDemo?.state().busy,onComplete:()=>{dialog.close();visible=false;root.PianoDeliveryDemo?.enterCalibration?.();d.querySelector('#demoCalStart')?.focus();}},{onState:s=>{find('.mountStatus').textContent=s.message;find('.mountStart').disabled=s.busy||!find('input').checked;find('.mountFinish').disabled=!s.ready||!s.busy;find('input').disabled=s.busy;}});
+ const handle=async action=>{try{await action();}catch(e){find('.mountStatus').textContent=e.message;}};
+ function open(){if(root.deliveryDemoBusy?.()||root.pianoFirmwareBusy?.())return;visible=true;find('input').checked=false;find('.mountStart').disabled=true;find('.mountStatus').textContent='先摘下手套，拆下六个舵机臂，再勾选确认。';dialog.showModal();}
+ async function close(){await handle(()=>ctl.stop());if(!ctl.state().busy&&ctl.state().phase!=='error'){dialog.close();visible=false;}}
+ find('input').onchange=()=>{find('.mountStart').disabled=!find('input').checked||ctl.state().busy;};find('.mountStart').onclick=()=>handle(()=>ctl.start(find('input').checked));find('.mountFinish').onclick=()=>handle(()=>ctl.finish());find('.mountStop').onclick=()=>handle(()=>ctl.stop());find('.mountClose').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});d.addEventListener('click',e=>{if(e.target.closest('#demoMountOpen'))open();});
+ root.pianoMountBusy=()=>visible||ctl.state().busy;root.pianoMountStop=()=>ctl.stop('已停止安装，舵机已释放。');root.PianoMountUI={open,close,controller:ctl};d.addEventListener('visibilitychange',()=>{if(d.hidden&&ctl.state().busy)handle(()=>ctl.stop('页面已隐藏，安装已停止；返回后重新确认拆臂。'));});root.addEventListener('pagehide',()=>{if(ctl.state().busy)ctl.stop().catch(()=>{});});
+}
+return {controller,fields,init};
+});

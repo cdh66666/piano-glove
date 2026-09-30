@@ -1,0 +1,202 @@
+/* Delivery console: quiet system surfaces, compact controls, piano-key feedback. */
+body.delivery-compact{margin:0!important;padding:0!important;height:100dvh;overflow:hidden;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+body.delivery-compact>:not(#demoRoot):not(.mountDialog):not(.validationDialog):not(script):not(style):not(link){display:none!important}
+#demoRoot{box-sizing:border-box;position:fixed;inset:0;display:grid;grid-template-rows:58px 46px minmax(0,1fr) 24px;gap:10px;padding:14px 20px 8px;overflow:hidden;max-width:1500px;margin:auto}
+#demoRoot *{box-sizing:border-box}#demoRoot button,#demoRoot select,#demoRoot input{font:inherit}#demoRoot button{cursor:pointer;transition:background .14s,color .14s,box-shadow .14s}#demoRoot button:disabled{opacity:.36;cursor:not-allowed}#demoRoot button:focus-visible,#demoRoot select:focus-visible{outline:3px solid #007aff66;outline-offset:2px}
+#demoTop{display:flex;align-items:center;gap:9px;padding:9px 13px 9px 18px;background:#ffffffd9;border:1px solid #e5e5ea;border-radius:17px;box-shadow:0 3px 12px #00000005;position:relative;z-index:15;backdrop-filter:blur(18px)}
+#demoTop h1{font-size:18px;font-weight:650;white-space:nowrap;margin:0 auto 0 0;letter-spacing:-.5px}#demoTop button,#demoTop select{min-height:34px;margin:0;padding:7px 12px;white-space:nowrap;border-radius:9px;font-size:12px;border:0}
+#demoPort{width:112px;background:#f2f2f7;color:#424245}#demoPort.connected{box-shadow:inset 0 0 0 1px #007aff55;background:#eaf3ff;color:#0066cc}#demoConnection{color:#6e6e73;background:transparent}#demoConnection.connected{color:#0066cc;background:#edf5ff}#demoFlash{background:#f2f2f7;color:#1d1d1f}#demoStop{background:#fff0ef;color:#c93128;font-weight:650;min-width:75px}#demoStop:hover{background:#ffe2df}
+#demoTabs{display:flex;align-items:center;justify-self:center;align-self:center;padding:3px;background:#e9e9ed;border-radius:11px;gap:2px}#demoTabs button{height:33px;padding:0 29px;background:transparent;color:#6e6e73;border:0;border-radius:8px;font-size:13px;font-weight:600;min-height:0;margin:0}#demoTabs button.active{background:#fff;color:#1d1d1f;box-shadow:0 1px 4px #00000012}
+#demoRoot .demo-panel{min-height:0;overflow:hidden;background:transparent;border:0;border-radius:0;padding:0;margin:0}#demoRoot .demo-panel[hidden]{display:none!important}
+#demoRoot .demoColumns{display:grid;grid-template-columns:1.08fr 1fr;gap:14px;height:100%;min-height:0}
+#demoRoot .demoBlock{min-width:0;min-height:0;overflow:hidden;padding:20px 22px;background:#fff;border:1px solid #e5e5ea;border-radius:18px}
+#demoRoot .demoBlock h2{font-size:19px;font-weight:650;letter-spacing:-.45px;line-height:1.25;margin:0 0 11px;color:#1d1d1f}
+#demoRoot .demoBlock p{font-size:11px;line-height:1.5;margin:7px 0;color:#86868b}
+#demoRoot .demoRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+#demoRoot .demoBlock button,#demoRoot .demoBlock select{padding:8px 12px;min-height:34px;border:0;border-radius:9px;background:#f2f2f7;color:#1d1d1f;margin:0;font-size:12px}
+#demoRoot .demoBlock button.primary,#demoSongStart{background:#0071e3;color:white}#demoRoot .demoBlock button:hover:not(:disabled){filter:brightness(.97)}
+#demoRoot .demoBlock pre{font:11px/1.6 inherit;background:#f5f5f7;border-radius:10px;padding:9px;margin:8px 0;white-space:pre-wrap}
+#demoRoot .demoCalibrationTable{border-collapse:collapse;width:100%;font-size:12px;margin:10px 0 12px;font-variant-numeric:tabular-nums}#demoRoot .demoCalibrationTable th{font-size:10px;font-weight:500;color:#86868b;padding:6px 8px;text-align:left;border:0;background:transparent}#demoRoot .demoCalibrationTable td{padding:7px 8px;border:0;border-top:1px solid #f0f0f2;color:#424245}#demoRoot .demoCalibrationTable td:first-child{font-weight:550;color:#1d1d1f}
+#demoRoot .demoActionGroup{padding:13px 0;border-bottom:1px solid #efeff2}#demoRoot .demoActionGroup:first-of-type{padding-top:3px}#demoRoot .demoActionGroup:last-of-type{border-bottom:0}#demoRoot .demoActionGroup h3{font-size:13px;font-weight:600;margin:0 0 7px;color:#424245}#demoRoot .demoActionGroup .demoRow{margin:6px 0}
+#demoRoot .demoChecks{gap:10px}#demoRoot .demoChecks label{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#6e6e73;margin:0}#demoRoot input[type=checkbox]{accent-color:#007aff;width:14px;height:14px}
+#demoRoot .demoMessage{font-size:11px;line-height:1.5;color:#6e6e73;min-height:28px;margin-top:9px}
+#demoRoot .demoSongLayout{height:100%;display:grid;grid-template-columns:250px minmax(0,1fr);gap:14px;min-height:0}
+#demoRoot .demoSongList{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:20px 15px}#demoRoot .demoSongList h2{padding:0 7px;margin-bottom:14px}#demoRoot .demoSongList button{display:block;width:100%;min-height:51px;text-align:left;padding:13px 14px;background:transparent;color:#424245;border-radius:11px;line-height:1.5}#demoRoot .demoSongList button.active,#demoRoot .demoSongList button.selected{background:#eaf3ff;color:#0066cc}#demoRoot .demoSongList p{margin-top:auto;padding:0 7px}
+#demoRoot .demoSongStage{display:flex;flex-direction:column;padding:24px;gap:5px}#demoRoot .demoSongStage>.demoRow{margin:0 0 12px;justify-content:space-between}#demoRoot #demoSelectedTitle{font-size:22px;margin:0;color:#1d1d1f;font-weight:600;letter-spacing:-.5px}#demoRoot #demoSongStart{padding:9px 20px;background:#0071e3;color:#fff}
+#demoRoot .demoSongStage>div:has(>.demoFinger){display:flex;gap:8px;align-items:end;min-height:150px;margin:8px 0 6px}
+#demoRoot .demoFinger{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;min-width:0;height:143px;border:1px solid #e5e5ea;border-bottom:5px solid #e5e5ea;background:#fbfbfd;border-radius:9px 9px 17px 17px;font-size:36px;font-weight:450;color:#424245;margin:0;transition:background .1s,transform .1s}
+#demoRoot .demoFinger small{display:block;margin-top:17px;font-size:11px;font-weight:400;color:#86868b}#demoRoot .demoFinger.active{background:#0071e3;border-color:#005cb9;color:#fff;transform:translateY(3px)}#demoRoot .demoFinger.active small{color:#dcecff}
+#demoRoot #demoSongProgress{font-size:12px;color:#6e6e73;margin:3px 0 8px}#demoRoot #demoSongEvents{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;min-height:45px;max-height:112px;overflow:auto;background:#f5f5f7;border-radius:11px;padding:10px;white-space:normal;font-size:11px;color:#86868b}#demoRoot #demoSongEvents>span{padding:4px 7px;background:#fff;border-radius:5px;color:#6e6e73}#demoRoot #demoSongEvents>span.active{background:#0071e3;color:white}
+#demoFoot{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#86868b;gap:10px;padding:0 4px;overflow:hidden}#demoNotice{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#demoVersion{white-space:nowrap}
+#demoFirmwareDialog{width:min(590px,90vw);max-height:80dvh;border:1px solid #e5e5ea;border-radius:20px;padding:24px;color:#1d1d1f;background:#fffffff5;backdrop-filter:blur(22px)}#demoFirmwareDialog[open]{position:fixed;top:90px;margin:0 auto;z-index:12;box-shadow:0 20px 80px #00000024}#demoFirmwareDialog h2{margin:0 0 20px;font-size:20px}#demoFirmwareDialog progress{width:100%;height:10px;accent-color:#007aff}#demoFirmwareDialog pre{max-height:220px;overflow:auto;font-size:11px;white-space:pre-wrap;background:#f5f5f7;padding:12px;border-radius:10px}#demoFirmwareStatus{font-size:13px;line-height:1.7;white-space:pre-wrap}#demoFirmwareClose{float:right;border:0;background:#f2f2f7;border-radius:8px;padding:7px 10px}
+@media(max-width:1100px){#demoRoot{padding:12px 14px 6px;gap:8px;grid-template-rows:56px 42px minmax(0,1fr) 22px}#demoTop{padding:8px 10px 8px 15px;gap:5px}#demoTop button,#demoTop select{font-size:11px;padding:7px 9px}#demoTop h1{font-size:17px}#demoRoot .demoBlock{padding:16px 17px}#demoRoot .demoSongLayout{grid-template-columns:224px minmax(0,1fr)}#demoRoot .demoSongStage{padding:20px}#demoRoot .demoCalibrationTable td{padding:6px 7px}#demoRoot .demoBlock h2{font-size:17px;margin-bottom:8px}#demoRoot .demoActionGroup{padding:10px 0}}
+@media(max-height:630px){#demoRoot .demoFinger{height:126px}#demoRoot .demoSongStage>div:has(>.demoFinger){min-height:132px}#demoRoot .demoCalibrationTable{margin:7px 0 9px}#demoRoot .demoCalibrationTable td{padding:5px 7px}#demoRoot .demoBlock p{margin:5px 0}#demoRoot .demoActionGroup{padding:8px 0}#demoRoot .demoRow{margin:8px 0}}
+@media(prefers-reduced-motion:reduce){#demoRoot *{transition:none!important}}
+
+#demoRoot .demoSongHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}#demoRoot .demoFingers{display:flex;gap:8px;align-items:end;min-height:150px;margin:8px 0 6px}#demoRoot .demoFinger b{font-weight:450;line-height:1}#demoRoot .demoFinger>span{font-size:12px;color:#86868b;margin-top:12px}#demoRoot .demoFinger small{margin-top:7px}#demoRoot .demoFinger.active>span{color:#dcecff}#demoRoot .demoTimeline .demoEvent{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:43px;background:white;padding:6px;border-radius:6px;color:#6e6e73}#demoRoot .demoEvent b{font-size:14px;font-weight:600}#demoRoot .demoEvent small,#demoRoot .demoEvent>span{font-size:9px}#demoRoot .demoEvent.active{background:#0071e3;color:white}
+#demoRoot dialog:not(#demoFirmwareDialog){position:fixed;inset:80px auto auto 50%;transform:translateX(-50%);margin:0;width:min(760px,92vw);max-height:calc(100dvh - 105px);overflow:auto;border:1px solid #e5e5ea;border-radius:20px;background:#fff;padding:24px;color:#1d1d1f;box-shadow:0 20px 80px #00000024}#demoRoot dialog::backdrop{background:#00000024;backdrop-filter:blur(4px)}#demoRoot dialog h2{font-size:20px;margin-top:0}#demoRoot dialog p{font-size:12px;color:#6e6e73}#demoRoot dialog button{border:0;border-radius:8px;background:#f2f2f7;padding:8px 12px;font-size:12px}#demoRoot dialog button.primary{background:#0071e3;color:white}
+@media(max-height:630px){#demoRoot .demoFingers{min-height:132px}}
+
+#demoRoot [hidden]{display:none!important}#demoRoot .demoSongList,#demoRoot .demoSongStage{min-width:0;overflow:hidden;background:#fff;border:1px solid #e5e5ea;border-radius:18px}#demoRoot .demoSongList h2{font-size:19px;font-weight:650;letter-spacing:-.4px;margin-top:0}#demoRoot .demoSongList button{border:0;font-size:13px}#demoRoot .demoSongList button small{display:block;margin-top:4px;font-size:10px;color:#86868b}#demoRoot .demoSongList button.selected small{color:#4c90d1}#demoRoot .demoSongList p,#demoRoot .demoSongNote{font-size:11px;line-height:1.5;color:#86868b}#demoRoot .demoSongHeading>div>small{display:block;font-size:11px;color:#86868b;margin-bottom:7px}#demoRoot #demoSongStart{min-height:35px;border:0;border-radius:9px;font-size:12px}#demoRoot .demoSongNote{margin-top:auto;margin-bottom:0}#demoConnection.warning{color:#8a631e;background:#fff5dd}#demoEnrollOpen{float:right!important;margin-top:-32px!important;font-size:11px!important;color:#0071e3!important;background:#f2f7ff!important}#demoEnrollSteps{font-size:12px;line-height:1.7;padding:12px 12px 12px 28px;background:#f5f5f7;border-radius:12px}#demoEnrollStatus{font-size:12px;line-height:1.7;background:#f5f5f7;padding:12px;border-radius:10px;white-space:pre-wrap}
+
+#demoRoot .demoDialogHeading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:14px}#demoRoot .demoDialogHeading h2{margin:0}#demoEnrollStop{color:#c93128!important;background:#fff0ef!important}
+
+/* Enrollment is a focused connection stage, not a technical settings dialog. */
+#demoRoot #demoEnrollment{background:#171b22;border:1px solid #282f39;border-radius:20px;padding:24px 28px;color:#f5f7fb;position:relative;display:flex;flex-direction:column;gap:14px;box-shadow:0 8px 25px #17243c0d}
+#demoEnrollment h2{margin:0;font-size:17px;font-weight:550;color:#9caabd;letter-spacing:0}
+#demoRoot #demoEnrollment>p{font-size:12px;color:#97a5b9;margin:0;line-height:1.5}
+#demoRoot #demoEnrollment #demoEnrollStatus{font-size:clamp(22px,2.7vw,34px);font-weight:650;line-height:1.35;letter-spacing:-.5px;color:#72dfff;white-space:pre-wrap;background:none;padding:10px 0 0;margin:0;border-radius:0;max-width:100%;min-height:70px}
+#demoRoot #demoEnrollSlots{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:8px 0;min-height:125px}
+#demoRoot .demoEnrollSlot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-width:0;min-height:125px;padding:12px 7px;background:#212630;border:1px solid #333c48;border-radius:13px;color:#8290a3;text-align:center;font-size:12px;position:relative}
+#demoRoot .demoEnrollSlot b{font-size:28px;line-height:1;font-weight:600;color:#b3bed0}#demoRoot .demoEnrollSlot small{font-size:10px;color:#77879c}
+#demoRoot .demoEnrollSlot.done{background:#54ddf2;border-color:#b7f7ff;color:#073142;box-shadow:0 0 0 1px #54ddf240,0 6px 20px #23bdd51c;font-weight:600}#demoRoot .demoEnrollSlot.done b{color:#062c40}#demoRoot .demoEnrollSlot.done small{color:#fff;background:#073142;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700}#demoRoot .demoEnrollSlot.done small::before{content:"✓";margin-right:5px;font-weight:800}
+#demoRoot .demoEnrollSlot.current,#demoRoot .demoEnrollSlot.active{background:#0c4c72;border:2px solid #50ceff;box-shadow:0 0 0 4px #37baff12,0 8px 24px #00000020;color:#fff;transform:translateY(-3px)}#demoRoot .demoEnrollSlot.current b,#demoRoot .demoEnrollSlot.active b{color:#8be8ff}#demoRoot .demoEnrollSlot.current small,#demoRoot .demoEnrollSlot.active small{color:#d1efff}
+#demoRoot #demoEnrollment .demoRow{display:flex;align-items:center;gap:10px;margin-top:auto;margin-bottom:0}#demoRoot #demoEnrollment button{border:0;border-radius:10px;padding:10px 18px;min-height:39px;background:#2c3441;color:#e3ecf8;font-size:13px;font-weight:550}#demoRoot #demoEnrollment #demoEnrollStart{background:#4ad1ff;color:#092535;box-shadow:0 3px 15px #41c4fa1a}#demoRoot #demoEnrollment #demoEnrollStop{background:#39272e!important;color:#f1a8a5!important}#demoRoot #demoEnrollment button:disabled{opacity:.35;box-shadow:none}
+#demoRoot #demoEnrollment .demoEnrollHint{font-size:12px;color:#91a4ba;line-height:1.5;margin:0}#demoRoot #demoEnrollment .demoEnrollSummary{font-size:12px;color:#93b9d0}
+@media(max-width:1100px){#demoRoot #demoEnrollment{padding:20px 22px;gap:10px}#demoRoot #demoEnrollSlots{gap:7px;min-height:119px}#demoRoot .demoEnrollSlot{min-height:119px;font-size:11px}#demoRoot .demoEnrollSlot b{font-size:25px}#demoRoot #demoEnrollment #demoEnrollStatus{font-size:25px;min-height:65px}}
+@media(max-height:630px){#demoRoot #demoEnrollment{gap:8px;padding-top:19px;padding-bottom:19px}#demoRoot #demoEnrollSlots{margin:4px 0}}
+
+#demoRoot #demoEnrollView{display:flex;flex-direction:column;gap:14px;height:100%;min-height:0}#demoRoot #demoEnrollProgress{font-size:13px;font-variant-numeric:tabular-nums;color:#a9bed3;margin:0}#demoRoot #demoEnrollView .demoRow{margin-top:auto}@media(max-height:630px){#demoRoot #demoEnrollView{gap:10px}}
+
+/* Guided operation surfaces share the enrollment stage. */
+#demoRoot #demoCalibration .demoBlock,#demoRoot .demoSongStage{background:#171b22;border-color:#282f39;color:#eaf1fa;box-shadow:none}#demoRoot #demoCalibration h2,#demoRoot #demoCalibration h3{color:#dbe6f4}#demoRoot #demoCalibration .demoBlock p{color:#93a2b7}#demoRoot #demoCalibration .demoBlock button,#demoRoot #demoCalibration .demoBlock select{background:#2a3341;color:#e0eaf6}#demoRoot #demoCalibration .demoBlock button.primary{background:#4ad1ff;color:#092535}#demoRoot #demoCalibration .demoActionGroup{border-color:#303744}#demoRoot #demoCalibration .demoChecks label,#demoRoot #demoCalibration .demoMessage{color:#9dafc4}#demoRoot #demoCalibration .demoCalibrationTable td{color:#adbed2;border-color:#303744}#demoRoot #demoCalibration .demoCalibrationTable td:first-child{color:#e0ebf8}#demoRoot #demoCalibration .demoCalibrationTable th{color:#8a9db4}
+#demoRoot .demoSongList{background:#202630;border-color:#303946;color:#b6c4d8}#demoRoot .demoSongList h2{color:#d6e4f6}#demoRoot .demoSongList button{background:transparent;color:#c2d0e2}#demoRoot .demoSongList button.selected{background:#0d496b;color:#8de5ff;box-shadow:inset 0 0 0 1px #40bff46b}#demoRoot .demoSongList button small,#demoRoot .demoSongList p{color:#8498b0}#demoRoot .demoSongList button.selected small{color:#8bbdd3}
+#demoRoot #demoSelectedTitle{font-size:clamp(23px,2.2vw,30px);color:#74dfff;font-weight:650}#demoRoot .demoSongHeading>div>small{color:#94a9c1}#demoRoot #demoSongStart{background:#4ad1ff;color:#092535;font-weight:650;padding:11px 22px}#demoRoot .demoFinger{background:#232a35;border-color:#364152;color:#b9c7da;height:160px;font-size:42px}#demoRoot .demoFinger>span,#demoRoot .demoFinger small{color:#8a9db6}#demoRoot .demoFinger.active{background:#0c4c72;border-color:#50ceff;box-shadow:0 0 0 2px #50ceff44;color:#8be8ff}#demoRoot .demoFinger.active>span,#demoRoot .demoFinger.active small{color:#e3f6ff}#demoRoot .demoFingers{min-height:167px;margin:10px 0}#demoRoot #demoSongProgress{color:#b1c6df;font-size:15px;min-height:23px}#demoRoot #demoSongEvents{background:#11151c;color:#8ca0bb;max-height:98px}#demoRoot #demoSongEvents .demoEvent{background:#232b38;color:#8ca0bb}#demoRoot #demoSongEvents .demoEvent.active{background:#0d557c;color:#adf0ff}#demoRoot .demoSongNote{color:#778ba5}
+#demoRoot #demoCalibrationGuide,#demoRoot .demoCalibrationGuide,#demoRoot #demoCalGuide{font-size:clamp(24px,2.5vw,34px);font-weight:650;line-height:1.3;color:#74dfff;margin:12px 0 16px;letter-spacing:-.4px}
+#demoRoot #demoCalibrationSlots,#demoRoot .demoCalibrationSlots,#demoRoot #demoCalSlots{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:12px 0}
+#demoRoot .demoCalibrationSlot,#demoRoot .demoCalSlot{background:#232a35;border:1px solid #354052;border-radius:12px;padding:13px 6px;min-height:92px;color:#8e9fb6;text-align:center;font-size:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}
+#demoRoot .demoCalibrationSlot b,#demoRoot .demoCalSlot b{font-size:23px;color:#c0cee0;font-weight:600}#demoRoot .demoCalibrationSlot.current,#demoRoot .demoCalSlot.current{background:#0c4c72;border:2px solid #50ceff;color:#e2f6ff}#demoRoot .demoCalibrationSlot.current b,#demoRoot .demoCalSlot.current b{color:#8be8ff}#demoRoot .demoCalibrationSlot.done,#demoRoot .demoCalSlot.done{background:#1e333c;border-color:#355869;color:#8bbac8}
+#demoRoot #demoCalStart,#demoRoot #demoCalibrationStart,#demoRoot #demoCalNext{background:#4ad1ff;color:#092535;font-weight:650;min-height:41px;padding:10px 22px;border:0;border-radius:10px}
+@media(max-width:1100px){#demoRoot .demoSongLayout{grid-template-columns:205px minmax(0,1fr)}#demoRoot .demoSongStage{padding:18px}#demoRoot #demoSelectedTitle{font-size:23px}#demoRoot .demoSongList{padding:18px 12px}}
+@media(max-height:630px){#demoRoot .demoFinger{height:136px;font-size:36px}#demoRoot .demoFingers{min-height:141px;margin:7px 0}#demoRoot #demoSongProgress{font-size:13px}#demoRoot #demoSongEvents{max-height:84px}}
+
+#demoRoot #demoCalibrationWizard{display:flex;flex-direction:column;min-height:0;gap:10px}#demoRoot #demoCalibrationWizard h2{color:#74dfff;font-size:clamp(23px,2.5vw,32px);line-height:1.35;margin:8px 0 3px;min-height:72px;letter-spacing:-.5px}#demoRoot #demoCalibrationProgress{color:#a1b8d2;font-size:13px;line-height:1.5;margin:0}#demoRoot #demoCalibrationSlots{gap:5px;margin:12px 0}#demoRoot .demoCalSlot{font-size:10px;min-height:98px;padding:12px 4px;border-radius:9px}#demoRoot .demoCalSlot small{font-size:9px;color:#7690ac}#demoRoot .demoCalSlot.current small{color:#bceaff}#demoRoot #demoCalStart{align-self:flex-start;margin-top:2px}#demoRoot #demoManualCalibration{margin-top:16px;border-top:1px solid #303744;padding-top:10px;color:#7b92ad;font-size:11px;max-height:190px;overflow:auto}#demoRoot #demoManualCalibration summary{cursor:pointer;color:#8ea4be;padding:5px 0}#demoRoot #demoManualCalibration .demoCalibrationTable{font-size:10px}#demoRoot #demoManualCalibration .demoRow{gap:5px}#demoRoot #demoManualCalibration button{font-size:10px;padding:6px 8px}
+@media(max-width:1100px){#demoRoot #demoCalibration .demoColumns{grid-template-columns:1.2fr 1fr;gap:12px}#demoRoot #demoCalibrationWizard h2{font-size:24px;min-height:65px}#demoRoot .demoCalSlot{font-size:9px;min-height:94px}}
+
+#demoRoot #demoCalibrationSlots{counter-reset:calstep}#demoRoot .demoCalSlot{counter-increment:calstep;font-size:11px}#demoRoot .demoCalSlot::before{content:counter(calstep);display:block;font-size:25px;font-weight:600;color:#9db1cb;line-height:1;margin-bottom:6px}#demoRoot .demoCalSlot.current::before{color:#82e3ff}#demoRoot .demoCalSlot.done::before{content:"✓";color:#69d2ce}#demoRoot #demoCalibration .demoActionGroup button.primary{background:#2a3341;color:#e0eaf6}#demoRoot #demoShowAll{background:#4ad1ff;color:#092535;font-weight:650}
+
+#demoRoot #demoCalibration .demoBlock:last-child{padding:16px 18px}#demoRoot #demoCalibration .demoBlock:last-child h2{margin-bottom:7px}#demoRoot #demoCalibration .demoBlock:last-child p{margin:5px 0}#demoRoot #demoManualCalibration:not([open])>:not(summary){display:none!important}
+
+#demoRoot #demoCalibration .demoBlock{position:relative}#demoRoot #demoManualActions{margin-top:16px;border-top:1px solid #303744;padding-top:10px;color:#7b92ad;font-size:11px;max-height:230px;overflow:auto}#demoRoot #demoManualActions summary{cursor:pointer;color:#8ea4be;padding:5px 0}#demoRoot #demoManualActions:not([open])>:not(summary){display:none!important}
+#demoRoot #demoManualCalibration[open],#demoRoot #demoManualActions[open]{position:absolute;bottom:16px;left:16px;right:16px;max-height:calc(100% - 32px);margin:0;padding:12px 14px;border:1px solid #43536a;border-radius:12px;background:#202733;z-index:3;box-shadow:0 12px 30px #00000055;overflow:auto}
+#demoRoot #demoActionProgress,#demoRoot .demoActionProgress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:20px 0;color:#8fa4be}#demoRoot .demoActionStep{padding:17px 8px;border:1px solid #354052;background:#232a35;border-radius:11px;font-size:12px;text-align:center}#demoRoot .demoActionStep.current,#demoRoot .demoActionStep.active{background:#0c4c72;border-color:#50ceff;color:#c2f1ff}#demoRoot .demoActionStep.done{background:#1e333c;color:#74d4d1}#demoRoot #demoActionGuide{font-size:25px;color:#74dfff;line-height:1.35;margin:10px 0}#demoRoot #demoShowAll{min-height:41px;padding:10px 22px}
+
+#demoRoot #demoIndividualActions{margin-top:16px;border-top:1px solid #303744;padding-top:10px;font-size:11px;color:#7b92ad}#demoRoot #demoIndividualActions summary{cursor:pointer;color:#8ea4be;padding:5px 0}#demoRoot #demoIndividualActions:not([open])>:not(summary){display:none!important}#demoRoot #demoIndividualActions[open]{position:absolute;bottom:16px;left:16px;right:16px;max-height:calc(100% - 32px);margin:0;padding:12px 14px;border:1px solid #43536a;border-radius:12px;background:#202733;z-index:3;box-shadow:0 12px 30px #00000055;overflow:auto}
+#demoRoot #demoShowSteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:22px 0;color:#8fa4be;counter-reset:showstep}#demoRoot #demoShowSteps>span{counter-increment:showstep;display:flex;flex-direction:column;gap:12px;padding:21px 8px;min-height:116px;border:1px solid #354052;background:#232a35;border-radius:11px;font-size:12px;text-align:center;justify-content:center}#demoRoot #demoShowSteps>span::before{content:counter(showstep);font-size:25px;color:#a5bad3;font-weight:600}#demoRoot #demoShowSteps>span.current{background:#0c4c72;border-color:#50ceff;color:#c2f1ff}#demoRoot #demoShowSteps>span.current::before{color:#82e3ff}#demoRoot #demoShowSteps>span.done{background:#1e333c;color:#74d4d1}#demoRoot #demoShowSteps>span.done::before{content:"✓";color:#74d4d1}
+
+#demoRoot #demoActionProgress{counter-reset:showstep}#demoRoot #demoActionProgress>.demoActionStep{counter-increment:showstep;display:flex;flex-direction:column;justify-content:center;gap:12px;min-height:116px}#demoRoot #demoActionProgress>.demoActionStep::before{content:counter(showstep);font-size:25px;font-weight:600;color:#a5bad3}#demoRoot #demoActionProgress>.demoActionStep.current::before{color:#82e3ff}#demoRoot #demoActionProgress>.demoActionStep.done::before{content:"✓";color:#74d4d1}
+
+/* On tall viewports distribute the real workflow vertically, keeping compact layouts unchanged. */
+@media(min-height:720px){
+ #demoRoot #demoCalibration .demoBlock{display:flex;flex-direction:column;padding:clamp(22px,3vh,32px);}
+ #demoRoot #demoCalibrationWizard{flex:1;min-height:0;gap:clamp(14px,2.2vh,24px);}
+ #demoRoot #demoCalibrationWizard h2{min-height:0;max-width:650px;font-size:clamp(28px,2.35vw,38px);margin:4px 0 0;}
+ #demoRoot #demoCalibrationProgress{font-size:15px;line-height:1.6;}
+ #demoRoot #demoCalibrationSlots{flex:1;min-height:145px;max-height:clamp(180px,29vh,280px);align-items:stretch;margin:clamp(14px,3.5vh,35px) 0;gap:10px;}
+ #demoRoot .demoCalSlot{min-height:145px;font-size:13px;gap:16px;border-radius:13px;}
+ #demoRoot .demoCalSlot::before{font-size:36px;margin-bottom:6px;}
+ #demoRoot #demoCalStart{margin-top:auto;margin-bottom:20px;min-height:46px;padding:12px 25px;font-size:14px;}
+ #demoRoot #demoManualCalibration:not([open]){flex-shrink:0;margin-top:auto;}
+ #demoRoot #demoCalibration .demoBlock:last-child>h2{font-size:23px;margin:3px 0 18px;order:0;}
+ #demoRoot #demoShowAll{align-self:flex-start;order:1;min-height:46px;padding:12px 25px;font-size:14px;}
+ #demoRoot #demoActionProgress{order:2;flex:1;align-content:center;min-height:170px;margin:24px 0;}
+ #demoRoot #demoActionProgress>.demoActionStep{height:clamp(170px,29vh,280px);font-size:18px;gap:22px;border-radius:15px;}
+ #demoRoot #demoActionProgress>.demoActionStep::before{font-size:42px;}
+ #demoRoot #demoActionMessage{order:3;min-height:32px;font-size:13px;margin:0 0 16px;}
+ #demoRoot #demoManualActions:not([open]){order:4;flex-shrink:0;margin-top:auto;}
+}
+
+@media(min-height:720px){
+ #demoRoot .demoSongStage{padding:clamp(24px,3vh,34px);gap:14px;}
+ #demoRoot .demoSongHeading{margin-bottom:7px;}
+ #demoRoot #demoSelectedTitle{font-size:clamp(28px,2.4vw,40px);}
+ #demoRoot #demoSongStart{min-height:44px;padding:12px 25px;font-size:14px;}
+ #demoRoot .demoSongStage .demoFingers{flex:1;min-height:0;align-items:stretch;margin:14px 0 8px;gap:12px;}
+ #demoRoot .demoSongStage .demoFinger{height:auto;min-height:160px;justify-content:center;font-size:clamp(42px,4.3vw,70px);gap:10px;border-radius:12px 12px 20px 20px;}
+ #demoRoot .demoSongStage .demoFinger>span{font-size:16px;margin-top:13px;}
+ #demoRoot .demoSongStage .demoFinger small{font-size:14px;margin-top:4px;}
+ #demoRoot #demoSongProgress{font-size:16px;min-height:26px;margin:0;}
+ #demoRoot #demoSongEvents{flex-shrink:0;min-height:78px;max-height:125px;margin:0;padding:12px;gap:7px;}
+ #demoRoot #demoSongEvents .demoEvent{min-width:48px;padding:8px 10px;gap:5px;}
+ #demoRoot #demoSongEvents .demoEvent b{font-size:17px;}
+ #demoRoot #demoSongEvents .demoEvent small,#demoRoot #demoSongEvents .demoEvent>span{font-size:10px;}
+ #demoRoot .demoSongNote{margin-top:2px;padding-top:5px;flex-shrink:0;}
+ #demoRoot .demoSongList{padding-top:26px;gap:14px;}
+ #demoRoot .demoSongList button{min-height:76px;font-size:15px;padding:17px 15px;}
+ #demoRoot .demoSongList button small{font-size:11px;margin-top:7px;}
+}
+
+/* A visible next action, with motion only while it can be used. */
+#demoRoot #demoEnrollment #demoEnrollNext{background:#54ddf2;color:#073142;border:1px solid #b7f7ff;font-weight:700;display:inline-flex;align-items:center;gap:12px}
+#demoRoot #demoEnrollNext[hidden]{display:none!important}
+#demoRoot #demoEnrollView:has(#demoEnrollNext:not([hidden])) #demoEnrollStart{background:#26313c;color:#cbd7e4;border:1px solid #435264}
+#demoRoot #demoEnrollNext::after,#demoRoot #demoCalStart::after,#demoRoot #demoShowAll:not(:disabled)::after,#demoRoot #demoSongStart:not(:disabled)::after{content:"→";display:inline-block;margin-left:10px;font-size:21px;line-height:1;animation:demo-next-arrow 1.25s ease-in-out infinite}
+#demoRoot #demoEnrollNext:disabled::after,#demoRoot #demoCalStart:disabled::after{animation:none}
+@keyframes demo-next-arrow{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+@media(prefers-reduced-motion:reduce){#demoRoot #demoEnrollNext::after,#demoRoot #demoCalStart::after,#demoRoot #demoShowAll::after,#demoRoot #demoSongStart::after{animation:none}}
+/* Persistent next-step prompt, kept clear of the top stop control. */
+#demoRoot > #demoEnrollNext{position:fixed;right:max(24px,calc((100vw - 1450px)/2 + 24px));bottom:28px;z-index:1200;display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:62px;padding:16px 26px;border:2px solid #c9fbff;border-radius:18px;background:#54ddf2;color:#073142;font-size:18px;font-weight:750;box-shadow:0 0 0 6px #54ddf220,0 14px 40px #00000055;max-width:calc(100vw - 48px)}
+#demoRoot > #demoEnrollNext[hidden]{display:none!important}
+#demoRoot > #demoEnrollNext:disabled{opacity:.55;box-shadow:none}
+#demoRoot > #demoEnrollNext:hover:not(:disabled){background:#8aebfa;box-shadow:0 0 0 8px #54ddf22b,0 14px 40px #00000055}
+#demoRoot > #demoEnrollNext:focus-visible{outline:3px solid #fff;outline-offset:5px}
+@media(max-height:650px){#demoRoot > #demoEnrollNext{bottom:22px;min-height:50px;font-size:15px;padding:12px 20px}}
+#demoRoot:has(> #demoEnrollNext:not([hidden])) #demoEnrollment #demoEnrollStart{background:#26313c;color:#cbd7e4;border:1px solid #435264;box-shadow:none}
+
+/* Live encoder level: circular delta is calculated from actual feedback. */
+#demoCalibrationSlots .demoCalSlot{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:68px}
+#demoCalibrationSlots .demoWater{position:absolute;z-index:0;left:0;right:0;bottom:0;height:var(--water-level,10%);background:linear-gradient(0deg,#13b6c577,#44e6ee22);border-top:1px solid #57eaf0aa;transition:height .18s linear;pointer-events:none}
+#demoCalibrationSlots .demoCalSlot b,#demoCalibrationSlots .demoCalSlot small{position:relative;z-index:1}
+#demoCalibrationSlots .demoCalSlot b{font-size:13px;font-weight:600}#demoCalibrationSlots .demoCalSlot small{font-size:11px;line-height:1.2;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){#demoCalibrationSlots .demoWater{transition:none}}
+
+/* reciprocal-cycle-badge */
+#demoRoot .demoCalSlot .demoCycleCount{display:inline-flex;align-items:center;justify-content:center;min-width:46px;border-radius:999px;padding:4px 9px;margin-top:8px;font-size:15px;font-weight:750;letter-spacing:.3px;color:#98aeca;background:#17212f}#demoRoot .demoCalSlot.current .demoCycleCount{color:#052637;background:#60e2fb;box-shadow:0 0 18px #49d7f63b}#demoRoot .demoCalSlot.done .demoCycleCount{color:#0c3c40;background:#76e5d6}
+
+/* Fixed encoder scale and actual swept intervals. */
+#demoCalibrationSlots .demoWater{display:none}
+#demoCalibrationSlots .demoSweep,#demoCalibrationSlots .demoSweepWrap{position:absolute;left:0;right:0;bottom:var(--sweep-bottom,0%);height:var(--sweep-height,0%);background:linear-gradient(90deg,#ff334c66,#ff684c44);border-block:1px solid #ff667d;pointer-events:none;z-index:0}
+#demoCalibrationSlots .demoSweepWrap{bottom:0;height:var(--wrap-height,0%)}
+#demoCalibrationSlots .demoCursor{position:absolute;left:0;right:0;bottom:var(--cursor-level,0%);height:2px;background:#62e7ff;box-shadow:0 0 9px #62e7ff;pointer-events:none;z-index:1}
+#demoCalibrationSlots .demoScaleMax,#demoCalibrationSlots .demoScaleMin{position:absolute;left:5px;font:9px ui-monospace,monospace;color:#d8e3f1;z-index:2;background:#111820aa;padding:1px 3px;border-radius:3px}
+#demoCalibrationSlots .demoScaleMax{top:4px}#demoCalibrationSlots .demoScaleMin{bottom:4px}
+#demoCalibrationSlots .demoPosition,#demoCalibrationSlots .demoDelta,#demoCalibrationSlots .demoCycleCount,#demoCalibrationSlots .demoCalSlot b{z-index:2;text-shadow:0 1px 4px #10151c}
+#demoRoot #demoMotionLive{color:#76e8ff!important;font-size:18px;line-height:1.35;min-height:26px;margin:12px 0;}
+#demoRoot #demoSpeedStart{border:1px solid #62d6ff;color:#a6f0ff;background:#153749;}
+#demoRoot #demoSpeedResults{display:flex;gap:6px;flex-wrap:wrap;}
+#demoRoot #demoSpeedResults[hidden]{display:none;}
+#demoRoot #demoSpeedResults p{flex:1;min-width:100px;margin:3px 0;padding:8px;border:1px solid #366375;border-radius:9px;background:#12303c;color:#b5f3ec!important;font-size:13px;}
+#demoRoot #demoCalibration .demoBlock .demoRow{flex-wrap:wrap;}
+
+#demoRoot .demoCalSlot.outside{border:2px solid #ff655e!important;box-shadow:0 0 0 3px #ff655e25;}#demoRoot .demoCalSlot.outside .demoPosition{color:#ff9f99!important;}
+
+/* Direct, independently selectable demonstrations. */
+#demoRoot #demoActionProgress>button.demoActionStep{cursor:pointer;transition:background .18s,box-shadow .18s; border:1px solid #42657b;color:#e7f6ff;}
+#demoRoot #demoActionProgress>button.demoActionStep:not(:disabled):hover{background:#164d68;box-shadow:0 0 0 2px #42cdf5;}
+#demoRoot #demoActionProgress>button.demoActionStep:focus-visible{outline:3px solid #54d9ff;outline-offset:3px;}
+#demoRoot #demoActionProgress>button.demoActionStep:disabled{cursor:default;opacity:.55;}
+#demoRoot #demoActionProgress>button.demoActionStep.current{opacity:1;background:#106380;box-shadow:0 0 20px #32c7f544;}
+
+#demoRoot .demoBenchEnable{display:flex;align-items:center;gap:10px;color:#a9efff;font-size:15px;margin:0 0 12px;}#demoRoot .demoBenchEnable input{width:20px;height:20px;accent-color:#42cdf5;}
+
+#demoRoot .demoSetupEntries{display:flex;gap:8px;flex-wrap:wrap}#demoRoot .demoSetupEntries button{flex:1;margin:0;font-size:13px;padding:10px}#demoRoot #demoValidationOpen{background:#42d2ee!important;color:#082633!important}
+
+#demoRoot #demoManualCalibration,#demoRoot #demoManualActions{display:none!important}
+
+/* Real right-hand score excerpts stay legible alongside the live fingers. */
+#demoRoot #demoSongs .demoSongStage{display:grid;grid-template-rows:auto minmax(130px,1fr) auto auto auto auto;gap:10px;min-height:0;padding:20px 24px}
+#demoRoot #demoSongs .demoSongHeading{margin:0;min-height:0}
+#demoRoot #demoSongs #demoSelectedTitle{font-size:clamp(22px,2.4vw,38px);line-height:1.2}
+#demoRoot #demoScoreExcerpt{display:flex;flex-direction:column;min-height:0;margin:0;padding:10px 16px;background:#fff;border-radius:16px;overflow:hidden;color:#233344}
+#demoRoot #demoScoreExcerpt[hidden]{display:none}
+#demoRoot #demoScoreCaption{font-size:13px;font-weight:650;color:#233344;flex-shrink:0}
+#demoRoot #demoScoreImage{display:block;flex:1;min-height:0;width:100%;object-fit:contain;object-position:center}
+#demoRoot #demoScoreSource{font-size:11px;color:#647080;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+#demoRoot #demoSongs .demoFingers{display:flex;min-height:0;margin:0;gap:9px;align-items:stretch}
+#demoRoot #demoSongs .demoFinger{height:clamp(95px,15vh,150px);min-height:0;gap:3px;font-size:18px;border-radius:14px}
+#demoRoot #demoSongs .demoFinger b{font-size:clamp(30px,4vh,48px)}
+#demoRoot #demoSongs .demoFinger small{margin:1px 0;font-size:12px}
+#demoRoot #demoSongs #demoSongEvents{height:82px;min-height:82px;max-height:82px;box-sizing:border-box;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;margin:0;padding:6px;scrollbar-width:thin;scrollbar-color:#48647b #11151c}
+#demoRoot #demoSongs #demoSongEvents .demoEvent{flex:0 0 55px;min-width:0;padding:5px;gap:2px;line-height:1.15;box-sizing:border-box}
+#demoRoot #demoSongs #demoSongEvents .demoEvent b{font-size:16px}
+#demoRoot #demoSongs #demoSongProgress,#demoRoot #demoSongs .demoSongNote{margin:0}

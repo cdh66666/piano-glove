@@ -1,0 +1,2 @@
+const test=require('node:test'),assert=require('node:assert/strict'),{enrollConflictMessage}=require('../delivery-demo.js');
+test('enrollment failure tells the specific physical step instead of claiming every failure is duplicate ID',()=>{assert.match(enrollConflictMessage({reason:'expected_missing_persistent'}),/掉线.*供电/);assert.match(enrollConflictMessage({reason:'inserted_during_verification'}),/上一台.*拔下刚接/);assert.match(enrollConflictMessage({reason:'multiple_new_addresses'}),/一次只接一台/);assert.doesNotMatch(enrollConflictMessage({reason:'none'}),/总线冲突/);});

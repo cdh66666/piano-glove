@@ -44,6 +44,11 @@ bool    refreshAll();
 bool    torqueSlot(int s, bool on);
 void    torqueAll(bool on);
 void    safe();
+struct ArmCheck{bool registersOk=false,feedbackOk=false,limitsOk=false;int registerError=0,feedbackError=0,limitError=0,torque=-1,goal=-1,position=-1,minimum=-1,maximum=-1,responseLevel=-1,responseError=0;};
+  bool inspectArmSlot(int s,ArmCheck &out);
+  const char *armFailure();
+  bool armPrepareCurrent(uint8_t mask=0x3F);
+  bool    armAtCurrent(uint8_t mask = 0x3F);  // Fail closed unless off/goal/current readbacks agree.
 
 uint16_t pressPos(int s, uint8_t depthPct);
 uint16_t releasePos(int s);
@@ -55,14 +60,31 @@ bool    pressSlot(int s, uint16_t speed, uint8_t acc);
 bool    releaseSlot(int s, uint16_t speed, uint8_t acc);
 bool    moveRaw(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc);
 
+bool benchMove(uint8_t id,uint16_t pos,uint16_t speed);
+bool benchGroup(uint8_t mask,const uint16_t positions[6],uint16_t speed);
+bool benchActive();
+const char *benchFailure();
+void benchTick();
+
+bool mountStart();
+bool mountKeep();
+bool mountStop();
+void mountTick();
+bool mountActive();
+uint8_t mountReadyMask();
+int mountPosition(int id);
+const char *mountReason();
+
 bool    setMap(int s, uint8_t id);
 void    setDir(int s, Dir d);
 void    remapId(uint8_t oldId, uint8_t newId);
 
 void    calClear();
+void    invalidateCalibration();
 void    calCapture(int s, uint16_t mn, uint16_t st, uint16_t mx);
 bool    calSave();
 int     calInvalidSlot();
+bool    motionCalibrationSupported();
 int     calValidCount();
 
 void     autoStart();
@@ -109,7 +131,7 @@ void     rateStop();
 bool     rateActive();
 uint16_t rateDone();          // 已完成几次完整行程
 uint16_t rateCycles();
-uint32_t rateHalfUs();        // 最近一个半程耗时（微秒）
+uint32_t rateHalfUs();        // 已完成半程的平均耗时（微秒）
 uint32_t rateSlowUs();        // 最慢的一个半程（超时说明跟不上）
 uint16_t rateLost();          // 有多少个半程是超时放弃的
 
