@@ -4541,6 +4541,7 @@ function actionGate(info, rows, roles){
   if(outside.length){const labels=['拇指按压','拇指侧摆','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
   return ordered;
 }
+function motionBounds(slot,profile){const margin=profile.family==='STS'?Math.max(profile.inset,Math.ceil((slot.high-slot.low)*.05)):profile.inset;const lo=slot.low+margin,hi=slot.high-margin;if(lo>=hi)throw Error('校准行程不足以保留端点余量');return {lo,hi};}
 class StrictActionExecutor{
   constructor(io,{now=()=>performance.now(),sleep=ms=>new Promise(r=>setTimeout(r,ms)),progress=()=>{}}={}){this.io=io;this.now=now;this.sleep=sleep;this.progress=progress;this.active=false;this.cancelled=false;this.generation=0;this.pending=0;this.deadline=null;}
   async stop(){this.cancelled=true;await this.io.safe();}
@@ -4559,9 +4560,9 @@ class StrictActionExecutor{
       const {info,slots}=await this.prepare(roles),profile=motionProfile(info);if(demoSpeed!==null&&(!internalSlots||!file.benchQuick||!Number.isInteger(demoSpeed)||demoSpeed<profile.speedMin||demoSpeed>profile.speedMax))throw Error('展示速度超出当前型号范围');file={...file,runtimeSpeed:demoSpeed??profile.defaultBenchSpeed};
       if((file.validationOnly||file.validationSpeed!==undefined)&&validationSpeed===null)throw Error('档位验证只能从专用流程启动');
       if(validationSpeed!==null){if(!profile.stages.includes(validationSpeed)||!internalSlots)throw Error('档位验证参数无效');file={...file,validationOnly:true,validationSpeed,fullStroke:true,quickDemo:true,benchQuick:info.profile==='STS'||validationSpeed>200};}
-      if(file.benchQuick||file.fullStroke){
-        if(!internalSlots||file.quickDemo!==true)throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
-        for(const slot of slots){const lo=slot.low+profile.inset,hi=slot.high-profile.inset;if(lo>=hi)throw Error('校准行程不足以保留端点余量');slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
+      if(file.benchQuick||file.fullStroke||profile.family==='STS'){
+        if((file.benchQuick||file.fullStroke)&&(!internalSlots||file.quickDemo!==true))throw Error('高速展示仅支持已识别的短演示');motionProfile(info,{requireBench:file.benchQuick===true});
+        for(const slot of slots){const {lo,hi}=motionBounds(slot,profile);slot.press=Math.max(lo,Math.min(hi,slot.press));slot.rest=Math.max(lo,Math.min(hi,slot.rest));if(file.fullStroke){slot.lift=slot.press===lo?hi:lo;slot.midpoint=Math.round((lo+hi)/2);}}
       }
       if(!((await this.command('RATE')).some(l=>/^OK RATE active=0(?:\s|$)/.test(l))))throw Error('请先停止后台测速');
       const map={1:0,2:2,3:3,4:4,5:5};
@@ -4688,7 +4689,7 @@ class StrictActionExecutor{
   async runFeedbackSpeedTest({selected,amplitudes,cycles,speed:requestedSpeed},slots,info,onProgress){
     const profile=motionProfile(info,{requireBench:true}),speed=requestedSpeed??profile.defaultBenchSpeed;if(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax)throw Error('测速速度超出当前型号范围');
     if(selected.length!==6)throw Error('测速需要六台舵机一起');if(info.bench_group!=='1')throw Error('请更新支持同步控制的固件');
-    const base=slots.map(slot=>{const lo=slot.low+profile.inset,hi=slot.high-profile.inset;if(lo>=hi)throw Error('校准行程不足以保留端点余量');const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
+    const base=slots.map(slot=>{const {lo,hi}=motionBounds(slot,profile);const press=slot.press<=lo?lo:hi,lift=press===lo?hi:lo;return {...slot,press,lift,rest:lift,midpoint:Math.round((lo+hi)/2)};});
     const started=this.now(),results=[];let watchdog;const budget=profile.family==='STS'?Math.min(180000,Math.max(45000,(2*cycles+2)*amplitudes.reduce((n,a)=>n+Math.max(...base.map(s=>Math.abs(s.press-s.lift)*a))/speed*1000+2000,0))):45000;this.deadline=started+budget;this.feedbackMetrics={start:started,samples:0};
     const execute=async()=>{
       await this.command('ARM');if(actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO '))).armed!=='1')throw Error('使能未确认');
