@@ -746,7 +746,7 @@ const isLatch = s => ROLES[s] === "latch";
 const labelOf = s => (s < 2) ? (FINGER_BASE[s] + (isLatch(s) ? "侧摆" : "按压")) : FINGER_BASE[s];
 
 let SLOTS      = [];      // 6 个槽位的显示名（由 ROLES 推出来）
-let PLAY_SLOTS = [];      // 参与演奏的槽位（默认 [0,2,3,4,5]）
+let PLAY_SLOTS = [];      // 参与演奏的槽位（默认 [1,2,3,4,5]）
 let LATCH_SLOT = -1;      // 侧摆槽位（不参与演奏），默认 1
 function rederiveRoles(){
   SLOTS      = [0,1,2,3,4,5].map(labelOf);
@@ -4464,7 +4464,7 @@ body.pg-simple #simpleEmergencyStop{background:#fff1f1;border-radius:9px}
 (function installStrictActionPreview(){
 'use strict';
 // Candidate file format only. Pure parsing: no transport, timers or motion.
-const FINGER_TO_SLOT = Object.freeze({ 1: 0, 2: 2, 3: 3, 4: 4, 5: 5 });
+const FINGER_TO_SLOT = Object.freeze({ 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 });
 const MAX_DURATION_MS = 300000;
 const MAX_EVENTS = 2000;
 
@@ -4539,7 +4539,7 @@ function actionGate(info, rows, roles){
     if(pos<lo-startTolerance||pos>hi+startTolerance)outside.push(s);
     ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.min(info.profile==='SCS'?6:24,Math.floor(span/4))};
   }
-  if(outside.length){const labels=['拇指按压','拇指侧摆','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
+  if(outside.length){const labels=['拇指外展／内收','拇指按压','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
   return ordered;
 }
 function motionBounds(slot,profile){const margin=profile.family==='STS'?Math.max(profile.inset,Math.ceil((slot.high-slot.low)*.05)):profile.inset;const lo=slot.low+margin,hi=slot.high-margin;if(lo>=hi)throw Error('校准行程不足以保留端点余量');return {lo,hi};}
@@ -4635,12 +4635,12 @@ class StrictActionExecutor{
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
       await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
-      const scoreStarted=this.now(),pending=new Map();let index=0,nextPoll=0,nextInfo=0,positions=this.lastPositions?.positions??slots.map(slot=>slot.lift),positionsAt=this.lastPositions?.at??-Infinity;
+      const scoreStarted=this.now(),pending=new Map(),pressedSlots=new Set();let index=0,nextPoll=0,nextInfo=0,positions=this.lastPositions?.positions??slots.map(slot=>slot.lift),positionsAt=this.lastPositions?.at??-Infinity;
       while(index<batches.length||pending.size){
         this.check();let now=this.now(),elapsed=now-scoreStarted;
         const due=index<batches.length&&elapsed>=batches[index].t,priority=due&&info.bench_feedback==='1'&&now-positionsAt<=100&&positions.armed==='1'&&positions.bench_active==='1'&&batches[index].events.every(e=>!pending.has(e.s))&&[...pending.values()].every(goal=>now-goal.at<1000);
         if(now>=nextPoll&&!priority){positions=await this.positions(slots,+info.range);now=this.now();positionsAt=now;elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);if(Math.abs(positions[slot]-goal.pos)<=profile.tolerance)pending.delete(slot);}
-          this.progress({elapsed,index,groupIndex:index,total:batches.length,positions,targets:[...pending].map(([slot,g])=>({slot,pos:g.pos})),feedback:true,rhythm:true,...this.feedbackStats()});}
+          this.progress({elapsed,index,groupIndex:index,total:batches.length,positions,targets:[...pending].map(([slot,g])=>({slot,pos:g.pos})),feedback:true,rhythm:true,pressedSlots:[...pressedSlots],...this.feedbackStats()});}
         if(info.bench_feedback==='1'&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('节奏展示已被安全释放，请重新开始');
         if(info.bench_feedback!=='1'&&now>=nextInfo){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('节奏展示已被安全释放，请重新开始');now=this.now();elapsed=now-scoreStarted;nextInfo=now+200;}
         if(index<batches.length&&elapsed>=batches[index].t){const batch=batches[index];if(elapsed-batch.t>100)throw Error('节奏延迟超过100毫秒，已停止，不追赶旧动作');
@@ -4650,13 +4650,13 @@ class StrictActionExecutor{
           if(info.bench_feedback==='1'&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('节奏控制状态未确认');
           if(ack.readback!=='1'||+ack.count!==batch.events.length||parseInt(ack.mask)!==mask||+ack.speed!==(file.runtimeSpeed??profile.defaultBenchSpeed))throw Error('节奏组合写入未完整确认');
           if(this.now()-scoreStarted-batch.t>100)throw Error('节奏写入延迟超过100毫秒，已停止');
-          for(const e of batch.events)pending.set(e.s,{pos:targets[slots[e.s].id-1],at});index++;nextPoll=0;
-          this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,...this.feedbackStats()});continue;}
+          for(const e of batch.events){pending.set(e.s,{pos:targets[slots[e.s].id-1],at});if(e.on)pressedSlots.add(e.s);else pressedSlots.delete(e.s);}index++;nextPoll=0;
+          this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,pressedSlots:[...pressedSlots],...this.feedbackStats()});continue;}
         await this.sleep(4);
       }
       await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'midpoint'});
       await this.io.safe();this.feedbackArmedExpected=false;this.lastPositions=null;
-      while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
+      while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,pressedSlots:[],tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
       const scoreElapsed=this.now()-scoreStarted;
       return {completed:true,feedbackVerified:true,fullStroke:true,protocol:'rhythm-fullStroke-v1',duration_ms:file.duration_ms,score_elapsed_ms:scoreElapsed,elapsed_ms:this.now()-started,events:events.length,...this.feedbackStats()};
     };
