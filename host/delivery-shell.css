@@ -135,12 +135,12 @@ body.delivery-compact>:not(#demoRoot):not(.mountDialog):not(.validationDialog):n
 @keyframes demo-next-arrow{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
 @media(prefers-reduced-motion:reduce){#demoRoot #demoEnrollNext::after,#demoRoot #demoCalStart::after,#demoRoot #demoShowAll::after,#demoRoot #demoSongStart::after{animation:none}}
 /* Persistent next-step prompt, kept clear of the top stop control. */
-#demoRoot > #demoEnrollNext{position:fixed;right:max(24px,calc((100vw - 1450px)/2 + 24px));bottom:28px;z-index:1200;display:inline-flex;align-items:center;justify-content:center;gap:12px;min-height:62px;padding:16px 26px;border:2px solid #c9fbff;border-radius:18px;background:#54ddf2;color:#073142;font-size:18px;font-weight:750;box-shadow:0 0 0 6px #54ddf220,0 14px 40px #00000055;max-width:calc(100vw - 48px)}
+#demoRoot > #demoEnrollNext{position:absolute;right:20px;top:80px;bottom:auto;z-index:1200;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border:2px solid #c9fbff;border-radius:12px;background:#54ddf2;color:#073142;font-size:14px;font-weight:750;box-shadow:0 0 0 4px #54ddf220,0 4px 14px #00000022;max-width:calc(100vw - 48px)}
 #demoRoot > #demoEnrollNext[hidden]{display:none!important}
 #demoRoot > #demoEnrollNext:disabled{opacity:.55;box-shadow:none}
 #demoRoot > #demoEnrollNext:hover:not(:disabled){background:#8aebfa;box-shadow:0 0 0 8px #54ddf22b,0 14px 40px #00000055}
 #demoRoot > #demoEnrollNext:focus-visible{outline:3px solid #fff;outline-offset:5px}
-@media(max-height:650px){#demoRoot > #demoEnrollNext{bottom:22px;min-height:50px;font-size:15px;padding:12px 20px}}
+@media(max-height:650px){#demoRoot > #demoEnrollNext{top:76px;bottom:auto;min-height:36px;font-size:13px;padding:6px 12px}}
 #demoRoot:has(> #demoEnrollNext:not([hidden])) #demoEnrollment #demoEnrollStart{background:#26313c;color:#cbd7e4;border:1px solid #435264;box-shadow:none}
 
 /* Live encoder level: circular delta is calculated from actual feedback. */
