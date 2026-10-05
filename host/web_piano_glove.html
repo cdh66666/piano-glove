@@ -4535,9 +4535,9 @@ function actionGate(info, rows, roles){
     const requiredCounts=Math.ceil((s===1?30:60)*.65*(range+1)/(info.profile==='SCS'?300:360));
     if(span<requiredCounts)throw Error('活动幅度不足，请重新校准完整舒适行程。');
     if(!Number.isInteger(pos)||pos<0||pos>range)throw Error('未读到有效位置，请保持连接。');
-    const startTolerance=Math.min(info.profile==='SCS'?6:114,Math.floor(span/4));
+    const startTolerance=Math.floor(span*.15);
     if(pos<lo-startTolerance||pos>hi+startTolerance)outside.push(s);
-    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.min(info.profile==='SCS'?6:114,Math.floor(span/4))};
+    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.floor(span*.15)};
   }
   if(outside.length){const labels=['拇指外展／内收','拇指按压','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
   return ordered;
@@ -4596,7 +4596,7 @@ class StrictActionExecutor{
           const line=(await this.command('POSALL')).find(l=>l.startsWith('OK POSALL '));
           positions=(line||'').split(/\s+/).slice(2,8).map(Number);
           if(positions.length!==6||positions.some(p=>!Number.isInteger(p)||p<0||p>range))throw Error('位置反馈丢失，执行已中止');
-          positions.forEach((p,s)=>{if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
+          positions.forEach((p,s)=>{if(p<(slots[s].hardwareLow??0)||p>(slots[s].hardwareHigh??range))throw Error('ID '+slots[s].id+' 反馈越出硬件范围，已停止');if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
           now=this.now();elapsed=now-start;nextPoll=now+40;
           for(const [s,g] of targets){if(Math.min(Math.abs(positions[s]-g.pos),range+1-Math.abs(positions[s]-g.pos))<=slots[s].arrivalTolerance)targets.delete(s);else if(now-g.at>g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+slots[s].arrivalTolerance+'，已停止');}
         }
@@ -4744,7 +4744,7 @@ class StrictActionExecutor{
       for(let slot=0;slot<6;slot++){const check=checks.find(r=>+r.slot===slot),row=rows.find(r=>+r.slot===slot),low=+check?.min,high=+check?.max;
         if(!check||+check.id!==slots[slot].id||check.ok!=='1'||check.torque!=='0'||!Number.isInteger(low)||!Number.isInteger(high)||low<0||high>+info.range||low>=high)throw Error('ID '+slots[slot].id+' 的准备状态未确认，请保持手不动后再开始');
         const lo=Math.max(+row.min,low),hi=Math.min(+row.max,high);
-        const startTolerance=Math.min(info.profile==='SCS'?6:114,Math.floor((hi-lo)/4));
+        const startTolerance=Math.floor((+row.max-+row.min)*.15);
         if(lo>=hi||!Number.isInteger(+check.pos)||+check.pos<low||+check.pos>high||+check.pos<lo-startTolerance||+check.pos>hi+startTolerance)throw Error('ID '+slots[slot].id+' 当前超出可控制范围，请轻轻回到已标红行程内');
         if(slots[slot].rest<lo||slots[slot].rest>hi)throw Error('ID '+slots[slot].id+' 自然放松位置超出硬件控制范围，需调整安装位置');
         slots[slot].press=Math.max(lo,Math.min(hi,slots[slot].press));slots[slot].low=lo;slots[slot].high=hi;slots[slot].hardwareLow=low;slots[slot].hardwareHigh=high;slots[slot].tolerance=startTolerance;

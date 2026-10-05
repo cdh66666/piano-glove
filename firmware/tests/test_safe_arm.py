@@ -37,7 +37,7 @@ bool readRegs(uint8_t id,uint8_t addr,uint8_t n,uint8_t *out){
  out[2]=pf.family==Family::SCS?v>>8:v&255;out[3]=pf.family==Family::SCS?v&255:v>>8;}
  return true;
 }
-bool readFeedback(uint8_t id,Feedback &fb){int i=id-1;int n=++feedbackReads[i];fb.pos=edgePosition>=0?edgePosition:hardwareOutside||(prewriteHardwareOutside&&n>1)?1005:outside||(prewriteOutside&&n>1)||(settleOutside&&n>=4)?999:(drift&&torque[i]?481:((settleTransient&&n==4)||(engagementTransient&&n>=3&&n<=4)||(enableTransient&&n>=7&&n<=8)||(enablePersistent&&n>=7)||(settlePersistent&&n>=4)?390:(slack&&n>1?401:381)));return true;}
+bool readFeedback(uint8_t id,Feedback &fb){int i=id-1;int n=++feedbackReads[i];fb.pos=edgePosition>=0?edgePosition:hardwareOutside||(prewriteHardwareOutside&&n>1)?1005:outside||(prewriteOutside&&n>1)||(settleOutside&&n>=4)?1021:(drift&&torque[i]?481:((settleTransient&&n==4)||(engagementTransient&&n>=3&&n<=4)||(enableTransient&&n>=7&&n<=8)||(enablePersistent&&n>=7)||(settlePersistent&&n>=4)?390:(slack&&n>1?401:381)));return true;}
 bool moveTo(uint8_t id,uint16_t p,uint16_t,uint8_t){assert(!torque[id-1]);goals[id-1]=p;++writes;if(autoEnable&&(autoEnableId<0||id==autoEnableId)){torque[id-1]=true;++implicitEnables;}return !missingAck;}
 bool setTorque(uint8_t id,bool on){if(on){assert(writes==6);assert(goals[id-1]==(edgePosition>=0?(edgePosition<g_slot[id-1].lo?g_slot[id-1].lo:(edgePosition>g_slot[id-1].hi?g_slot[id-1].hi:edgePosition)):(slack?401:381)));++enables;if(id==failedEnable)return false;}torque[id-1]=on;return true;}
 }
@@ -51,12 +51,12 @@ int main(){
  reset();assert(!moveRaw(1,381,600,30));g_armed=true;assert(!moveRaw(1,99,600,30));assert(!moveRaw(77,381,600,30));g_slot[0].lo=0;assert(!moveRaw(1,19,600,30));assert(scs::writes==0);
  reset();scs::autoEnable=true;scs::edgePosition=461;for(auto &sl:g_slot){sl.lo=276;sl.hi=460;}assert(armAtCurrent(63));for(int goal:scs::goals)assert(goal==460);for(auto &sl:g_slot)assert(sl.lo==276&&sl.hi==460); // Actual passive rebound regression.
  for(int edge:{901,906,99,94}){reset();scs::autoEnable=true;scs::edgePosition=edge;assert(armAtCurrent(63));for(int goal:scs::goals)assert(goal==(edge>900?900:100));for(auto &sl:g_slot)assert(sl.lo==100&&sl.hi==900);}
- reset();scs::edgePosition=907;assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_outside"));
- reset();scs::edgePosition=93;assert(!armAtCurrent(63));off();assert(scs::writes==0);
- reset();scs::edgePosition=106;for(auto &sl:g_slot){sl.lo=100;sl.hi=104;}assert(!armAtCurrent(63));off();assert(scs::writes==0); // Small span4 allows margin1 only.
+ reset();scs::edgePosition=1021;assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_outside"));
+ reset();scs::edgePosition=0;for(auto &sl:g_slot)sl.lo=200;assert(!armAtCurrent(63));off();assert(scs::writes==0);
+ reset();scs::edgePosition=106;for(auto &sl:g_slot){sl.lo=100;sl.hi=104;}assert(!armAtCurrent(63));off();assert(scs::writes==0); // Small span4 floors to zero margin.
  reset();scs::edgePosition=1004;for(auto &sl:g_slot){sl.lo=900;sl.hi=1003;}assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_hardware_outside"));
- for(int edge:{801,914,199,86}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(armFeedbackAllowed(g_slot[0],edge,4095));assert(armCurrentGoal(g_slot[0],edge,20,1003)==(edge>800?800:200));for(auto &sl:g_slot)assert(sl.lo==200&&sl.hi==800);}
- for(int edge:{915,85}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(!armAtCurrent(63));off();assert(scs::writes==0);}
+ for(int edge:{801,890,199,110}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(armFeedbackAllowed(g_slot[0],edge,4095));assert(armCurrentGoal(g_slot[0],edge,20,1003)==(edge>800?800:200));for(auto &sl:g_slot)assert(sl.lo==200&&sl.hi==800);}
+ for(int edge:{891,109}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(!armAtCurrent(63));off();assert(scs::writes==0);}
  reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::edgePosition=1004;for(auto &sl:g_slot){sl.lo=900;sl.hi=1003;}assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_hardware_outside"));
  reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::edgePosition=106;for(auto &sl:g_slot){sl.lo=100;sl.hi=104;}assert(!armAtCurrent(63));off();assert(scs::writes==0);
  reset();for(auto &sl:g_slot)sl.hi=1020;scs::hardwareOutside=true;assert(!armAtCurrent(63));off();assert(strstr(armFailure(),"feedback_hardware_outside"));assert(scs::writes==0);
@@ -79,6 +79,7 @@ int main(){
  reset();scs::autoEnable=true;scs::badGoal=true;assert(!armPrepareCurrent(63));off();assert(strstr(armFailure(),"goal_mismatch"));
  reset();scs::autoEnable=true;scs::missingAck=true;assert(!armPrepareCurrent(63));off();assert(strstr(armFailure(),"goal_write_unacknowledged"));
  reset();scs::autoEnable=true;scs::outside=true;assert(!armAtCurrent(63));off();assert(scs::writes==0&&scs::implicitEnables==0);
+ for(auto family:{scs::Family::SCS,scs::Family::STS})for(int span:{4,7,100,237,600}){reset();scs::pf.family=family;scs::pf.range=family==scs::Family::SCS?1023:4095;auto &sl=g_slot[0];sl.lo=200;sl.hi=200+span;const int margin=span*15/100;assert(armFeedbackMargin(sl)==margin);assert(armFeedbackAllowed(sl,sl.lo-margin,scs::pf.range));assert(armFeedbackAllowed(sl,sl.hi+margin,scs::pf.range));assert(!armFeedbackAllowed(sl,sl.lo-margin-1,scs::pf.range));assert(!armFeedbackAllowed(sl,sl.hi+margin+1,scs::pf.range));assert(armCurrentGoal(sl,sl.hi+margin,20,1003)==sl.hi);assert(sl.lo==200&&sl.hi==200+span);}
  reset();ArmCheck row;assert(inspectArmSlot(0,row));assert(row.responseLevel==1&&row.torque==0&&row.goal==800&&row.position==381&&row.minimum==20&&row.maximum==1003);assert(scs::writes==0&&scs::enables==0&&scs::safeCount==0);
  reset();assert(armPrepareCurrent(63));off();assert(scs::writes==6&&scs::enables==0);
  reset();scs::missingAck=true;assert(!armPrepareCurrent(63));off();assert(strstr(armFailure(),"goal_write_unacknowledged"));assert(strstr(armFailure(),"observed=381 expected=381"));assert(scs::enables==0);

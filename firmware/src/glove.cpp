@@ -462,11 +462,11 @@ bool inspectArmSlot(int s,ArmCheck &out){
  return out.registersOk&&out.feedbackOk&&out.limitsOk;
 }
 // Measurement slack is separate from allowed command travel: never persist or
-// send an expanded endpoint. Feedback slack: at most six SCS or 114 STS counts, capped at span/4.
+// send an expanded endpoint. Feedback slack: 15% of the recorded span for both supported families.
 static int armFeedbackMargin(const Slot &sl){
  if((scs::profile().family!=scs::Family::SCS&&scs::profile().family!=scs::Family::STS)||sl.lo>sl.hi)return 0;
  const int span=sl.hi-sl.lo;
- int tol=scs::profile().family==scs::Family::SCS?6:114;if(tol>span/4)tol=span/4;return tol;
+ return span*15/100;
 }
 static bool armFeedbackAllowed(const Slot &sl,int pos,int range){
  if(pos<0||pos>range)return false;

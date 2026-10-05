@@ -45,7 +45,7 @@ test('bench quick rejects absent quickmode and unrelatedprofile',async()=>{const
 test('transport deadline safety covers lateBENCH requests',()=>{assert.match(html,/\^\(ARM\|MOVE\|BENCH\)/);});
 test('quick feedback reports measuredframes and frequency with serialized requests',async()=>{const f=setup({latency:5});const r=await f.executor.run({quickDemo:true,benchQuick:true,events:[{slot:0,t_ms:0,duration_ms:60,amplitude:1}]},roles,{internalSlots:true});assert.equal(r.feedbackSamples,4);assert(r.feedbackHz>0);assert.equal(r.feedbackHz,Math.round(r.feedbackSamples*10000/r.elapsed_ms)/10);assert(f.progress.some(p=>p.feedbackSamples>0&&p.feedbackHz>0));});
 
-test('SCS prepared start permits6count rebound but never7 orhardwarelimit escape',async()=>{for(const [position,hardwareLow,pass]of [[94,20,true],[93,20,false],[94,95,false]]){const f=setup(),base=f.io.send;f.io.send=async cmd=>{const lines=await base(cmd);if(cmd==='STATUS_ALL')return lines.map(l=>l.startsWith('SLOT slot=0 ')?l.replace('pos=100','pos='+position):l);if(cmd==='ARM CHECK')return lines.map(l=>l.startsWith('ARM_CHECK_SLOT slot=0 ')?l.replace('pos=100','pos='+position).replace('min=20','min='+hardwareLow):l);return lines;};if(pass){const ready=await f.executor.prepare(roles);assert.equal(ready.slots[0].press,350);assert.equal(ready.slots[0].rest,100);assert(!f.sent.some(c=>c.startsWith('MOVE')));}else await assert.rejects(f.executor.prepare(roles),/超出/);}});
+test('SCS prepared start permits37count rebound for250span but never38 or hardwarelimit escape',async()=>{for(const [position,hardwareLow,pass]of [[63,20,true],[62,20,false],[63,64,false]]){const f=setup(),base=f.io.send;f.io.send=async cmd=>{const lines=await base(cmd);if(cmd==='STATUS_ALL')return lines.map(l=>l.startsWith('SLOT slot=0 ')?l.replace('pos=100','pos='+position):l);if(cmd==='ARM CHECK')return lines.map(l=>l.startsWith('ARM_CHECK_SLOT slot=0 ')?l.replace('pos=100','pos='+position).replace('min=20','min='+hardwareLow):l);return lines;};if(pass){const ready=await f.executor.prepare(roles);assert.equal(ready.slots[0].press,350);assert.equal(ready.slots[0].rest,100);assert(!f.sent.some(c=>c.startsWith('MOVE')));}else await assert.rejects(f.executor.prepare(roles),/超出/);}});
 test('SCS rebound allowance never bypasses failingARM CHECK',async()=>{const f=setup(),base=f.io.send;f.io.send=async cmd=>{const lines=await base(cmd);return cmd==='ARM CHECK'?lines.map(l=>l.startsWith('ARM_CHECK_SLOT slot=0 ')?l.replace('ok=1','ok=0').replace('pos=100','pos=94'):l):lines;};await assert.rejects(f.executor.prepare(roles),/准备状态未确认/);});
 
 test('every arrival branch accepts35counts but rejects36',async()=>{for(const [quick,bench,scaledTolerance] of [[true,true,false],[false,false,false],[true,true,true]])for(const error of [35,36]){const f=setup({latency:20}),base=f.io.send;f.io.send=async cmd=>{const lines=await base(cmd);if(cmd==='POSALL'&&f.sent.some(c=>/^(BENCH MOVE|MOVE) /.test(c)))return ['OK POSALL '+[350-error,100,100,100,100,100].join(' ')];return lines;};const slots=Array.from({length:6},(_,i)=>({id:i+1,low:100,high:350,rest:100,press:350,tolerance:6}));await f.io.send('ARM');const run=f.executor.reach([{slot:0,amplitude:1}],slots,{profile:'SCS',range:1023},true,0,0,1,quick,bench,{scaledTolerance});if(error===35)await run;else await assert.rejects(run,/未到位/);}});
@@ -156,19 +156,19 @@ test('SC09 model-specific songs finish with 300ms feedback travel and keep chord
 });
 
 
-test('STS passive rebound allows114 counts but never115 or hardware-limit escape; targets remain calibrated',async()=>{
- for(const [position,hardwareLow,hardwareHigh,pass]of [[76,20,1003,true],[714,20,1003,true],[715,20,1003,false],[76,77,1003,false],[714,20,713,false]]){
+test('STS passive rebound allows75 counts but never76 or hardware-limit escape; targets remain calibrated',async()=>{
+ for(const [position,hardwareLow,hardwareHigh,pass]of [[25,20,1003,true],[675,20,1003,true],[24,20,1003,false],[676,20,1003,false],[25,26,1003,false],[675,20,674,false]]){
   const f=stsSetup(),base=f.io.send;
   f.io.send=async cmd=>{const lines=await base(cmd);if(cmd==='STATUS_ALL')return lines.map(l=>l.startsWith('SLOT slot=0 ')?l.replace('pos=100','pos='+position):l);if(cmd==='ARM CHECK')return lines.map(l=>l.startsWith('ARM_CHECK_SLOT slot=0 ')?l.replace('pos=100','pos='+position).replace('min=20','min='+hardwareLow).replace('max=1003','max='+hardwareHigh):l);if(cmd==='POSALL')return lines.map(l=>l.replace('OK POSALL 100 ','OK POSALL '+position+' '));return lines;};
-  if(pass){const {slots}=await f.executor.prepare(roles);assert.equal(slots[0].low,100);assert.equal(slots[0].high,600);assert.equal(slots[0].press,600);assert.equal(slots[0].tolerance,114);assert(!f.sent.some(c=>c.startsWith('BENCH')||c.startsWith('MOVE')));}
+  if(pass){const {slots}=await f.executor.prepare(roles);assert.equal(slots[0].low,100);assert.equal(slots[0].high,600);assert.equal(slots[0].press,600);assert.equal(slots[0].tolerance,75);assert(!f.sent.some(c=>c.startsWith('BENCH')||c.startsWith('MOVE')));}
   else await assert.rejects(f.executor.prepare(roles),/超出/);
  }
 });
-test('prepared STS live feedback enforces114-count calibration slack and strict hardware bounds',async()=>{
- for(const [position,hardwareHigh,pattern]of [[714,1003,null],[715,1003,/校准范围/],[714,713,/硬件范围/]]){
+test('prepared STS live feedback enforces75-count calibration slack and strict hardware bounds',async()=>{
+ for(const [position,hardwareHigh,pattern]of [[675,1003,null],[676,1003,/校准范围/],[675,674,/硬件范围/]]){
  const f=stsSetup(),{slots}=await f.executor.prepare(roles),base=f.io.send;slots[0].hardwareHigh=hardwareHigh;
  f.io.send=async cmd=>cmd==='POSALL'?['OK POSALL '+[position,100,100,100,100,100].join(' ')+' armed=0 bench_active=0']:base(cmd);
- if(pattern)await assert.rejects(f.executor.positions(slots,4095),pattern);else assert.equal((await f.executor.positions(slots,4095))[0],714);
+ if(pattern)await assert.rejects(f.executor.positions(slots,4095),pattern);else assert.equal((await f.executor.positions(slots,4095))[0],675);
  }
 });
 
@@ -206,4 +206,12 @@ for(const family of ['SCS','STS'])test(family+' centered speed does not reinterp
  const f=family==='STS'?stsSetup():setup({latency:5,benchFeedback:true}),send=f.io.send;
  f.io.send=async cmd=>(await send(cmd)).map(l=>cmd==='STATUS_ALL'&&l.startsWith('SLOT ')?l.replace(/min=100 max=\d+/,'min='+(family==='STS'?3900:950)+' max=50'):l);
  await assert.rejects(f.executor.runSpeedTest({},roles),/跨零/);assert(!f.sent.includes('ARM'));assert(!f.sent.some(c=>c.startsWith('BENCH')));
+});
+
+test('SCS live feedback uses recorded15percent margin while physical limits remain strict',async()=>{
+ for(const [pos,hardwareHigh,pattern]of [[387,1003,null],[388,1003,/校准范围/],[387,386,/硬件范围/]]){
+ const f=setup({latency:5,benchFeedback:true}),{slots}=await f.executor.prepare(roles),send=f.io.send;assert.equal(slots[0].tolerance,37);slots[0].hardwareHigh=hardwareHigh;
+ f.io.send=async cmd=>cmd==='POSALL'?['OK POSALL '+[pos,100,100,100,100,100].join(' ')+' armed=0 bench_active=0']:send(cmd);
+ if(pattern)await assert.rejects(f.executor.positions(slots,1023),pattern);else assert.equal((await f.executor.positions(slots,1023))[0],387);
+ }
 });

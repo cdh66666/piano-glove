@@ -21,7 +21,7 @@ test('stored calibration remains valid while resting fingers outside bounds requ
  const info={fw:'PIANO_GLOVE_2',ver:'2.2.4',profile:'SCS',range:1023,calibrated:'1',armed:'0',online:6,auto_active:'0',enroll_active:'0',sweep:'0'},roles=['latch','press','press','press','press','press'];
  const values=[[328,504,504,465,'min'],[798,885,885,845,'min'],[550,550,718,995,'max'],[750,828,914,831,'max'],[50,95,205,108,'max'],[717,717,877,708,'max']];
  const rows=values.map(([min,standby,max,pos,press],slot)=>({slot,id:slot+1,min,standby,max,pos,press,valid:'1',online:'1'}));
- assert.throws(()=>gate(info,rows,roles),e=>{assert.equal(e.code,'CAL_POSITION_OUTSIDE');assert.deepEqual(Array.from(e.repairSlots),[2,5]);assert.match(e.message,/食指、小指/);assert.doesNotMatch(e.message,/校准无效/);return true;});
+ assert.throws(()=>gate(info,rows,roles),e=>{assert.equal(e.code,'CAL_POSITION_OUTSIDE');assert.deepEqual(Array.from(e.repairSlots),[2]);assert.match(e.message,/食指/);assert.doesNotMatch(e.message,/小指/);assert.doesNotMatch(e.message,/校准无效/);return true;});
  assert.equal(gate(info,rows.map(r=>({...r,pos:r.standby})),roles).length,6);
  assert.throws(()=>gate(info,rows.map(r=>({...r,pos:r.standby,valid:r.slot===2?'0':'1'})),roles),/校准无效/);
 });
