@@ -76,7 +76,7 @@ class FirmwareTests(unittest.TestCase):
                  patch.object(self.b,'send',return_value={'lines':['OK INFO '+fields]}),patch.object(ff.time,'sleep'):
                 self.f.busy=True
                 self.f._worker('flash','COM3',self.f.identity('COM3'))
-                self.assertTrue(self.b.paused)
+                self.assertEqual(self.b.paused, not self.f._data.get('verified', False))
                 self.assertFalse(self.f.busy)
         return commands,self.f.status()
 

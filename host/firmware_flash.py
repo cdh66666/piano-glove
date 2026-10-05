@@ -6,7 +6,7 @@ reports the actual absolute source, board, baud and detected MAC for review.
 The API accepts no arbitrary path, binary, command, board or baud override.
 GET /api/firmware; POST /api/firmware/build {}; POST /api/firmware/flash
 {port: COMx}. Only flash reserves the serial interface. External bus power may stay on.
-Only flash opens/resets the board. Flash leaves automatic reconnection paused.
+Only flash opens/resets the board. Failed flash leaves reconnection paused.
 No erase-all: write ranges are 1000,8000,e000,10000; NVS 9000..dfff is retained.
 written/hashVerified/verified distinguish write, byte verification and INFO readback.
 """
@@ -259,9 +259,10 @@ class FirmwareManager:
             if action == 'flash':
                 bridge.close()
         finally:
-            # Never auto-reconnect another port or resume movement after flashing/failure.
+            # Verified firmware is already disarmed. Resume connection checks only;
+            # failed/unverified writes stay paused, and movement is never resumed.
             if action == 'flash':
-                bridge.paused = True
+                bridge.paused = not self._data.get('verified', False)
             with self._lock:
                 self.busy = False
                 self.serialExclusive = False

@@ -63,6 +63,7 @@ import traceback
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
+from urllib.request import urlopen
 
 try:
     import serial
@@ -293,6 +294,24 @@ class Bridge(object):
         self.connected_at = 0.0        # 断了就别留着上次的时间戳，界面会照着它算「连了多久」
         with self._cv:
             self._cv.notify_all()
+
+    @exclusive
+    def select_port(self, target, baud=None):
+        """Explicit user selection changes the reconnect target, never a movement goal."""
+        if self.connected and self.port == target:
+            self.paused = False
+            return True, "已连接 " + target
+        if self.connected:
+            reply = self.send('SAFE', timeout_ms=1500, quiet_ms=25)
+            if not any(line.startswith('OK SAFE') and re.search(r'\barmed=0\b', line) for line in reply.get('lines', [])):
+                return False, "原设备停止未确认，未切换串口"
+        self.paused = True
+        self.close()
+        self.url = target
+        self.recording_root = os.path.join(HOST_DIR, "calibration_recordings", re.sub(r"[^A-Za-z0-9_-]", "_", target))
+        ok, message = self.open(target, baud)
+        self.paused = False  # Retry only this explicitly selected board after an open failure.
+        return ok, message
 
     @exclusive
     def open(self, target=None, baud=None):
@@ -631,6 +650,21 @@ DENY_PREFIX = ("/tests/shots",)
 DENY_FILES = (".git",)
 
 
+def peer_console_url(current_http_port, target):
+    """Read-only lookup of the other local console; do not steal its serial handle."""
+    for port in (8123, 8124):
+        if port == current_http_port:
+            continue
+        try:
+            with urlopen('http://127.0.0.1:%d/api/status' % port, timeout=.3) as response:
+                state = json.load(response)
+            if state.get('fixed') == target:
+                return 'http://127.0.0.1:%d/web_piano_glove.html?simple=1' % port
+        except Exception:
+            continue
+    return None
+
+
 def make_handler(bridge):
     class Handler(BaseHTTPRequestHandler):
         server_version = "piano-glove-bridge"
@@ -775,16 +809,17 @@ def make_handler(bridge):
                 if u.path == "/api/connect":
                     port = (b.get("port") or "").strip()
                     baud = b.get("baud")
-                    if bridge.url:
-                        if port and port != bridge.url:
-                            return self._json({"ok":False,"error":"本调试台固定连接 " + bridge.url},409)
-                        port = bridge.url
+                    port = port or bridge.url
+                    if port and port != bridge.url:
+                        peer_url = peer_console_url(self.server.server_port, port)
+                        if peer_url:
+                            return self._json({"ok":True,"redirect":peer_url,"msg":"该设备已在另一调试台打开"})
                     bridge.paused = False
                     if port:
                         bridge._reload_ports()
                         if not any(p['device'] == port and p['candidate'] for p in bridge.ports):
                             return self._json({'ok': False, 'error': '仅支持 10C4:EA60 CP210x 主控串口'}, 400)
-                        ok, msg = bridge.open(port, baud)
+                        ok, msg = bridge.select_port(port, baud)
                         if ok:
                             bridge.probe_ok = port
                     else:
