@@ -1,0 +1,6 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {chartData,stages}=require('../delivery-speed-chart.js');
+const summarize=r=>({averageHz:r.hz,fingers:[{slot:1,hz:r.hz}],synchronousHz:r.hz});
+test('five speed bars share scale, retain ascending stages, and leave unfinished stages blank',()=>{const data=chartData([{amplitude:1,hz:2,feedbackVerified:true},{amplitude:.2,hz:4,feedbackVerified:true}],summarize);assert.deepEqual(data.map(x=>x.amplitude),[.2,.4,.6,.8,1]);assert.equal(data[0].height,100);assert.equal(data[4].height,50);assert(data.slice(1,4).every(x=>x.summary===null&&x.height===0));});
+test('unverified or invalid frequency never becomes a bar',()=>{for(const r of [{hz:4},{hz:NaN,feedbackVerified:true},{hz:0,feedbackVerified:true},{hz:-2,feedbackVerified:true}])assert.equal(chartData([{amplitude:.2,...r}],summarize)[0].summary,null);assert.deepEqual(stages,[.2,.4,.6,.8,1]);});
+test('partial results remain visible when no later measurements exist',()=>{const data=chartData([{amplitude:.2,hz:3,feedbackVerified:true},{amplitude:.4,hz:2,feedbackVerified:true}],summarize);assert.deepEqual(data.filter(d=>d.summary).map(d=>d.summary.averageHz),[3,2]);assert.equal(data.filter(d=>!d.summary).length,3);});

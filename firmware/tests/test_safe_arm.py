@@ -55,7 +55,10 @@ int main(){
  reset();scs::edgePosition=93;assert(!armAtCurrent(63));off();assert(scs::writes==0);
  reset();scs::edgePosition=106;for(auto &sl:g_slot){sl.lo=100;sl.hi=104;}assert(!armAtCurrent(63));off();assert(scs::writes==0); // Small span4 allows margin1 only.
  reset();scs::edgePosition=1004;for(auto &sl:g_slot){sl.lo=900;sl.hi=1003;}assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_hardware_outside"));
- reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::edgePosition=901;assert(!armAtCurrent(63));off();assert(scs::writes==0); // STS remains strict.
+ for(int edge:{801,914,199,86}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(armFeedbackAllowed(g_slot[0],edge,4095));assert(armCurrentGoal(g_slot[0],edge,20,1003)==(edge>800?800:200));for(auto &sl:g_slot)assert(sl.lo==200&&sl.hi==800);}
+ for(int edge:{915,85}){reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;for(auto &sl:g_slot){sl.lo=200;sl.hi=800;}scs::edgePosition=edge;assert(!armAtCurrent(63));off();assert(scs::writes==0);}
+ reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::edgePosition=1004;for(auto &sl:g_slot){sl.lo=900;sl.hi=1003;}assert(!armAtCurrent(63));off();assert(scs::writes==0&&strstr(armFailure(),"feedback_hardware_outside"));
+ reset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::edgePosition=106;for(auto &sl:g_slot){sl.lo=100;sl.hi=104;}assert(!armAtCurrent(63));off();assert(scs::writes==0);
  reset();for(auto &sl:g_slot)sl.hi=1020;scs::hardwareOutside=true;assert(!armAtCurrent(63));off();assert(strstr(armFailure(),"feedback_hardware_outside"));assert(scs::writes==0);
  reset();for(auto &sl:g_slot)sl.hi=1020;scs::prewriteHardwareOutside=true;assert(!armAtCurrent(63));off();assert(strstr(armFailure(),"prewrite_hardware_outside"));assert(scs::writes==0);
  reset();scs::autoEnable=true;scs::enableTransient=true;assert(armAtCurrent(63));assert(g_armed&&scs::writes==6);

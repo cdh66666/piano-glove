@@ -1,0 +1,22 @@
+#demoRoot #demoSpeedResults.speedChart{display:block;width:100%;margin-top:18px;padding:20px;background:#101c27;border:1px solid #355163;border-radius:18px;box-sizing:border-box}
+.speedChartHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}.speedChartHead b{font-size:19px;color:#effbff}.speedChartHead span{font-size:12px;color:#9db4c9}.speedChartStatus{min-height:22px;margin:12px 0 18px;color:#7bdfed;font-size:14px}.speedChartStatus.error{color:#ffbdba}
+.speedChartColumns{display:grid;grid-template-columns:repeat(5,minmax(90px,1fr));gap:8px;overflow-x:auto;padding:4px 2px 10px}
+#demoRoot .speedChartStage{display:grid;grid-template-rows:36px 150px 30px 24px;align-items:center;text-align:center;min-width:90px;padding:12px 8px;border:1px solid #304759;border-radius:12px;background:#1a2935;color:#91a8b9;opacity:1;cursor:default}
+#demoRoot .speedChartStage.measured{cursor:pointer;color:#d5f8ff}#demoRoot .speedChartStage.testing{border-color:#42d5fa;background:#153d4d;box-shadow:0 0 0 2px #42d5fa33}#demoRoot .speedChartStage.selected,#demoRoot .speedChartStage:focus-visible{outline:2px solid #87f5eb;outline-offset:2px}
+.speedChartHz{font-size:25px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}.speedChartPlot{position:relative;height:140px;display:block;border-bottom:1px solid #617684;margin:0 8px}.speedChartPlot i{position:absolute;bottom:0;left:0;right:0;height:0;background:linear-gradient(0deg,#229abe,#6aece3);border-radius:5px 5px 0 0;transition:height .3s ease}.speedChartStage small{font-size:11px;white-space:nowrap}.speedChartStage>b{font-size:17px}.speedChartDetail{margin-top:14px;padding:16px 2px 2px;border-top:1px solid #355163;color:#d6eef9}.speedChartDetail>small{display:block;color:#9db4c9;font-size:12px;margin-top:14px}.speedChartFingers{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px}.speedChartFingers span{display:grid;gap:8px}.speedChartFingers small{font-size:12px;color:#9db4c9}.speedChartFingers strong{font-size:16px;font-variant-numeric:tabular-nums}
+@media(max-width:600px){#demoRoot #demoSpeedResults.speedChart{padding:12px}.speedChartFingers{grid-template-columns:repeat(3,1fr)}.speedChartColumns{grid-template-columns:repeat(5,94px)}}
+@media(prefers-reduced-motion:reduce){.speedChartPlot i{transition:none}}
+
+.speedChartNote{margin-top:14px;color:#9db4c9;font-size:12px;line-height:1.5}
+
+/* Speed comparison has its own scrollable workflow; never shrink or clip controls. */
+#demoRoot #demoCalibration .demoBlock:has(.speedChart){display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;justify-content:flex-start}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart)>*{flex-shrink:0}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart)>h2{order:0;position:sticky;top:0;background:#171b22;z-index:3;padding:8px 0;margin:0;min-height:34px}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart)>.demoRow{order:1;position:sticky;top:50px;background:#171b22;z-index:3;margin:0;padding:8px 0}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoActionProgress{order:2;flex:0 0 auto;min-height:0;margin:12px 0;align-content:normal}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoActionProgress>.demoActionStep{height:54px;min-height:54px;flex-direction:row;gap:8px;font-size:15px;padding:8px}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoActionProgress>.demoActionStep::before{font-size:18px;margin:0}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoMotionLive{order:3}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoSpeedResults{order:4}
+#demoRoot #demoCalibration .demoBlock:has(.speedChart) #demoActionMessage{order:5;margin-top:12px}

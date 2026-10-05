@@ -176,6 +176,7 @@ class Bridge(object):
         self._maintenance_lock = threading.RLock()
         self.firmware = FirmwareManager(self)
         self.url = url                 # 指定了口就一直用它
+        self.recording_root = os.path.join(HOST_DIR, "calibration_recordings", re.sub(r"[^A-Za-z0-9_-]", "_", url)) if url else os.path.join(HOST_DIR, "calibration_recordings")
         self.baud = baud
         self.auto = auto and (url is None)
         self.ser = None
@@ -299,6 +300,8 @@ class Bridge(object):
         target = target or self.url or self.port
         if not target:
             return False, "没有指定串口"
+        if self.url and target != self.url:
+            return False, "本调试台固定连接 " + self.url
         if baud:
             self.baud = baud
         self.close()
@@ -418,6 +421,8 @@ class Bridge(object):
             return True, "已连接 " + str(self.port)
         if self.paused:
             return False, "已被用户断开，等一个明确的连接请求"
+        if self.url:
+            return self.open(self.url)
         self._reload_ports()
         cands = [p for p in self.ports if p["candidate"]]
         if not cands:
@@ -712,7 +717,7 @@ def make_handler(bridge):
             q = parse_qs(u.query)
             if u.path == "/api/calibration/recording":
                 try:
-                    return self._json(read_recording((q.get("id") or [""])[0]))
+                    return self._json(read_recording((q.get("id") or [""])[0], root=bridge.recording_root))
                 except ValueError as e:
                     return self._json({"ok":False,"error":str(e)},400)
                 except FileNotFoundError:
@@ -748,6 +753,8 @@ def make_handler(bridge):
                     if origin is not None and origin not in ("http://127.0.0.1:%s" % port, "http://localhost:%s" % port):
                         return self._json({"ok": False, "error": "固件维护仅接受本调试页面同源请求"}, 403)
                     try:
+                        if u.path.endswith("/flash") and bridge.url and b.get("port") != bridge.url:
+                            raise ValueError("本调试台固定连接 " + bridge.url)
                         return self._json(bridge.firmware.start(u.path.rsplit('/', 1)[1], b), 202)
                     except ValueError as e:
                         return self._json({"ok": False, "error": str(e)}, 400)
@@ -755,7 +762,7 @@ def make_handler(bridge):
                         return self._json({"ok": False, "error": str(e)}, 409)
                 if u.path == "/api/calibration/recording":
                     try:
-                        return self._json(save_recording(b),201)
+                        return self._json(save_recording(b, root=bridge.recording_root),201)
                     except ValueError as e:
                         return self._json({"ok":False,"error":str(e)},400)
                 if bridge.firmware.serialExclusive:
@@ -768,6 +775,10 @@ def make_handler(bridge):
                 if u.path == "/api/connect":
                     port = (b.get("port") or "").strip()
                     baud = b.get("baud")
+                    if bridge.url:
+                        if port and port != bridge.url:
+                            return self._json({"ok":False,"error":"本调试台固定连接 " + bridge.url},409)
+                        port = bridge.url
                     bridge.paused = False
                     if port:
                         bridge._reload_ports()

@@ -4535,9 +4535,9 @@ function actionGate(info, rows, roles){
     const requiredCounts=Math.ceil((s===1?30:60)*.65*(range+1)/(info.profile==='SCS'?300:360));
     if(span<requiredCounts)throw Error('活动幅度不足，请重新校准完整舒适行程。');
     if(!Number.isInteger(pos)||pos<0||pos>range)throw Error('未读到有效位置，请保持连接。');
-    const startTolerance=info.profile==='SCS'?Math.min(6,Math.floor(span/4)):0;
+    const startTolerance=Math.min(info.profile==='SCS'?6:114,Math.floor(span/4));
     if(pos<lo-startTolerance||pos>hi+startTolerance)outside.push(s);
-    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.min(info.profile==='SCS'?6:24,Math.floor(span/4))};
+    ordered[s]={id:+r.id,rest,press:r.press==='min'?lo:hi,arrivalTolerance:motionProfile(info).tolerance,tolerance:Math.min(info.profile==='SCS'?6:114,Math.floor(span/4))};
   }
   if(outside.length){const labels=['拇指外展／内收','拇指按压','食指','中指','无名指','小指'];const e=Error(outside.map(s=>labels[s]).join('、')+'当前超出记录范围，请补校准。');e.code='CAL_POSITION_OUTSIDE';e.repairSlots=outside;throw e;}
   return ordered;
@@ -4636,11 +4636,17 @@ class StrictActionExecutor{
     const started=lifecycleStarted,all=slots.map((_,slot)=>({slot,amplitude:1}));let watchdog;this.feedbackMetrics={start:started,samples:0};this.deadline=started+10000;
     const execute=async()=>{
       await this.reach(all,slots,info,false,started,0,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
-      const scoreStarted=this.now(),pending=new Map(),pressedSlots=new Set();let index=0,nextPoll=0,nextInfo=0,positions=this.lastPositions?.positions??slots.map(slot=>slot.lift),positionsAt=this.lastPositions?.at??-Infinity;
+      const scoreStarted=this.now(),pending=new Map(),pressedSlots=new Set();let index=0,nextPoll=0,nextInfo=0,lastGoalAt=scoreStarted,positions=this.lastPositions?.positions??slots.map(slot=>slot.lift),positionsAt=this.lastPositions?.at??-Infinity;
       while(index<batches.length||pending.size){
         this.check();let now=this.now(),elapsed=now-scoreStarted;
         const due=index<batches.length&&elapsed>=batches[index].t,priority=due&&info.bench_feedback==='1'&&now-positionsAt<=100&&positions.armed==='1'&&positions.bench_active==='1'&&batches[index].events.every(e=>!pending.has(e.s))&&[...pending.values()].every(goal=>now-goal.at<1000);
-        if(now>=nextPoll&&!priority){positions=await this.positions(slots,+info.range);now=this.now();positionsAt=now;elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);if(Math.abs(positions[slot]-goal.pos)<=profile.tolerance)pending.delete(slot);}
+        if(now>=nextPoll&&!priority){positions=await this.positions(slots,+info.range);now=this.now();positionsAt=now;elapsed=now-scoreStarted;nextPoll=now+20;for(const [slot,goal]of pending){if(now-goal.at>=1000)throw Error('ID '+slots[slot].id+' 节奏动作未到位：目标 '+goal.pos+'，实际 '+positions[slot]);
+            // Song-only concession: a NEW post-command feedback frame must show
+            // at least half the commanded travel in the commanded direction.
+            // Reference the measured start of this leg, never the nominal opposite
+            // endpoint: a finger stalled at mid-stroke cannot pass both directions.
+            const travel=Math.abs(goal.pos-goal.from),progress=(positions[slot]-goal.from)*Math.sign(goal.pos-goal.from);
+            if(Math.abs(positions[slot]-goal.pos)<=profile.tolerance||travel>0&&progress>=travel*.5)pending.delete(slot);}
           this.progress({elapsed,index,groupIndex:index,total:batches.length,positions,targets:[...pending].map(([slot,g])=>({slot,pos:g.pos})),feedback:true,rhythm:true,pressedSlots:[...pressedSlots],...this.feedbackStats()});}
         if(info.bench_feedback==='1'&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('节奏展示已被安全释放，请重新开始');
         if(info.bench_feedback!=='1'&&now>=nextInfo){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('节奏展示已被安全释放，请重新开始');now=this.now();elapsed=now-scoreStarted;nextInfo=now+200;}
@@ -4651,15 +4657,30 @@ class StrictActionExecutor{
           if(info.bench_feedback==='1'&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('节奏控制状态未确认');
           if(ack.readback!=='1'||+ack.count!==batch.events.length||parseInt(ack.mask)!==mask||+ack.speed!==(file.runtimeSpeed??profile.defaultBenchSpeed))throw Error('节奏组合写入未完整确认');
           if(this.now()-scoreStarted-batch.t>100)throw Error('节奏写入延迟超过100毫秒，已停止');
-          for(const e of batch.events){pending.set(e.s,{pos:targets[slots[e.s].id-1],at});if(e.on)pressedSlots.add(e.s);else pressedSlots.delete(e.s);}index++;nextPoll=0;
+          for(const e of batch.events){pending.set(e.s,{pos:targets[slots[e.s].id-1],from:positions[e.s],at});if(e.on)pressedSlots.add(e.s);else pressedSlots.delete(e.s);}lastGoalAt=at;index++;nextPoll=0;
           this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index-1,total:batches.length,slots:batch.events.map(e=>e.s),on:batch.events.some(e=>e.on),positions,targets:batch.events.map(e=>({slot:e.s,pos:targets[slots[e.s].id-1]})),feedback:true,rhythm:true,pressedSlots:[...pressedSlots],...this.feedbackStats()});continue;}
         await this.sleep(4);
       }
-      await this.reach(all,slots,info,false,started,batches.length,batches.length,true,true,{speed:file.runtimeSpeed??profile.defaultBenchSpeed,phase:'lift'});
+      // Final release accepts the song's half-travel criterion, then allows
+      // at most 200 ms for motion to settle before removing torque. No new
+      // target is issued: this is feedback slack, not expanded command travel.
+      const settleStarted=this.now();let previous=positions,stableFrames=0,settled=false;
+      while(this.now()-settleStarted<200){
+        this.check();
+        if(profile.keep&&this.now()-lastGoalAt>=900){const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('收尾保持未确认，已停止');lastGoalAt=this.now();}
+        await this.sleep(Math.min(20,200-(this.now()-settleStarted)));
+        positions=await this.positions(slots,+info.range);
+        if(info.bench_feedback==='1'&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('收尾已被安全释放，已停止');
+        if(info.bench_feedback!=='1'){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('收尾已被安全释放，已停止');}
+        stableFrames=positions.every((p,s)=>Math.abs(p-previous[s])<=profile.feedbackTolerance)?stableFrames+1:0;previous=positions;
+        this.progress({elapsed:this.now()-scoreStarted,rhythm:true,settling:true,positions,targets:[],pressedSlots:[],...this.feedbackStats()});
+        if(stableFrames>=2){settled=true;break;}
+      }
+      const settleElapsed=this.now()-settleStarted;
       await this.io.safe();this.feedbackArmedExpected=false;this.lastPositions=null;
       while(this.now()-scoreStarted<file.duration_ms){this.check();this.progress({elapsed:this.now()-scoreStarted,index,groupIndex:index,total:batches.length,rhythm:true,pressedSlots:[],tailRest:true,targets:[],...this.feedbackStats()});await this.sleep(Math.min(20,file.duration_ms-(this.now()-scoreStarted)));}
       const scoreElapsed=this.now()-scoreStarted;
-      return {completed:true,feedbackVerified:true,fullStroke:true,protocol:'rhythm-fullStroke-v1',duration_ms:file.duration_ms,score_elapsed_ms:scoreElapsed,elapsed_ms:this.now()-started,events:events.length,...this.feedbackStats()};
+      return {completed:true,feedbackVerified:true,fullStroke:true,minimumTravelFraction:.5,settled,settle_elapsed_ms:settleElapsed,protocol:'rhythm-fullStroke-v1',duration_ms:file.duration_ms,score_elapsed_ms:scoreElapsed,elapsed_ms:this.now()-started,events:events.length,...this.feedbackStats()};
     };
     try{return await Promise.race([execute(),new Promise((_,reject)=>{watchdog=setTimeout(()=>{this.cancelled=true;this.generation++;this.io.safe().catch(()=>{});reject(Error('节奏展示超过10秒，已停止'));},Math.max(1,10000-(this.now()-started)));})]);}finally{clearTimeout(watchdog);this.deadline=null;}
   }
@@ -4670,7 +4691,7 @@ class StrictActionExecutor{
   }
   async runSpeedTest(options,roles,onProgress=()=>{}){
     if(this.active||this.pending)throw Error('已有动作正在执行或正在停止');
-    const selected=options?.slots??[1,2,3,4,5],requestedAmplitudes=options?.amplitudes,amplitudes=requestedAmplitudes??[1],cycles=options?.cycles??3;
+    const selected=options?.slots??[1,2,3,4,5],requestedAmplitudes=options?.amplitudes,amplitudes=requestedAmplitudes??[.2,.4,.6,.8,1],cycles=options?.cycles??3;
     if(!Array.isArray(selected)||!selected.length||selected.some(s=>!Number.isInteger(s)||s<1||s>5)||new Set(selected).size!==selected.length||!Array.isArray(amplitudes)||!amplitudes.length||amplitudes.some(a=>!Number.isFinite(a)||a<=0||a>1)||!Number.isInteger(cycles)||cycles<2||cycles>10)throw Error('测速参数无效');
     this.active=true;this.cancelled=false;this.deadline=null;this.feedbackMetrics=null;this.lastPositions=null;this.feedbackRetries=0;this.feedbackArmedExpected=false;this.generation++;const results=[];
     try{
@@ -4678,7 +4699,7 @@ class StrictActionExecutor{
       const initial=actionKV((await this.command('RATE')).find(l=>l.startsWith('OK RATE ')));if(initial.active!=='0')throw Error('先停止当前测速');
       if(info.profile==='SCS'||info.bench_sts==='1')return await this.runFeedbackSpeedTest({selected,amplitudes,cycles,speed:options?.speed},slots,info,onProgress);
       throw Error('请更新支持STS归一化同步控制的固件');
-      if(requestedAmplitudes===undefined)amplitudes.splice(0,amplitudes.length,.25,.5,1);
+      if(requestedAmplitudes===undefined)amplitudes.splice(0,amplitudes.length,.2,.4,.6,.8,1);
       const mask='0x'+selected.reduce((m,s)=>m|(1<<s),0).toString(16);
       for(const amplitude of amplitudes){
         await this.command('RATE '+mask+' 0 30 '+Math.round(amplitude*100)+' '+cycles);
@@ -4699,7 +4720,7 @@ class StrictActionExecutor{
     const execute=async()=>{
       await this.command('ARM');if(actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO '))).armed!=='1')throw Error('使能未确认');
       for(const amplitude of amplitudes){
-        this.check();const scaled=base.map(slot=>({...slot,press:Math.round(slot.lift+(slot.press-slot.lift)*amplitude),measurementTolerance:amplitude<1?Math.max(profile.feedbackTolerance,Math.min(profile.tolerance,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):profile.tolerance}));
+        this.check();const scaled=base.map(slot=>{const center=(slot.lift+slot.press)/2,lift=Math.round(center+(slot.lift-center)*amplitude),press=Math.round(center+(slot.press-center)*amplitude);return {...slot,lift,rest:lift,press,measurementTolerance:amplitude<1?Math.max(profile.feedbackTolerance,Math.min(profile.tolerance,Math.floor(Math.abs(slot.press-slot.lift)*amplitude*.25))):profile.tolerance};});
         if(scaled.some((slot,index)=>selected.includes(index)&&!slot.holdMidpoint&&Math.abs(slot.press-slot.lift)<profile.feedbackTolerance*2))throw Error('测速幅度过小，无法区分反馈噪声');
         const group=selected.map(slot=>({slot,amplitude:1})),cfg={speed,scaledTolerance:true};
         await this.reach([{slot:0,amplitude:1},...group],scaled,info,false,started,0,cycles,true,true,{...cfg,phase:'lift'});
@@ -4723,10 +4744,10 @@ class StrictActionExecutor{
       for(let slot=0;slot<6;slot++){const check=checks.find(r=>+r.slot===slot),row=rows.find(r=>+r.slot===slot),low=+check?.min,high=+check?.max;
         if(!check||+check.id!==slots[slot].id||check.ok!=='1'||check.torque!=='0'||!Number.isInteger(low)||!Number.isInteger(high)||low<0||high>+info.range||low>=high)throw Error('ID '+slots[slot].id+' 的准备状态未确认，请保持手不动后再开始');
         const lo=Math.max(+row.min,low),hi=Math.min(+row.max,high);
-        const startTolerance=info.profile==='SCS'?Math.min(6,Math.floor((hi-lo)/4)):0;
+        const startTolerance=Math.min(info.profile==='SCS'?6:114,Math.floor((hi-lo)/4));
         if(lo>=hi||!Number.isInteger(+check.pos)||+check.pos<low||+check.pos>high||+check.pos<lo-startTolerance||+check.pos>hi+startTolerance)throw Error('ID '+slots[slot].id+' 当前超出可控制范围，请轻轻回到已标红行程内');
         if(slots[slot].rest<lo||slots[slot].rest>hi)throw Error('ID '+slots[slot].id+' 自然放松位置超出硬件控制范围，需调整安装位置');
-        slots[slot].press=Math.max(lo,Math.min(hi,slots[slot].press));slots[slot].low=lo;slots[slot].high=hi;
+        slots[slot].press=Math.max(lo,Math.min(hi,slots[slot].press));slots[slot].low=lo;slots[slot].high=hi;slots[slot].hardwareLow=low;slots[slot].hardwareHigh=high;slots[slot].tolerance=startTolerance;
       }
       await this.positions(slots,+info.range);
       return {info,slots};
@@ -4741,7 +4762,7 @@ class StrictActionExecutor{
       if(attempt===1||state.armed==='0')throw Error('位置反馈丢失，已停止');
       this.feedbackRetries=(this.feedbackRetries??0)+1;retries++;this.check();
     }
-    positions.forEach((p,s)=>{if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
+    positions.forEach((p,s)=>{if(p<(slots[s].hardwareLow??0)||p>(slots[s].hardwareHigh??range))throw Error('ID '+slots[s].id+' 反馈越出硬件范围，已停止');if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
     Object.defineProperties(positions,{armed:{value:state.armed},bench_active:{value:state.bench_active},retries:{value:retries}});this.lastPositions={positions,at:this.now()};
     if(this.feedbackMetrics)this.feedbackMetrics.samples++;
     return positions;
@@ -4755,7 +4776,7 @@ class StrictActionExecutor{
     if(bench&&(!Number.isInteger(speed)||speed<profile.speedMin||speed>profile.speedMax))throw Error('台架档位无效');
     for(const event of group){const s=event.slot,a=event.amplitude??1;if(!Number.isFinite(a)||a<=0||a>1)throw Error('动作幅度无效');const pos=slots[s].holdMidpoint?(slots[s].holdPosition??slots[s].midpoint):phase==='lift'?slots[s].lift:phase==='midpoint'?slots[s].midpoint:on?Math.round(slots[s].rest+(slots[s].press-slots[s].rest)*a):slots[s].rest;
       if(!Number.isInteger(pos)||pos<slots[s].low||pos>slots[s].high)throw Error('动作目标超出校准范围');
-      const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
+      const travel=Math.abs(before[s]-pos),tolerance=bench&&scaledTolerance&&phase!=='midpoint'&&!slots[s].holdMidpoint?(slots[s].measurementTolerance??profile.tolerance):profile.tolerance;
       if(goals.has(s))throw Error('同一动作槽位重复');goals.set(s,{pos,tolerance,at:null,travel,timeout:bench?(profile.keep?Math.min(20000,Math.max(1200,travel/speed*1000+1000)):1000):Math.min(6000,Math.max(1200,travel/speed*1000+1000))});}
     if(modern&&before.armed!=='1')throw Error('台架已释放，停止当前档位');
     if(bench&&!modern){const state=actionKV((await this.command('INFO')).find(l=>l.startsWith('OK INFO ')));if(state.armed!=='1')throw Error('台架已释放，停止当前档位');}
@@ -4992,6 +5013,6 @@ window.pianoFirmwareBusy=locked;setInterval(()=>{render();refresh();},1500);refr
 </script>
 <!-- END MAIN_CONTROLLER_FIRMWARE -->
 
-<link rel="stylesheet" href="/delivery-shell.css"><script src="/delivery-shell.js"></script><script src="/delivery-demo.js"></script><link rel="stylesheet" href="/delivery-mount.css"><script src="/delivery-mount.js"></script><link rel="stylesheet" href="/delivery-validation.css"><script src="/delivery-validation.js"></script>
+<link rel="stylesheet" href="/delivery-shell.css"><script src="/delivery-shell.js"></script><link rel="stylesheet" href="/delivery-speed-chart.css"><script src="/delivery-speed-chart.js"></script><script src="/delivery-demo.js"></script><link rel="stylesheet" href="/delivery-mount.css"><script src="/delivery-mount.js"></script><link rel="stylesheet" href="/delivery-validation.css"><script src="/delivery-validation.js"></script>
 </body>
 </html>
