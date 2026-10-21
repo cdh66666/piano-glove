@@ -13,6 +13,35 @@ struct EnrollFlow {
  void fail(){phase=FAILED;from=to=0;}
  void conflict(const char *why="bus_conflict"){phase=CONFLICT;from=to=0;reason=why;}
  void transition(Phase p){phase=p;stable=0;missingScans=0;previous=0xffffffff;}
+ // Temporary addresses encode physical slot order, so recovery also works
+ // after USB reset. Persisted temporary mappings are a lower bound: a missed
+ // reply must never make a previously assigned slot available for reuse.
+ bool resume(uint32_t seen,uint32_t requiredStages=0){
+  if(!seen||(seen&~0x1ffffeul))return false;
+  EnrollFlow restored;restored.expected=seen;
+  bool complete=true,staged=false;uint8_t finalized=0;
+  for(uint8_t s=0;s<6;++s){
+   const bool low=seen&(1ul<<(s+1)),high=seen&(1ul<<(20-s));
+   if(low==high||(low&&staged)){complete=false;break;}
+   if(high)staged=true;else ++finalized;
+  }
+  const uint32_t slotAddresses=0x1f807eul;
+  if(complete&&!(seen&~slotAddresses)){
+   restored.count=6;restored.next=6;restored.finalSlot=finalized;
+   restored.phase=finalized==6?DONE:WAIT_NEXT;
+  }else{
+   uint32_t prefix=0;uint8_t n=0;
+   while(n<6&&(seen&(1ul<<(20-n)))){prefix|=1ul<<(20-n);++n;}
+   if((seen&requiredStages)!=requiredStages)return false;
+   const uint32_t added=seen&~prefix;
+   if((seen&0x1f8000ul)!=prefix||(added&&(added&(added-1)))||(n==6&&added))return false;
+   // A lone ordinary address can be the pending, not-yet-renamed servo.
+   if(added&~0x7ffeul)return false;
+   restored.count=n;restored.next=n<6?n+1:6;restored.expected=prefix;
+   restored.phase=n?WAIT_NEXT:WAIT_FIRST;
+  }
+  *this=restored;return true;
+ }
  bool finalize(){slot=finalSlot;from=20-finalSlot;to=1+finalSlot;expected=(expected&~(1ul<<from))|(1ul<<to);transition(VERIFY_FINAL);return true;}
  bool observe(uint32_t seen,uint32_t nowMs=0){
   from=to=0;lastSeen=seen;lastExpected=expected;if(!active())return false;
@@ -33,6 +62,7 @@ struct EnrollFlow {
   }
   stable=seen==previous?uint8_t(stable+1):1;previous=seen;if(stable<2)return false;
   if(phase==WAIT_EMPTY){transition(WAIT_FIRST);return false;}
+  if(phase==WAIT_NEXT&&count==6)return finalize();
   if(phase==VERIFY_FINAL){if(++finalSlot<6)return finalize();transition(DONE);return false;}
   if(phase==VERIFY_ASSIGN){++count;next=count<6?count+1:6;if(count==6)return finalize();transition(WAIT_NEXT);return false;}
   if(!added){stable=0;return false;}

@@ -1,1 +1,4 @@
-pyserial>=3.5
+pyserial==3.5
+pypdfium2==5.13.0
+pypdf==6.18.1
+Pillow==12.3.0

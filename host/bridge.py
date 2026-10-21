@@ -53,6 +53,8 @@ from firmware_flash import FirmwareManager, exclusive
 from calibration_recordings import save_recording, read_recording
 
 import argparse
+import base64
+import tempfile
 import json
 import os
 import re
@@ -594,6 +596,8 @@ class Bridge(object):
                     terminal = "SCAN_END"
                 elif command_words[:2] == ["ARM", "CHECK"]:
                     terminal = "OK ARM CHECK"
+                elif command_name == 'LIB' and len(command_words) > 1:
+                    terminal = 'OK LIB ' + command_words[1]
                 if terminal:
                     complete = any(line == terminal or line.startswith(terminal + " ") or
                                    line.startswith("ERR ") for line in got)
@@ -665,7 +669,421 @@ def peer_console_url(current_http_port, target):
     return None
 
 
+class SoftwareConsole:
+    """USB adapter for the same curve-library endpoints served by the glove AP."""
+    def __init__(self, bridge):
+        self.bridge = bridge
+        self.lock = threading.RLock()
+        self.chunk_max = 96
+        self.upload_session = None
+        self.controller_id = None
+        self.control_revision = 0
+        from score_sources import ScoreSources
+        self.sources = ScoreSources()
+
+    @staticmethod
+    def fields(line):
+        out = {}
+        for key, value in re.findall(r'([a-z_]+)=([^ ]+)', line):
+            if key not in ('hex', 'title_hex') and re.fullmatch(r'-?\d+', value): value = int(value)
+            out[key] = value
+        if 'title_hex' in out:
+            out['title'] = bytes.fromhex(str(out.pop('title_hex'))).decode('utf-8')
+        return out
+
+    def command(self, cmd, timeout=3000):
+        if self.bridge.firmware.serialExclusive:
+            raise RuntimeError('正在烧录，请等待完成')
+        r = self.bridge.send(cmd, timeout_ms=timeout, quiet_ms=25)
+        lines = r.get('lines', [])
+        errors = [line for line in lines if line.startswith('ERR ')]
+        if not r.get('ok') or errors or not any(line.startswith('OK ' + cmd.split()[0] + ' ' + cmd.split()[1]) for line in lines):
+            raise RuntimeError(errors[0] if errors else r.get('error') or '设备没有确认：' + cmd)
+        return lines
+
+    def library(self):
+        with self.lock:
+            info = self.command('LIB INFO')
+            capacity = self.fields(next(line for line in info if line.startswith('OK LIB INFO')))
+            announced = capacity.get('chunk_max')
+            self.chunk_max = announced if type(announced) is int and 1 <= announced <= 384 else 96
+            listing = self.command('LIB LIST', 6000)
+        slots = [self.fields(line) for line in listing if line.startswith('LIB_ITEM ')]
+        return {'ok': True, 'capacity': capacity, 'slots': slots}
+
+    def status(self):
+        result = self.bridge.status()
+        result.update(upload_protocol='chunks-v1', upload_chunk_max=self.chunk_max,
+                      upload_active=self.upload_session is not None, controller_id=self.controller_id or '')
+        result.update(score_clock=None, calibration_advisory=None)
+        if result.get('connected'):
+            r = self.bridge.send('INFO', timeout_ms=3000, quiet_ms=25)
+            result['device_info'] = ' '.join(r.get('lines', []))
+            info = self.fields(result['device_info'])
+            result['software_ready'] = info.get('software_protocol') == 1
+            result['calibration_ready'] = info.get('calibrated') == 1
+            result['motion_busy'] = info.get('auto_active') == 1 or info.get('enroll_active') == 1
+            result['motion_ready'] = bool(result['software_ready'] and result['calibration_ready'] and info.get('online') == 6
+                                          and not result['motion_busy'] and self.upload_session is None)
+            if result['software_ready']:
+                library_info = self.command('LIB INFO')
+                capabilities = self.fields(next(line for line in library_info if line.startswith('OK LIB INFO')))
+                if capabilities.get('score_clock') == 'continuous-v1':
+                    result['score_clock'] = 'continuous-v1'
+                if capabilities.get('calibration_advisory') in (0, 1):
+                    result['calibration_advisory'] = bool(capabilities['calibration_advisory'])
+        else:
+            result.update(software_ready=False, calibration_ready=False, motion_busy=False, motion_ready=False)
+        return result
+
+    def state(self):
+        # KEEP and read-only STATE must remain available during a long transfer.
+        revision = self.control_revision
+        lines = self.command('LIB STATE')
+        for line in lines:
+            if line.startswith('LIB_STATE '):
+                value = json.loads(line[len('LIB_STATE '):])
+                if not isinstance(value, dict): raise ValueError('设备状态格式不正确')
+                result = dict(ok=True, **self.expand_state(value))
+                break
+        else:
+            result = dict(ok=True, **self.fields(next(line for line in lines if line.startswith('OK LIB STATE'))))
+        with self.lock:
+            if revision == self.control_revision and (result.get('active') is False or result.get('active') == 0):
+                self.controller_id = None
+            result['controller_id'] = self.controller_id or ''
+        return result
+
+    def portal(self):
+        lines = self.command('LIB PORTAL')
+        for line in lines:
+            if line.startswith('LIB_PORTAL '):
+                value=json.loads(line[len('LIB_PORTAL '):])
+                if not isinstance(value,dict):raise ValueError('热点诊断格式不正确')
+                return dict(ok=True,**value)
+        raise ValueError('未读到热点诊断')
+
+    def release_usb(self):
+        """Release PC control without cancelling the phone's independent run."""
+        with self.lock:
+            lines = self.command('LIB INFO')
+            info = self.fields(next(line for line in lines if line.startswith('OK LIB INFO')))
+            if info.get('release_usb') == 1:
+                lines = self.command('LIB RELEASE')
+                result = self.fields(next(line for line in lines if line.startswith('OK LIB RELEASE')))
+                return {'ok': True, 'skipped': result.get('skipped') == 1, 'lines': lines}
+            # Compatibility with earlier software firmware. The new command
+            # closes the check/stop race; old firmware can only be checked.
+            current = self.state()
+            if (current.get('owner') == 'wifi' or
+                    (current.get('active') and current.get('owner') != 'usb')):
+                return {'ok': True, 'skipped': True, 'lines': []}
+            lines = self.command('LIB STOP')
+            reply = self.bridge.send('SAFE', timeout_ms=1000, quiet_ms=25)
+            safe_lines = reply.get('lines', [])
+            if (not reply.get('ok') or any(line.startswith('ERR ') for line in safe_lines) or
+                    not any(line.startswith('OK SAFE') for line in safe_lines)):
+                raise RuntimeError('设备未确认电脑控制已释放')
+            return {'ok': True, 'skipped': False, 'lines': lines + safe_lines}
+
+    @staticmethod
+    def expand_state(value):
+        """Expand compact serial STATE v1 without changing the public HTTP schema.
+
+        Ages are the firmware's actual per-register timestamps, never inferred
+        from the host request time or filled with a false zero-age sample.
+        """
+        if 'v' not in value:
+            return value
+        if type(value.get('v')) is not int or value['v'] != 1:
+            raise ValueError('设备状态协议版本不支持')
+        def integer(key):
+            result = value.get(key)
+            if type(result) is not int:
+                raise ValueError('设备状态字段不正确：' + key)
+            return result
+        def choice(key, choices):
+            result = integer(key)
+            if result not in choices:
+                raise ValueError('设备状态字段超出范围：' + key)
+            return choices[result]
+        def text(key):
+            result = value.get(key)
+            if not isinstance(result, str):
+                raise ValueError('设备状态文字字段不正确：' + key)
+            return result
+        scs = choice('p', {0: False, 1: True})
+        result = {
+            'active': choice('a', {0:False, 1:True}),
+            'initializing': choice('i', {0:False, 1:True}),
+            'mode': choice('m', {0:'score', 1:'train', 2:'pattern'}),
+            'owner': choice('o', {0:'none', 1:'usb', 2:'wifi'}),
+            'hold_variable': choice('r', {0:False, 1:True}),
+            'test_mode': choice('x', {0:'NORMAL', 1:'OFFHAND'}),
+            'model': 'SC09' if scs else 'STS3032-C001',
+            'hold_adjustable': not scs,
+            'piano_ids': [2,3,4,5,6], 'thumb_pose_id': 1,
+            'direction_source': 'fixed_model',
+            'press_directions': ['min'] * 6,
+            'error': text('e'), 'last_stop_reason': text('l'),
+        }
+        for compact, full in (
+            ('s','slot'),('t','elapsed_ms'),('d','duration_ms'),('q','tempo'),
+            ('k','mask'),('h','hold'),('z','recovery_mask'),('la','last_stop_at_ms'),
+            ('pa','last_prepare_ms'),('pm','last_pose_ms'),('ts','device_ms'),('mm','moving_mask')):
+            result[full] = integer(compact)
+        encoder_range = value.get('er', 1023 if scs else 4095)
+        if type(encoder_range) is not int or not 1 <= encoder_range <= 65535:
+            raise ValueError('设备编码器范围不正确')
+        result['encoder_range'] = encoder_range
+        for compact, full, maximum in (('pt','pattern',2), ('ps','pattern_step',800), ('pc','pattern_total',800)):
+            number = value.get(compact)
+            if number is not None and (type(number) is not int or not 0 <= number <= maximum):
+                raise ValueError('设备训练字段不正确：' + compact)
+            result[full] = number
+        fastest = value.get('pf')
+        if fastest is not None and (type(fastest) is not int or fastest not in (0,1)):
+            raise ValueError('设备最快训练状态不正确')
+        result['fastest'] = None if fastest is None else bool(fastest)
+        if result['pattern_step'] is not None and result['pattern_total'] is not None and result['pattern_step'] > result['pattern_total']:
+            raise ValueError('设备训练步数超出总数')
+        # These values belong to the device's virtual score clock. Old packets
+        # do not claim that clock is running or that its next boundary is zero.
+        result['clock_paused'] = choice('cp', {0:False,1:True}) if 'cp' in value else None
+        result['score_clock'] = choice('ct', {0:None, 1:'continuous-v1'}) if 'ct' in value else None
+        result['calibration_advisory'] = choice('ca', {0:False, 1:True}) if 'ca' in value else None
+        if 'cl' in value:
+            clock_limit = integer('cl')
+            if not -1 <= clock_limit <= 86400000:
+                raise ValueError('设备曲谱时钟边界不正确')
+            result['clock_limit_ms'] = None if clock_limit == -1 else clock_limit
+        else:
+            result['clock_limit_ms'] = None
+        for compact, full in (('si','score_index'), ('sn','score_total')):
+            if compact in value:
+                count = integer(compact)
+                if not 0 <= count <= 60000:
+                    raise ValueError('设备曲谱事件计数不正确：' + compact)
+                result[full] = count
+            else:
+                result[full] = None
+        if result['score_index'] is not None and result['score_total'] is not None and result['score_index'] > result['score_total']:
+            raise ValueError('设备曲谱已提交事件数超出总数')
+        bounds = value.get('b')
+        if bounds is not None and (not isinstance(bounds, list) or len(bounds) != 6):
+            raise ValueError('设备行程范围必须包含六台舵机')
+        rows = value.get('f')
+        valid_positions = value.get('pv')
+        if valid_positions is not None and (type(valid_positions) is not int or not 0 <= valid_positions <= 63):
+            raise ValueError('设备位置有效性掩码不正确')
+        if not isinstance(rows, list) or len(rows) != 6:
+            raise ValueError('设备反馈必须包含六台舵机')
+        result['feedback'] = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, list) or len(row) != 9 or any(type(x) is not int for x in row) or row[8] not in (0,1):
+                raise ValueError('设备舵机反馈格式不正确')
+            calibrated = minimum = maximum = allowed_minimum = allowed_maximum = None
+            if bounds is not None:
+                bound = bounds[index]
+                if (not isinstance(bound, list) or len(bound) != 4 or any(type(x) is not int for x in bound)
+                    or bound[3] not in (0,1) or not 0 <= bound[2] <= encoder_range
+                    or not 0 <= bound[0] <= encoder_range or not 0 <= bound[1] <= encoder_range):
+                    raise ValueError('设备舵机行程范围格式不正确')
+                calibrated = bool(bound[3])
+                if calibrated:
+                    if bound[0] >= bound[1]:
+                        raise ValueError('设备有效行程范围须按小到大')
+                    minimum, maximum = bound[:2]
+                    allowed_minimum = max(0, minimum - bound[2])
+                    allowed_maximum = min(encoder_range, maximum + bound[2])
+            result['feedback'].append(dict(
+                id=index+1, position=row[0], target=row[1],
+                min=minimum, max=maximum, allowed_min=allowed_minimum, allowed_max=allowed_maximum,
+                calibration_valid=calibrated,
+                sample_age_ms=row[2], position_age_ms=row[2], voltage_raw=row[3],
+                temperature=row[4], current_raw=row[5], hold_limit=row[6],
+                health_age_ms=row[7], health_valid=bool(row[8]),
+                pos_valid=None if valid_positions is None else bool(valid_positions & (1 << index)),
+                position_valid=None if valid_positions is None else bool(valid_positions & (1 << index)),
+                position_sample_ms=(result['device_ms'] - row[2]) & 0xffffffff))
+        return result
+
+    def score(self, slot):
+        slot = self.number(slot, 1, 100, '曲目位置')
+        from score_codec import decode
+        with self.lock:
+            lines = self.command('LIB READ %d' % slot, 15000)
+        blob = bytes.fromhex(''.join(self.fields(line)['hex'] for line in lines if line.startswith('LIB_DATA ')))
+        return dict(ok=True, base64=base64.b64encode(blob).decode('ascii'),
+                    source_preview=self.sources.lookup(blob), **decode(blob))
+
+    @staticmethod
+    def number(value, lo, hi, label):
+        if isinstance(value, bool) or not re.fullmatch(r'\d+', str(value)) or not lo <= int(value) <= hi:
+            raise ValueError(label + '超出范围')
+        return int(value)
+
+    @staticmethod
+    def controller(value):
+        if value is None or value == '':
+            return ''
+        if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', value):
+            raise ValueError('controller_token_invalid')
+        return value
+
+    def _upload_owned(self, controller):
+        session = self.upload_session
+        if session is None:
+            raise RuntimeError('upload_not_started')
+        if session['controller'] != self.controller(controller):
+            raise RuntimeError('controller_mismatch')
+        if time.monotonic() - session['updated'] > 30:
+            try:
+                self.command('LIB ABORT')
+            finally:
+                self.upload_session = None
+            raise RuntimeError('upload_timeout')
+        return session
+
+    def begin_upload(self, slot, size, controller=None):
+        slot = self.number(slot, 1, 100, '曲目位置')
+        size = self.number(size, 144, 960128, '曲谱大小')
+        if (size - 128) % 16:
+            raise ValueError('曲谱文件大小不正确')
+        owner = self.controller(controller)
+        with self.lock:
+            if self.upload_session is not None:
+                if time.monotonic() - self.upload_session['updated'] <= 30:
+                    raise RuntimeError('upload_active_finish_or_abort_first')
+                self.command('LIB ABORT')
+                self.upload_session = None
+            self.command('LIB BEGIN %d %d' % (slot, size))
+            self.upload_session = dict(slot=slot, expected=size, data=bytearray(), controller=owner, updated=time.monotonic())
+        return dict(ok=True, slot=slot, bytes=size, chunk_max=self.chunk_max)
+
+    def upload_chunk(self, blob, controller=None):
+        if not isinstance(blob, (bytes, bytearray)) or not 1 <= len(blob) <= self.chunk_max:
+            raise ValueError('upload_chunk_size_invalid')
+        with self.lock:
+            session = self._upload_owned(controller)
+            if len(session['data']) + len(blob) > session['expected']:
+                raise ValueError('upload_chunk_exceeds_total')
+            self.command('LIB CHUNK ' + blob.hex())
+            session['data'].extend(blob)
+            session['updated'] = time.monotonic()
+            return dict(ok=True, received=len(session['data']), total=session['expected'])
+
+    def commit_upload(self, controller=None):
+        from score_codec import decode
+        with self.lock:
+            session = self._upload_owned(controller)
+            if len(session['data']) != session['expected']:
+                raise ValueError('upload_incomplete')
+            try:
+                score = decode(session['data'])
+                self.command('LIB COMMIT', 15000)
+            except Exception:
+                try:
+                    self.command('LIB ABORT')
+                except Exception:
+                    pass
+                self.upload_session = None
+                raise
+            self.upload_session = None
+            return dict(ok=True, slot=session['slot'], bytes=session['expected'], title=score['title'])
+
+    def abort_upload(self, controller=None):
+        with self.lock:
+            if self.upload_session is None:
+                return dict(ok=True)
+            self._upload_owned(controller)
+            self.command('LIB ABORT')
+            self.upload_session = None
+            return dict(ok=True)
+
+    def upload(self, slot, blob, controller=None):
+        from score_codec import decode
+        slot = self.number(slot, 1, 100, '曲目位置')
+        score = decode(blob)
+        with self.lock:
+            self.begin_upload(slot, len(blob), controller)
+            try:
+                for offset in range(0, len(blob), self.chunk_max):
+                    self.upload_chunk(blob[offset:offset + self.chunk_max], controller)
+                self.commit_upload(controller)
+            except Exception:
+                try: self.abort_upload(controller)
+                except Exception: pass
+                raise
+        return {'ok': True, 'slot': slot, 'bytes': len(blob), 'title': score['title']}
+
+    def action(self, action, b, controller=None):
+        if action == 'play':
+            cmd = 'LIB PLAY %d %d %d %d' % (self.number(b.get('slot'),1,100,'曲目位置'), self.number(b.get('tempo',100),50,1000,'速度'), self.number(b.get('amplitude',100),1,100,'幅度'), self.number(b.get('hold',100),0,100,'保持阻力'))
+        elif action == 'train':
+            cmd = 'LIB TRAIN %d %d %d' % (self.number(b.get('mask'),0,31,'手指组合'), self.number(b.get('hold',50),0,100,'保持阻力'), self.number(b.get('amplitude',100),1,100,'幅度'))
+        elif action == 'pattern':
+            rate = self.number(b.get('tempo',0),0,1000,'训练速度')
+            if rate and rate < 50:
+                raise ValueError('训练速度须为最快0或50至1000')
+            cmd = 'LIB PATTERN %d %d %d %d %d' % (
+                self.number(b.get('pattern'),0,2,'训练方式'), self.number(b.get('repeats',3),1,20,'重复次数'),
+                rate, self.number(b.get('amplitude',100),1,100,'幅度'), self.number(b.get('hold',50),0,100,'保持阻力'))
+        elif action == 'tempo': cmd = 'LIB TEMPO %d' % self.number(b.get('tempo'),50,1000,'速度')
+        elif action == 'delete': cmd = 'LIB DELETE %d' % self.number(b.get('slot'),1,100,'曲目位置')
+        elif action in ('stop','keep'): cmd = 'LIB ' + action.upper()
+        else: raise ValueError('未知操作')
+        owner = self.controller(controller)
+        with self.lock:
+            if action == 'stop' and b.get('scope') == 'owned':
+                # Preparation, delayed errors and pagehide release only this
+                # document's live USB run. A phone's independent run must not
+                # be cancelled by the legacy global serial STOP command.
+                current = self.state()
+                if (self.controller_id != owner or not current.get('active') or
+                        current.get('owner') != 'usb'):
+                    return {'ok': True, 'skipped': True, 'lines': []}
+                result = self.release_usb()
+                self.control_revision += 1
+                self.controller_id = None
+                return result
+            if self.controller_id is not None and self.controller_id != owner:
+                # Re-read only when another tab claims an occupied session;
+                # a completed device run must not leave a permanent UI lock.
+                self.state()
+                if self.controller_id is not None:
+                    raise RuntimeError('controller_mismatch')
+            if self.upload_session is not None and action not in ('stop','keep'):
+                raise RuntimeError('upload_active_finish_or_abort_first')
+            lines = self.command(cmd)
+            if action in ('play','train','pattern'):
+                self.control_revision += 1
+                self.controller_id = owner
+            elif action == 'stop':
+                self.control_revision += 1
+                self.controller_id = None
+            return {'ok': True, 'lines': lines}
+
+    def convert(self, b):
+        from score_converter import recognize_pdf
+        name = str(b.get('filename', ''))
+        if not name.lower().endswith('.pdf'): raise ValueError('请选择PDF曲谱')
+        data = base64.b64decode(b.get('base64',''), validate=True)
+        if len(data) > 64 * 1024 * 1024 or not data.startswith(b'%PDF-'): raise ValueError('PDF文件不正确或超过64MB')
+        bpm = self.number(b.get('bpm',120),10,240,'每分钟拍数')
+        with tempfile.TemporaryDirectory(prefix='piano-score-') as root:
+            path = os.path.join(root, os.path.basename(name))
+            with open(path,'wb') as f: f.write(data)
+            project = recognize_pdf(path, bpm=bpm)
+            from pdf_preview import render_pdf_pages
+            project['page_previews'] = render_pdf_pages(path)
+            if re.fullmatch(r'[0-9a-f]{64}', str(project.get('source_sha256', ''))):
+                self.sources.record_document(project['source_sha256'], project['page_previews'], project.get('pages'))
+        return {'ok': True, 'project': project}
+
+
 def make_handler(bridge):
+    software = SoftwareConsole(bridge)
     class Handler(BaseHTTPRequestHandler):
         server_version = "piano-glove-bridge"
         protocol_version = "HTTP/1.1"
@@ -711,7 +1129,7 @@ def make_handler(bridge):
                 self.send_header("Access-Control-Allow-Origin", org)
                 self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Piano-Controller")
             self.send_header("Access-Control-Max-Age", "600")
 
         def do_OPTIONS(self):
@@ -749,6 +1167,30 @@ def make_handler(bridge):
                 return self._json({"ok": False, "error": "跨站请求被拒绝"}, 403)
             u = urlparse(self.path)
             q = parse_qs(u.query)
+            source_match = re.fullmatch(r'/api/software/source/([0-9a-f]{64})/(\d+)', u.path)
+            if source_match:
+                try:
+                    body = software.sources.image(source_match[1], int(source_match[2]))
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'image/png')
+                    self.send_header('Content-Length', str(len(body)))
+                    self.send_header('Cache-Control', 'private, max-age=3600')
+                    self.end_headers()
+                    return self.wfile.write(body)
+                except (ValueError, FileNotFoundError):
+                    return self._json({'ok':False, 'error':'原谱预览不存在'},404)
+            if u.path == '/api/software/status':
+                try: return self._json(software.status())
+                except Exception as e: return self._json({'ok':False,'error':str(e)},409)
+            if u.path == '/api/portal':
+                try:return self._json(software.portal())
+                except Exception as e:return self._json({'ok':False,'error':str(e)},409)
+            if u.path in ('/api/library', '/api/state', '/api/score'):
+                try:
+                    result = software.library() if u.path == '/api/library' else software.score((q.get('slot') or ['0'])[0]) if u.path == '/api/score' else software.state()
+                    return self._json(result)
+                except Exception as e:
+                    return self._json({'ok': False, 'error': str(e)}, 409)
             if u.path == "/api/calibration/recording":
                 try:
                     return self._json(read_recording((q.get("id") or [""])[0], root=bridge.recording_root))
@@ -779,8 +1221,70 @@ def make_handler(bridge):
             if not self._origin_ok():
                 return self._json({"ok": False, "error": "跨站请求被拒绝"}, 403)
             u = urlparse(self.path)
+            if u.path in ('/api/upload/begin', '/api/upload/chunk', '/api/upload/commit', '/api/upload/abort'):
+                try:
+                    size = int(self.headers.get('Content-Length') or 0)
+                    if not 0 <= size <= (384 if u.path.endswith('/chunk') else 4096):
+                        raise ValueError('upload_request_too_large')
+                    raw = self.rfile.read(size)
+                    body = {} if u.path.endswith('/chunk') else (json.loads(raw) if 'application/json' in (self.headers.get('Content-Type') or '') else {k:v[0] for k,v in parse_qs(raw.decode('utf-8')).items()})
+                    controller = self.headers.get('X-Piano-Controller') or body.get('controller')
+                    if u.path.endswith('/begin'):
+                        result = software.begin_upload(body.get('slot'), body.get('bytes'), controller)
+                    elif u.path.endswith('/chunk'):
+                        result = software.upload_chunk(raw, controller)
+                    elif u.path.endswith('/commit'):
+                        result = software.commit_upload(controller)
+                    else:
+                        result = software.abort_upload(controller)
+                    return self._json(result)
+                except Exception as e:
+                    return self._json({'ok':False,'error':str(e)},409)
+            if u.path == '/api/upload':
+                try:
+                    n = int(self.headers.get('Content-Length') or 0)
+                    if not 128 <= n <= 960128:
+                        raise ValueError('曲谱文件大小不正确')
+                    slot = int((parse_qs(u.query).get('slot') or ['0'])[0])
+                    return self._json(software.upload(slot, self.rfile.read(n), self.headers.get('X-Piano-Controller')))
+                except Exception as e:
+                    return self._json({'ok': False, 'error': str(e)}, 400)
+            if u.path in ('/api/play', '/api/train', '/api/pattern', '/api/tempo', '/api/stop', '/api/keep', '/api/delete'):
+                try:
+                    n = int(self.headers.get('Content-Length') or 0)
+                    if n > 4096: raise ValueError('请求过大')
+                    raw = self.rfile.read(n).decode('utf-8')
+                    b = json.loads(raw) if 'application/json' in (self.headers.get('Content-Type') or '') else {k:v[0] for k,v in parse_qs(raw).items()}
+                    return self._json(software.action(u.path.rsplit('/', 1)[1], b,
+                        self.headers.get('X-Piano-Controller') or b.get('controller')))
+                except Exception as e:
+                    return self._json({'ok': False, 'error': str(e)}, 409)
             b = self._body()
             try:
+                if u.path == '/api/software/convert':
+                    try: return self._json(software.convert(b))
+                    except (ValueError, TypeError) as e: return self._json({'ok':False,'error':str(e)},400)
+                if u.path == '/api/software/export':
+                    from score_converter import export_reviewed
+                    from score_codec import encode
+                    try:
+                        score = export_reviewed(b.get('project'))
+                        blob = encode(score)
+                    except (ValueError, TypeError, AttributeError) as e: return self._json({'ok':False,'error':str(e)},400)
+                    associated = software.sources.associate(blob, b.get('project'), score)
+                    result = {'ok': True, 'base64': base64.b64encode(blob).decode('ascii'), 'bytes': len(blob),
+                              'source_preview_available':associated}
+                    if associated:
+                        try:
+                            package = software.sources.package(blob)
+                            if package is not None:
+                                result.update(package_base64=base64.b64encode(package).decode('ascii'),
+                                              package_extension='pglpack', package_bytes=len(package))
+                        except (ValueError, OSError) as error:
+                            # A valid compact score remains exportable if its
+                            # optional preview bundle exceeds the phone limit.
+                            result['package_error'] = str(error)
+                    return self._json(result)
                 if u.path in ("/api/firmware/build", "/api/firmware/flash"):
                     origin = self.headers.get("Origin")
                     port = self.server.server_address[1]

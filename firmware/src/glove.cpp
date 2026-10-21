@@ -1,6 +1,7 @@
 #include "glove.h"
 #include "cal_circle.h"
 #include "profile_limits.h"
+#include "library_targets.h"
 
 #include <Preferences.h>
 
@@ -463,21 +464,54 @@ bool inspectArmSlot(int s,ArmCheck &out){
 }
 // Measurement slack is separate from allowed command travel: never persist or
 // send an expanded endpoint. Feedback slack: 15% of the recorded span for both supported families.
+static bool g_libraryArm=false;
+static bool g_libraryOffhand=false;
+static bool g_librarySoftware=false;
+static uint8_t g_librarySoftwareSelected=0,g_librarySoftwareAmplitude=100;
+static int g_libraryPosition[SLOT_COUNT]={},g_libraryInitial[SLOT_COUNT]={},g_libraryHardwareLo[SLOT_COUNT]={},g_libraryHardwareHi[SLOT_COUNT]={};
 static int armFeedbackMargin(const Slot &sl){
  if((scs::profile().family!=scs::Family::SCS&&scs::profile().family!=scs::Family::STS)||sl.lo>sl.hi)return 0;
  const int span=sl.hi-sl.lo;
- return span*15/100;
+ const int margin=span*15/100;
+ const int tolerance=scs::profile().family==scs::Family::SCS?35:114;
+ return g_libraryArm?(margin>tolerance?margin:tolerance):margin;
 }
 static bool armFeedbackAllowed(const Slot &sl,int pos,int range){
  if(pos<0||pos>range)return false;
+ if(g_libraryArm&&(g_libraryOffhand||g_librarySoftware))return true; // Read-back hardware limits are still mandatory at every caller.
  if(calcircle::contains(sl.lo,sl.hi,pos,range))return true;
  const int tol=armFeedbackMargin(sl);
  return sl.lo<=sl.hi&&pos>=int(sl.lo)-tol&&pos<=int(sl.hi)+tol;
 }
 static int armCurrentGoal(const Slot &sl,int pos,int hardwareLo,int hardwareHi){
- const int lo=sl.lo>hardwareLo?sl.lo:hardwareLo,hi=sl.hi<hardwareHi?sl.hi:hardwareHi;
+ if(g_librarySoftware){
+  const int s=int(sl.id)-1;
+  return librarytargets::softwareTarget(s,scs::profile().family==scs::Family::SCS,sl.lo,sl.hi,hardwareLo,hardwareHi,
+                               s>0&&bool(g_librarySoftwareSelected&(1<<(s-1))),s==0?100:g_librarySoftwareAmplitude);
+ }
+ const int span=int(sl.hi)-sl.lo;
+ const int scsInset=span/4<6?span/4:6;
+ const int inset=g_libraryArm?(scs::profile().family==scs::Family::SCS?scsInset:span*5/100):0;
+ const int workingLo=int(sl.lo)+inset,workingHi=int(sl.hi)-inset;
+ const int lo=workingLo>hardwareLo?workingLo:hardwareLo,hi=workingHi<hardwareHi?workingHi:hardwareHi;
  if(lo>hi)return -1;
  return pos<lo?lo:(pos>hi?hi:pos);
+}
+static bool readArmFeedback(int s,scs::Feedback &fb,const char *stage){
+ const auto &sl=g_slot[s];
+ if(!g_libraryArm)return scs::readFeedback(sl.id,fb)&&!scs::lastError()&&fb.ok?true:armFail(stage,s);
+ int samples[3];for(int j=0;j<3;++j){
+  if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail(stage,s);
+  if(g_librarySoftware){
+   if(fb.pos<0||fb.pos>scs::profile().range||fb.pos<g_libraryHardwareLo[s]||fb.pos>g_libraryHardwareHi[s])return armFail("software_feedback_hardware_outside",s,fb.pos);
+   if(fb.temp>=65||fb.voltage<40||fb.voltage>65)return armFail("software_temperature_or_voltage",s,fb.voltage,fb.temp);
+  }
+  samples[j]=fb.pos;if(j<2)delay(1);
+ }
+ if(samples[0]>samples[1]){int v=samples[0];samples[0]=samples[1];samples[1]=v;}if(samples[1]>samples[2]){int v=samples[1];samples[1]=samples[2];samples[2]=v;}if(samples[0]>samples[1]){int v=samples[0];samples[0]=samples[1];samples[1]=v;}
+ const int tolerance=scs::profile().family==scs::Family::SCS?35:114;
+ if(!g_librarySoftware&&samples[1]-samples[0]>tolerance&&samples[2]-samples[1]>tolerance)return armFail("library_feedback_unstable",s,samples[2]-samples[0],tolerance);
+ fb.pos=samples[1];g_libraryPosition[s]=fb.pos;return true;
 }
 // Position commands may engage an SCS servo from passive mechanical slack.
 // Wait only for the existing goal: never send a corrective goal during settling.
@@ -485,9 +519,18 @@ static bool checkArmSettled(int s,int goal,int hardwareLo,int hardwareHi,bool wa
  const auto &sl=g_slot[s];const int range=scs::profile().range;const uint32_t started=millis();int consecutive=0;
  do{
   scs::Feedback fb;
-  if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail(readStage,s);
+  if(!readArmFeedback(s,fb,readStage))return false;
   if(!armFeedbackAllowed(sl,fb.pos,range)||fb.pos<hardwareLo||fb.pos>hardwareHi)return armFail(outsideStage,s,fb.pos,goal);
-  const bool within=abs(calcircle::delta(goal,fb.pos,range))<=scs::posTol();
+  if(g_librarySoftware)return true; // Arrival is advisory; do not wait or send recovery targets.
+  const int libraryMargin=armFeedbackMargin(sl);
+  const bool initialOutsideNormal=g_libraryInitial[s]<int(sl.lo)-libraryMargin||g_libraryInitial[s]>int(sl.hi)+libraryMargin;
+  if(g_libraryArm&&g_libraryOffhand&&initialOutsideNormal){
+   const int initialDistance=abs(goal-g_libraryInitial[s]);
+   if(abs(goal-fb.pos)>initialDistance+3)return armFail("library_recovery_moved_away",s,fb.pos,goal);
+   return true; // Non-wearing test recovery is monitored continuously by the library tick.
+  }
+  const int tolerance=g_libraryArm?(scs::profile().family==scs::Family::SCS?35:114):scs::posTol();
+  const bool within=abs(calcircle::delta(goal,fb.pos,range))<=tolerance;
   if(!wait)return within?true:armFail(movedStage,s,fb.pos,goal);
   consecutive=within?consecutive+1:0;
   if(consecutive>=2)return true;
@@ -500,6 +543,7 @@ static bool prepareArm(uint8_t mask,bool enable){
  const scs::Profile &pf=scs::profile();const bool big=pf.family==scs::Family::SCS;
  if((pf.family!=scs::Family::STS&&!big)||(big&&(!pf.probed||pf.range!=1023)))return armFail("profile");
  if(!mask||(mask&~0x3F))return armFail("mask");
+ if(g_librarySoftware)for(int s=0;s<SLOT_COUNT;++s)if(g_slot[s].id!=s+1)return armFail("software_requires_ids_1_to_6",s);
  if(!g_calibrated||calInvalidSlot()>=0)return armFail("calibration",calInvalidSlot());
  if(!motionCalibrationSupported())return armFail("wrapped_motion");
  uint16_t goals[SLOT_COUNT]={},hardwareLo[SLOT_COUNT]={},hardwareHi[SLOT_COUNT]={};
@@ -512,15 +556,17 @@ static bool prepareArm(uint8_t mask,bool enable){
   hardwareLo[s]=big?(limits[0]<<8)|limits[1]:limits[0]|(limits[1]<<8);
   hardwareHi[s]=big?(limits[2]<<8)|limits[3]:limits[2]|(limits[3]<<8);
   if(hardwareLo[s]>=hardwareHi[s]||hardwareHi[s]>pf.range)return armFail("hardware_limits_invalid",s,hardwareLo[s],hardwareHi[s]);
-  if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail("feedback_read",s);
+  if(g_libraryArm){g_libraryHardwareLo[s]=hardwareLo[s];g_libraryHardwareHi[s]=hardwareHi[s];}
+  if(!readArmFeedback(s,fb,"feedback_read"))return false;
   if(!armFeedbackAllowed(sl,fb.pos,pf.range))return armFail("feedback_outside",s,fb.pos);
   if(fb.pos<hardwareLo[s]||fb.pos>hardwareHi[s])return armFail("feedback_hardware_outside",s,fb.pos);
   const int boundedGoal=armCurrentGoal(sl,fb.pos,hardwareLo[s],hardwareHi[s]);
   if(boundedGoal<0)return armFail("target_intersection_empty",s);
+  if(g_libraryArm)g_libraryInitial[s]=fb.pos;
   goals[s]=boundedGoal;
  }
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;const Slot &sl=g_slot[s];scs::Feedback fb;
-  if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail("prewrite_feedback",s);
+  if(!readArmFeedback(s,fb,"prewrite_feedback"))return false;
   if(!armFeedbackAllowed(sl,fb.pos,pf.range))return armFail("prewrite_outside",s,fb.pos);
   if(fb.pos<hardwareLo[s]||fb.pos>hardwareHi[s])return armFail("prewrite_hardware_outside",s,fb.pos);
   // While torque is off, passive slack can settle after the all-axis snapshot.
@@ -530,6 +576,7 @@ static bool prepareArm(uint8_t mask,bool enable){
   const int boundedGoal=armCurrentGoal(sl,fb.pos,hardwareLo[s],hardwareHi[s]);
   if(boundedGoal<0)return armFail("target_intersection_empty",s);
   goals[s]=boundedGoal;
+  if(g_libraryArm)g_libraryInitial[s]=fb.pos;
   const bool writeOk=scs::moveTo(sl.id,goals[s],g_speed,g_acc)&&!scs::lastError();const int writeError=scs::lastError();
   // Both SCS and STS position writes have been observed to auto-enable. PREPARE requests off
  // immediately, then proves off/goal/current readback; it is not a never-enabled command.
@@ -558,6 +605,18 @@ static bool prepareArm(uint8_t mask,bool enable){
 }
 bool armAtCurrent(uint8_t mask){return prepareArm(mask,true);}
 bool armPrepareCurrent(uint8_t mask){return prepareArm(mask,false);}
+bool armLibraryAtCurrent(uint8_t mask,bool offhandTest){g_libraryArm=true;g_libraryOffhand=offhandTest;const bool result=prepareArm(mask,true);g_libraryArm=false;g_libraryOffhand=false;return result;}
+bool armLibrarySoftwarePose(uint8_t selected,int amplitude){
+ if(selected>31||amplitude<1||amplitude>100)return armFail("software_pose_parameters");
+ g_libraryArm=true;g_libraryOffhand=false;g_librarySoftware=true;
+ g_librarySoftwareSelected=selected;g_librarySoftwareAmplitude=amplitude;
+ const bool result=prepareArm(0x3f,true);
+ g_libraryArm=false;g_libraryOffhand=false;g_librarySoftware=false;g_librarySoftwareSelected=0;g_librarySoftwareAmplitude=100;
+ return result;
+}
+int armLibraryLastPosition(int s){return s>=0&&s<SLOT_COUNT?g_libraryPosition[s]:-1;}
+int armLibraryHardwareMinimum(int s){return s>=0&&s<SLOT_COUNT?g_libraryHardwareLo[s]:-1;}
+int armLibraryHardwareMaximum(int s){return s>=0&&s<SLOT_COUNT?g_libraryHardwareHi[s]:-1;}
 
 uint16_t pressPos(int s, uint8_t depthPct) {
   const Slot &sl = g_slot[s];

@@ -17,6 +17,7 @@
 #include "scs_bus.h"
 #include "enroll_flow.h"
 #include "profile_limits.h"
+#include "device_library.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
 #define FW_VER "2.2.4"
@@ -79,6 +80,9 @@ static uint32_t g_rxDrop;
 static EnrollFlow g_enrollFlow;
 static bool g_enroll=false;
 static bool g_enrollAutomaticBoot=false;
+static bool g_enrollResume=false;
+static uint8_t g_enrollResumeStable=0;
+static uint32_t g_enrollResumePrevious=0xffffffff,g_enrollResumeRequired=0;
 static uint8_t g_enrollBootReadyStable=0;
 static void probeAndReport(uint8_t id);
 static uint8_t g_enrollNext=1;
@@ -96,10 +100,10 @@ static bool enrollFail(const char *reason,const char *step){
  return false;
 }
 static scs::Family g_enrollFamily=scs::Family::UNKNOWN;
-static void enrollSync(){g_enroll=g_enrollFlow.active();g_enrollNext=g_enrollFlow.next;g_enrollPhase=g_enrollFlow.name();}
+static void enrollSync(){g_enroll=g_enrollFlow.active();g_enrollNext=g_enrollFlow.next;g_enrollPhase=g_enrollResume?"RECOVER_SCAN":g_enrollFlow.name();}
 static void enrollStop(){
   const uint32_t restore=g_enrollLockedBaud?g_enrollLockedBaud:(g_enroll?g_enrollStartBaud:scs::busBaud());
-  g_enrollFlow.stop();enrollSync();g_enrollAutomaticBoot=false;g_enrollBootReadyStable=0;
+  g_enrollResume=false;g_enrollFlow.stop();enrollSync();g_enrollAutomaticBoot=false;g_enrollBootReadyStable=0;
   scs::setBusBaud(restore);
   glove::safe();g_enrollScanId=1;g_enrollSeen=0;g_enrollBaudIndex=0;g_enrollLockedScans=0;
 }
@@ -110,6 +114,15 @@ static bool enrollStart(bool automaticBoot=false){
  g_enrollStartBaud=scs::busBaud();
  g_enrollLockedBaud=0;g_enrollModel=0;g_enrollFamily=scs::Family::UNKNOWN;g_enrollFoundBaud=0;
  g_enrollFlow.start();enrollSync();g_enrollAutomaticBoot=automaticBoot;return true;
+}
+static void enrollResumeStart(){
+ // setMap persists each accepted address. Reuse that record across reboot,
+ // including the ID-write -> readback interruption window, without erasing it.
+ uint32_t required=0;
+ for(uint8_t s=0;s<6;++s)if(glove::slot(s).id==20-s)required|=1ul<<(20-s);
+ enrollStop();enrollStart();
+ g_enrollResumeRequired=required;g_enrollResumePrevious=0xffffffff;g_enrollResumeStable=0;
+ g_enrollResume=true;g_enrollStep="resume_scan";enrollSync();
 }
 static uint8_t freshFixedDevices(){
  uint8_t live=0;
@@ -128,20 +141,45 @@ static void bootCheckEnrollment(){
  if(live!=0x3F)enrollStart(true);
  sayf("BOOT DEVICES live_mask=0x%02X ready=%d enrollment=%s motion=0",live,live==0x3F,g_enrollPhase);
 }
+static bool enrollRead(uint8_t id,uint8_t addr,uint8_t len,uint8_t *out){
+ for(uint8_t attempt=0;attempt<3;++attempt){
+  if(scs::readRegs(id,addr,len,out)&&!scs::lastError())return true;
+  delay(20);
+ }
+ return false;
+}
 static bool enrollIdentity(uint8_t id,scs::Profile &p){
   uint8_t m[2],lo[2],hi[2];
   g_enrollModelRaw=-1;g_enrollMaxRaw=-1;
-  if(!scs::readRegs(id,3,2,m))return enrollFail("read_model_failed","read_reg3");
+  if(!enrollRead(id,3,2,m))return enrollFail("read_model_failed","read_reg3");
   const uint16_t raw=(uint16_t(m[0])<<8)|m[1];g_enrollModelRaw=raw;
   if(raw==0 || raw==0xffff)return enrollFail("model_invalid","identify");
-  if(!scs::readRegs(id,9,2,lo))return enrollFail("read_limit_failed","read_reg9");
-  if(!scs::readRegs(id,11,2,hi))return enrollFail("read_limit_failed","read_reg11");
+  if(!enrollRead(id,9,2,lo))return enrollFail("read_limit_failed","read_reg9");
+  if(!enrollRead(id,11,2,hi))return enrollFail("read_limit_failed","read_reg11");
   g_enrollMaxRaw=(uint16_t(hi[0])<<8)|hi[1];
   uint16_t mn=0,mx=0;int kind=identifyLimitEndian(lo,hi,mn,mx);
-  if(!kind){uint8_t endian=255;if(!scs::readRegs(id,2,1,&endian)||scs::lastError())return enrollFail("read_endian_failed","read_reg2");kind=identifyMarkedLimits(lo,hi,endian,mn,mx);}
+  if(!kind){uint8_t endian=255;if(!enrollRead(id,2,1,&endian))return enrollFail("read_endian_failed","read_reg2");kind=identifyMarkedLimits(lo,hi,endian,mn,mx);}
   if(!kind)return enrollFail("family_ambiguous_limits","identify");
   p.family=kind==1?scs::Family::STS:scs::Family::SCS;p.range=kind==1?4095:1023;
   p.model=raw;p.minAng=mn;p.maxAng=mx;p.probed=true;return true;
+}
+static bool enrollConfirmId(uint8_t from,uint8_t to){
+ uint8_t confirmed=0;bool oldPresent=false;
+ // Never repeat the EEPROM ID write just because its acknowledgement was
+ // lost. Confirm the actual old/new addresses on consecutive readbacks.
+ for(uint8_t attempt=0;attempt<6;++attempt){
+  oldPresent=from!=to&&scs::ping(from,20);
+  const bool target=scs::ping(to,20)&&!scs::lastError();
+  confirmed=!oldPresent&&target?confirmed+1:0;
+  if(confirmed>=2)return true;
+  delay(25);
+ }
+ return enrollFail(oldPresent?"old_id_remains":"new_id_missing","verify_id");
+}
+static bool enrollRelock(uint8_t id,scs::Family family){
+ const uint8_t addr=family==scs::Family::SCS?48:55,one=1;uint8_t locked=0;
+ scs::writeRegs(id,addr,&one,1);
+ return (enrollRead(id,addr,1,&locked)&&locked==1)||enrollFail("relock_failed","relock");
 }
 static bool enrollRename(uint8_t from,uint8_t to){
   scs::Profile p;uint8_t torque=255;
@@ -149,24 +187,47 @@ static bool enrollRename(uint8_t from,uint8_t to){
   if(g_enrollModel && (p.model!=g_enrollModel||p.family!=g_enrollFamily)){g_enrollFlow.conflict();return enrollFail("mixed_model","compare_model");}
   if(!g_enrollModel){g_enrollModel=p.model;g_enrollFamily=p.family;scs::setProfile(p);glove::saveProfile();}
   if(!scs::setTorque(from,false))return enrollFail("torque_write_failed","disable_torque");
-  if(!scs::readRegs(from,40,1,&torque)||torque!=0)return enrollFail("torque_off_unverified","verify_torque");
+  if(!enrollRead(from,40,1,&torque)||torque!=0)return enrollFail("torque_off_unverified","verify_torque");
   if(from==to){ // A partial prior session may already have isolated this physical slot.
-    if(!scs::ping(to,5))return enrollFail("existing_id_missing","verify_existing");
+    if(!enrollConfirmId(from,to))return false;
     scs::Profile after;
-    return enrollIdentity(to,after)&&after.model==g_enrollModel&&after.family==g_enrollFamily;
+    return enrollRelock(to,p.family)&&enrollIdentity(to,after)&&after.model==g_enrollModel&&after.family==g_enrollFamily;
   }
   if(scs::ping(to,5))return enrollFail("target_id_present","before_write");
   // SDK: STS LOCK=55, SCSCL LOCK=48. ID=5 and TORQUE=40 are common one-byte registers.
-  const uint8_t lock=p.family==scs::Family::SCS?48:55,z=0,o=1;
+  const uint8_t lock=p.family==scs::Family::SCS?48:55,z=0;
   if(!scs::writeRegs(from,lock,&z,1))return enrollFail("unlock_failed","unlock");
   delay(10);
   scs::writeRegs(from,5,&to,1); // ID-write ACK may use the new address; verify both addresses below.
   delay(300);
-  if(scs::ping(from,5))return enrollFail("old_id_remains","verify_id");
-  if(!scs::ping(to,5))return enrollFail("new_id_missing","verify_id");
-  if(!scs::writeRegs(to,lock,&o,1))return enrollFail("relock_failed","relock");
+  if(!enrollConfirmId(from,to))return false;
+  if(!enrollRelock(to,p.family))return false;
   scs::Profile after;
   return enrollIdentity(to,after)&&after.model==g_enrollModel&&after.family==g_enrollFamily;
+}
+static bool enrollRestore(uint32_t seen){
+ EnrollFlow recovered;
+ if(!recovered.resume(seen,g_enrollResumeRequired))return enrollFail("resume_layout_incomplete","resume_scan");
+ scs::Profile first;
+ bool haveModel=false;
+ // Verify all responders before changing any mapping or ID.
+ for(uint8_t id=1;id<=20;++id)if(seen&(1ul<<id)){
+  scs::Profile p;uint8_t off=255;
+  if(!enrollIdentity(id,p))return false;
+  if(haveModel&&(p.model!=first.model||p.family!=first.family))return enrollFail("mixed_model","resume_identity");
+  if(!haveModel){first=p;haveModel=true;}
+  if(!scs::setTorque(id,false)||!enrollRead(id,40,1,&off)||off!=0)return enrollFail("torque_off_unverified","resume_torque");
+  if(!enrollRelock(id,p.family))return false;
+ }
+ g_enrollModel=first.model;g_enrollFamily=first.family;scs::setProfile(first);glove::saveProfile();
+ if(recovered.count&&recovered.phase!=EnrollFlow::DONE)glove::invalidateCalibration();
+ for(uint8_t s=0;s<recovered.count;++s){
+  const uint8_t id=(recovered.expected&(1ul<<(20-s)))?20-s:s+1;
+  if(glove::slot(s).id!=id&&!glove::setMap(s,id))return enrollFail("map_failed","resume_map");
+ }
+ g_enrollFlow=recovered;g_enrollReason="none";g_enrollStep="scanning";
+ sayf("ENROLL RESUMED count=%u final=%u expected=0x%08lX phase=%s",recovered.count,recovered.finalSlot,(unsigned long)recovered.expected,recovered.name());
+ return true;
 }
 static void enrollTick(uint32_t now){
   (void)now;if(!g_enroll)return;
@@ -190,7 +251,7 @@ static void enrollTick(uint32_t now){
   }
   // Always restore locked bus between incremental probes, including before SAFE.
   if(g_enrollLockedBaud)scs::setBusBaud(g_enrollLockedBaud);
-  if(!g_enrollFlow.active()){enrollSync();glove::safe();sayf("ENROLL STATUS active=0 next=%u count=%u phase=%s enroll_flow=3",g_enrollNext,g_enrollFlow.count,g_enrollPhase);return;}
+  if(!g_enrollFlow.active()){g_enrollResume=false;enrollSync();glove::safe();sayf("ENROLL STATUS active=0 next=%u count=%u phase=%s enroll_flow=3",g_enrollNext,g_enrollFlow.count,g_enrollPhase);return;}
   if(++g_enrollScanId<=20)return;
   g_enrollScanId=1;
   if(!g_enrollLockedBaud&&g_enrollBaudIndex==0&&g_enrollFlow.phase==EnrollFlow::WAIT_FIRST&&g_enrollSeen&&!(g_enrollSeen&(g_enrollSeen-1))){
@@ -210,6 +271,19 @@ static void enrollTick(uint32_t now){
   if(++g_enrollBaudIndex<sizeof(ENROLL_BAUDS)/sizeof(ENROLL_BAUDS[0]))return;
   g_enrollBaudIndex=0;
   const auto before=g_enrollFlow.phase;
+  if(g_enrollResume){
+   g_enrollResumeStable=g_enrollSeen==g_enrollResumePrevious?g_enrollResumeStable+1:1;
+   g_enrollResumePrevious=g_enrollSeen;
+   if(g_enrollResumeStable>=2){
+    if(g_enrollFoundBaud)g_enrollLockedBaud=g_enrollFoundBaud;
+    scs::setBusBaud(g_enrollLockedBaud?g_enrollLockedBaud:g_enrollStartBaud);
+    if(!enrollRestore(g_enrollSeen))g_enrollFlow.fail();
+    g_enrollResume=false;enrollSync();
+    if(!g_enroll)glove::safe();
+    sayf("ENROLL STATUS active=%d next=%u count=%u phase=%s enroll_flow=3",g_enroll?1:0,g_enrollNext,g_enrollFlow.count,g_enrollPhase);
+   }
+   g_enrollSeen=0;g_enrollFoundBaud=0;return;
+  }
   // Main USB may boot before the separately powered servo bus. Only automatic
   // boot preparation can accept an already complete bus without renumbering.
   if(g_enrollAutomaticBoot&&g_enrollFlow.count==0&&(before==EnrollFlow::WAIT_EMPTY||before==EnrollFlow::WAIT_FIRST)){
@@ -305,10 +379,11 @@ static void probeAndReport(uint8_t id) {
 
 static void cmdInfo() {
   const scs::Profile &pf = scs::profile();
-  sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=PIANO_GLOVE_A50528 ip=192.168.4.1 "
+  sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=%s ip=%s ap_ready=%d software_protocol=1 "
        "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=20 "
-       "enroll_phase=%s enroll_flow=3 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1 bench_sts=1 bench_keep=1 bench_fullstroke=1 cal_origin=1 bench_acc=0 motion_speed_unit=counts_per_s bench_speed_min=50 bench_speed_max=%d bench_default_speed=%d motion_speed_default=%d motion_speed_max=%d motion_tolerance=%d motion_inset=%d mount_target=%d mount_speed=%d origin_epoch=%lu",
+       "enroll_phase=%s enroll_flow=3 enroll_resume=1 enroll_fix=20261021 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1 bench_sts=1 bench_keep=1 bench_fullstroke=1 cal_origin=1 bench_acc=0 motion_speed_unit=counts_per_s bench_speed_min=50 bench_speed_max=%d bench_default_speed=%d motion_speed_default=%d motion_speed_max=%d motion_tolerance=%d motion_inset=%d mount_target=%d mount_speed=%d origin_epoch=%lu",
        FW_ID, scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0,
+       library::ssid(),library::ip().c_str(),library::apReady()?1:0,
        glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
        g_enroll ? 1 : 0, (unsigned)g_enrollNext, g_enrollPhase,
        bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?200:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?35:114,pf.family==scs::Family::SCS?6:24,glove::mountTarget(),glove::mountSpeed(),(unsigned long)glove::originEpoch());
@@ -647,7 +722,8 @@ static bool servoDiag(uint8_t id){
  okf("DIAG id=%u raw_count=67 read_only=1",id);return true;
 }
 static void cmdLine(char *raw) {
-  char  buf[256];
+  // Called only by loop(); do not reserve another full UART line on its stack.
+  static char buf[1024];
   strncpy(buf, raw, sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = 0;
 
@@ -671,6 +747,13 @@ static void cmdLine(char *raw) {
   strncpy(v, t[0], sizeof(v) - 1);
   v[sizeof(v) - 1] = 0;
   for (char *q = v; *q; ++q) *q = (char)toupper((unsigned char)*q);
+
+  if(!strcmp(v,"SAFE")||!strcmp(v,"DISARM"))library::stop("external_stop");
+  if(!strcmp(v,"LIB")){
+    if(g_enroll){errf("LIB enrollment_active");return;}
+    library::command(n,t);return;
+  }
+  if(library::active()&&strcmp(v,"INFO")&&strcmp(v,"STATUS")&&strcmp(v,"STATUS_ALL")&&strcmp(v,"POSALL")&&strcmp(v,"SAFE")&&strcmp(v,"DISARM")&&strcmp(v,"BUSINFO")){errf("LIB active_STOP_first");return;}
 
   glove::mountTick();
   if(glove::mountActive()&&strcmp(v,"MOUNT")&&strcmp(v,"DIAG")&&strcmp(v,"INFO")&&strcmp(v,"STATUS")&&strcmp(v,"STATUS_ALL")&&strcmp(v,"POSALL")&&strcmp(v,"SAFE")&&strcmp(v,"DISARM")&&strcmp(v,"BUSINFO")){errf("MOUNT active_STOP_first");return;}
@@ -1063,6 +1146,12 @@ static void cmdLine(char *raw) {
       a[sizeof(a) - 1] = 0;
       for (char *q = a; *q; ++q) *q = (char)toupper((unsigned char)*q);
     }
+    if (strcmp(a, "RESUME") == 0) {
+      if(glove::armed()||glove::autoActive()||glove::sweepActive()){errf("ENROLL stop_motion_first");return;}
+      enrollResumeStart();
+      okf("ENROLL RESUME active=1 phase=RECOVER_SCAN keep_wiring=1");
+      return;
+    }
     if (strcmp(a, "START") == 0) {
       if (!enrollStart()) { errf("ENROLL already_active"); return; }
       okf("ENROLL START active=1 next=1 temp=20 phase=WAIT_EMPTY requirement=%s",
@@ -1090,7 +1179,7 @@ static void cmdLine(char *raw) {
 
 // ---------------------------------------------------------------- 主流程
 
-static char g_rx[256];
+static char g_rx[1024];
 static int  g_rxLen = 0;
 // g_rxDrop 在文件上方已前置声明 —— 因行缓冲溢出被丢弃的行数，用于诊断上位机突发丢包
 
@@ -1127,6 +1216,7 @@ void setup() {
   }
   // Profile/register layout is now resolved. Actually request torque-off before ready.
   glove::safe();
+  library::begin();
   bootCheckEnrollment(); // Once per power-on; STOP and reconnect never restart enrollment.
   sayf("READY FW=%s ver=%s boot_motion=0 torque=off_requested", FW_ID, FW_VER);
   sayf("READY BUS echo=%d echo_bytes=%u uart_rx_buf=%u (echo=1 说明 TX/RX 并联，属正常)",
@@ -1135,6 +1225,8 @@ void setup() {
 }
 
 void loop() {
+  library::setExclusiveBusy(g_enroll);
+  library::tick();
   glove::mountTick();
   glove::benchTick();
   while (Serial.available()) {

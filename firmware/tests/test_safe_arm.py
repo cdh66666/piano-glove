@@ -7,6 +7,7 @@ prefix=r'''
 #include <stdint.h>
 #include <initializer_list>
 #include "../src/cal_circle.h"
+#include "../src/library_targets.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@ bool moveRaw(uint8_t,uint16_t,uint16_t,uint8_t);
 namespace scs{
 enum class Family{UNKNOWN,STS,SCS};
 struct Profile{Family family=Family::SCS;bool probed=true;int range=1023;}pf;
-struct Feedback{bool ok=true;int pos=381;};
+struct Feedback{bool ok=true;int pos=381;uint8_t voltage=50,temp=25;};
 const int REG_TORQUE_EN=40;
 bool torque[6];int goals[6];int writes=0,enables=0,safeCount=0;
 int edgePosition=-1;

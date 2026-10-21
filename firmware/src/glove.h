@@ -49,6 +49,11 @@ struct ArmCheck{bool registersOk=false,feedbackOk=false,limitsOk=false;int regis
   const char *armFailure();
   bool armPrepareCurrent(uint8_t mask=0x3F);
   bool    armAtCurrent(uint8_t mask = 0x3F);  // Fail closed unless off/goal/current readbacks agree.
+  bool    armLibraryAtCurrent(uint8_t mask = 0x3F, bool offhandTest = false); // Scoped library slack or explicit nonpersistent bench recovery.
+  bool    armLibrarySoftwarePose(uint8_t selected, int amplitude); // Musical pose; calibration drift/arrival are advisory, hardware checks remain.
+  int     armLibraryLastPosition(int s);
+  int     armLibraryHardwareMinimum(int s);
+  int     armLibraryHardwareMaximum(int s);
 
 uint16_t pressPos(int s, uint8_t depthPct);
 uint16_t releasePos(int s);

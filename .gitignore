@@ -106,3 +106,5 @@ firmware/tests/*_generated.cpp
 host/calibration-resume.json
 host/calibration_recordings/
 host/web_piano_glove.before-*.html
+# Rebuilt from host/software* by firmware/embed_ui.py before every PIO build.
+firmware/src/software_ui.h

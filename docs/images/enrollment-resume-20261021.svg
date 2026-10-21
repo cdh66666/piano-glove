@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000" role="img" aria-labelledby="title desc">
+  <title id="title">钢琴手套编号中断后保持接线续编</title>
+  <desc id="desc">六台舵机按物理槽位暂存为20到15。第六台已写15但确认回包丢失时，点击继续编号保留进度，核对现有地址及主控保存映射，再按20到1、19到2、18到3、17到4、16到5、15到6完成。无需全部拔下重来，不驱动位置，不替代动作或穿戴验收。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 2 10 6 2 10" fill="none" stroke="#13a6b3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#142d4e}
+      .title{font-size:43px;font-weight:700}.sub{font-size:25px;fill:#65758b}.heading{font-size:29px;font-weight:700}.body{font-size:24px;fill:#4c6079}.small{font-size:21px;fill:#65758b}.label{font-size:20px;font-weight:700}.cyan{fill:#078d9b}.white{fill:#fff}.id{font-size:43px;font-weight:700}.final{font-size:48px;font-weight:700}.line{fill:none;stroke:#13a6b3;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <rect width="1440" height="1000" rx="28" fill="#fff"/>
+  <rect x="52" y="47" width="7" height="54" rx="3.5" fill="#13a6b3"/>
+  <text class="title" x="80" y="91">编号中断了？保持接线，接着完成</text>
+  <text class="sub" x="80" y="138">先核对已写入的地址，再补完剩余步骤</text>
+  <rect x="1202" y="53" width="186" height="42" rx="21" fill="#e8f8fa"/>
+  <text class="label cyan" x="1226" y="81">续编 / 2026.10</text>
+
+  <text class="heading" x="52" y="206">中断现场：六台已保留在临时地址</text>
+  <text class="small" x="52" y="243">临时地址本身保留了接入顺序；不会把已完成的五台从头再编号。</text>
+  <g text-anchor="middle">
+    <g><rect x="52" y="272" width="206" height="153" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="label" x="155" y="308">槽位 1</text><text class="id" x="155" y="364">20</text><text class="small" x="155" y="400">已保留</text></g>
+    <g><rect x="278" y="272" width="206" height="153" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="label" x="381" y="308">槽位 2</text><text class="id" x="381" y="364">19</text><text class="small" x="381" y="400">已保留</text></g>
+    <g><rect x="504" y="272" width="206" height="153" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="label" x="607" y="308">槽位 3</text><text class="id" x="607" y="364">18</text><text class="small" x="607" y="400">已保留</text></g>
+    <g><rect x="730" y="272" width="206" height="153" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="label" x="833" y="308">槽位 4</text><text class="id" x="833" y="364">17</text><text class="small" x="833" y="400">已保留</text></g>
+    <g><rect x="956" y="272" width="206" height="153" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="label" x="1059" y="308">槽位 5</text><text class="id" x="1059" y="364">16</text><text class="small" x="1059" y="400">已保留</text></g>
+    <g><rect x="1182" y="272" width="206" height="153" rx="18" fill="#fff5e9" stroke="#efb777" stroke-width="2"/><text class="label" x="1285" y="308">槽位 6 · 断点</text><text class="id" x="1285" y="364">15</text><text class="small" x="1285" y="400">已写入，确认漏包</text></g>
+  </g>
+
+  <rect x="52" y="468" width="390" height="166" rx="20" fill="#078d9b"/>
+  <text class="label white" x="80" y="507">操作入口</text>
+  <text class="heading white" x="80" y="553">继续编号（保留进度）</text>
+  <text x="80" y="598" class="body white">现有六台不用全部拔下</text>
+  <path class="line" d="M461 551h43" marker-end="url(#arrow)"/>
+  <rect x="528" y="468" width="860" height="166" rx="20" fill="#eaf9fa" stroke="#b4e3e8"/>
+  <text class="heading" x="557" y="509">先核对，再继续</text>
+  <g class="body"><text x="557" y="553">① 扫描现有地址</text><text x="930" y="553">② 对照主控已保存进度</text><text x="557" y="597">③ 核对型号与扭矩关闭</text><text x="930" y="597">④ 补完剩余改号并读回</text></g>
+
+  <text class="heading" x="52" y="697">完成：回到正式编号 1～6</text>
+  <text class="small" x="52" y="733">正式编号转换到一半中断，也从尚未完成的位置继续。</text>
+  <g text-anchor="middle">
+    <g><rect x="52" y="760" width="206" height="135" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="small" x="155" y="795">20 → 1</text><text class="final cyan" x="155" y="859">1</text></g>
+    <g><rect x="278" y="760" width="206" height="135" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="small" x="381" y="795">19 → 2</text><text class="final cyan" x="381" y="859">2</text></g>
+    <g><rect x="504" y="760" width="206" height="135" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="small" x="607" y="795">18 → 3</text><text class="final cyan" x="607" y="859">3</text></g>
+    <g><rect x="730" y="760" width="206" height="135" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="small" x="833" y="795">17 → 4</text><text class="final cyan" x="833" y="859">4</text></g>
+    <g><rect x="956" y="760" width="206" height="135" rx="18" fill="#f5f8fc" stroke="#dce5ef"/><text class="small" x="1059" y="795">16 → 5</text><text class="final cyan" x="1059" y="859">5</text></g>
+    <g><rect x="1182" y="760" width="206" height="135" rx="18" fill="#eaf9fa" stroke="#b4e3e8"/><text class="small" x="1285" y="795">15 → 6</text><text class="final cyan" x="1285" y="859">6</text></g>
+  </g>
+  <path d="M52 933h1336" stroke="#e5ebf2"/>
+  <circle cx="65" cy="965" r="6" fill="#13a6b3"/>
+  <text class="small" x="84" y="972">已编号设备无需重编；续编不驱动位置，也不代替校准、动作或穿戴验收。</text>
+</svg>
