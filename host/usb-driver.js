@@ -11,17 +11,16 @@ function view(status,connected=false){
  if(state==='unplugged')return {show:true,title:'未检测到主控 USB',detail:'请接上主控，并使用支持数据传输的 USB 线。接好后会自动重新检测；已接好仍无反应可查看 USB 帮助。'};
  return {show:true,title:'暂时无法确认 USB 驱动状态',detail:'不能据此判断缺少驱动。可查看安装步骤，或在设备管理器核对 CP2102 是否有黄色感叹号。'};
 }
-const api={view,state:()=>null,open:()=>{}};
+const api={view,state:()=>null,open:()=>{},install:()=>{}};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(!root.document||!['127.0.0.1','localhost','[::1]'].includes(root.location.hostname))return;
 function init(){
- if(document.getElementById('usbDriverHelp'))return;
- const banner=document.createElement('section');banner.id='usbDriverBanner';banner.hidden=true;banner.setAttribute('aria-label','USB 连接诊断');
- banner.innerHTML='<div><strong id="usbDriverTitle"></strong><p id="usbDriverDetail"></p><progress id="usbDriverInstallProgress" max="100" value="0" hidden></progress></div><div class="usbDriverActions"><button id="usbDriverAuto" class="usbDriverPrimary" hidden>自动安装并连接</button><button id="usbDriverHelp">查看帮助</button><button id="usbDriverRetry">重新检测</button></div>';
+ if(document.getElementById('usbDriverDialog'))return;
  const header=document.getElementById('demoTop')||document.querySelector('body>header');
- if(!header)return;header.after(banner);
- const help=document.createElement('button');help.id='usbDriverHelpEntry';help.textContent='USB / 驱动帮助';
- const footer=document.getElementById('demoFoot')||document.querySelector('nav');(footer||header).append(help);
+ if(!header)return;
+ // The compact console already has its connection button. Keep its layout.
+ const help=document.getElementById('demoTop')?null:document.createElement('button');
+ if(help){help.id='usbDriverHelpEntry';help.textContent='USB / 驱动帮助';(document.querySelector('nav')||header).append(help);}
  const dialog=document.createElement('dialog');dialog.id='usbDriverDialog';dialog.className='usbDriverDialog';dialog.setAttribute('aria-labelledby','usbDriverGuideTitle');
  dialog.innerHTML=`<div class="usbDriverHeading"><div><small>第一次在这台 Windows 电脑使用</small><h2 id="usbDriverGuideTitle">安装 CP2102 串口驱动</h2></div><button id="usbDriverClose" aria-label="关闭驱动帮助">关闭</button></div><p id="usbDriverGuideState" role="status"></p><ol><li><b>下载官方驱动</b><p>适用于 Windows 10 / 11，选择 CP210x Universal Windows Driver。</p><a class="usbDriverPrimary" href="${download}" target="_blank" rel="noopener noreferrer">下载官方驱动 ZIP</a> <a href="${official}" target="_blank" rel="noopener noreferrer">官网下载页</a></li><li><b>解压，然后在设备管理器安装</b><p>右键 Windows 开始按钮 → 设备管理器 → 其他设备 → 带黄色感叹号的 <strong>CP2102 USB to UART Bridge Controller</strong>。</p><p>右键它 → 更新驱动程序 → 浏览我的电脑以查找驱动程序 → 选择刚解压的文件夹，勾选“包括子文件夹” → 下一步。</p><p class="usbDriverNote">ZIP 中没有安装 EXE 是正常的；请先解压，不要选择 ZIP 文件。Windows 如询问管理员权限，请由电脑使用者确认。</p></li><li><b>看到 COM 口后，回到调试台</b><p>成功后，设备应出现在“端口（COM 和 LPT）”，名称含 Silicon Labs CP210x，后面带 COM 编号。</p><button id="usbDriverCheck" class="usbDriverPrimary">安装完成，重新检测</button></li></ol><p id="usbDriverCheckResult" role="status"></p><details><summary>仍然没有 COM 口？</summary><p>确认使用数据线，重新插拔主控 USB，并检查设备管理器中的错误代码。代码 28 表示缺少驱动；其他错误需要按实际错误处理。安装驱动不需要给舵机重新编号或重新烧录。</p></details>`;
  document.body.append(dialog);
@@ -31,15 +30,15 @@ function init(){
  const install=document.createElement('div');install.className='usbDriverInstallBox';install.innerHTML='<p>自动下载并校验官方驱动，安装后自动检测 COM 口、恢复连接。支持 Silicon Labs 与微软 Windows Update 官方分发。</p><button id="usbDriverInstall" class="usbDriverPrimary">自动安装并连接</button><p class="usbDriverNote">Windows 可能弹出管理员授权窗口，请在系统窗口确认。程序不会卸载现有驱动、重启电脑、重新编号或启动舵机。</p><p id="usbDriverInstallState" role="status"></p>';fallback.before(install);
  let latest=null,connected=false,checking=false,lastCheck=0,starting=false;
  api.state=()=>latest;
- function paint(){const model=view(latest,connected),job=latest?.installation||{},installing=starting||!!job.busy;banner.hidden=!model.show&&!installing;banner.dataset.state=latest?.state||'unavailable';document.getElementById('demoRoot')?.classList.toggle('usbDriverNotice',!banner.hidden);document.getElementById('usbDriverTitle').textContent=installing?'正在自动配置 USB 驱动':model.title;document.getElementById('usbDriverDetail').textContent=installing?job.message||'正在准备官方驱动…':job.message||model.detail;document.getElementById('usbDriverGuideState').textContent=model.title+'。'+model.detail;document.getElementById('usbDriverCheck').disabled=checking||installing;document.getElementById('usbDriverRetry').disabled=checking||installing;const canInstall=['missing_driver','device_error'].includes(latest?.state);document.getElementById('usbDriverAuto').hidden=!canInstall&&!installing;for(const id of ['usbDriverAuto','usbDriverInstall']){const n=document.getElementById(id);n.disabled=installing||connected||!canInstall;n.textContent=installing?'正在安装…':'自动安装并连接';}document.getElementById('usbDriverInstallState').textContent=job.message||'';const progress=document.getElementById('usbDriverInstallProgress');progress.hidden=!installing;progress.value=Number(job.progress)||0;document.dispatchEvent(new CustomEvent('usbdriver:state',{detail:{...latest,connected}}));}
+ function paint(){const model=view(latest,connected),job=latest?.installation||{},installing=starting||!!job.busy;document.getElementById('usbDriverGuideState').textContent=model.title+'。'+model.detail;document.getElementById('usbDriverCheck').disabled=checking||installing;const canInstall=['missing_driver','device_error'].includes(latest?.state),button=document.getElementById('usbDriverInstall');button.disabled=installing||connected||!canInstall;button.textContent=installing?'正在安装…':'自动安装并连接';document.getElementById('usbDriverInstallState').textContent=job.message||'';document.dispatchEvent(new CustomEvent('usbdriver:state',{detail:{...latest,connected}}));}
  async function read(path,body){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);try{const r=await fetch(path,body===undefined?{cache:'no-store',signal:controller.signal}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});const value=await r.json();if(!r.ok||value.ok===false)throw Error(value.error||'状态服务暂不可用');return value;}finally{clearTimeout(timer);}}
  async function check(force=false){if(checking||!force&&Date.now()-lastCheck<(latest?.installation?.busy?1000:5000))return;checking=true;lastCheck=Date.now();try{const status=await read('/api/status');connected=!!status.connected;if(connected&&!force&&!latest?.installation?.busy){latest={...latest,state:'ready'};return;}const previous=latest?.state;latest=await read('/api/driver'+(force?'?refresh=1':''));if(latest.state==='ready'&&latest.port_available&&previous!=='ready'){await read('/api/ports');document.dispatchEvent(new CustomEvent('usbdriver:ready'));}document.getElementById('usbDriverCheckResult').textContent=latest.state==='ready'?(latest.port_available?'驱动已就绪，调试台会重新连接；不会启动动作。':'驱动正常，正在等待系统分配 COM 口。'):view(latest,connected).detail;}catch(e){if(!connected)latest={...latest,state:'unavailable'};document.getElementById('usbDriverCheckResult').textContent='重新检测未完成，请确认本机调试服务仍在运行。';}finally{checking=false;paint();}}
  async function autoInstall(){if(starting||latest?.installation?.busy||connected)return;starting=true;paint();try{latest={...latest,installation:await read('/api/driver/install',{})};}catch(e){latest={...latest,installation:{busy:false,error:e.message}};}finally{starting=false;lastCheck=0;paint();check(true);}}
  api.open=()=>{paint();if(!dialog.open)dialog.showModal();check(true);};
- document.getElementById('usbDriverHelp').onclick=api.open;help.onclick=api.open;
+ if(help)help.onclick=api.open;
  document.getElementById('usbDriverClose').onclick=()=>dialog.close();
- document.getElementById('usbDriverAuto').onclick=autoInstall;document.getElementById('usbDriverInstall').onclick=autoInstall;
- document.getElementById('usbDriverRetry').onclick=()=>check(true);document.getElementById('usbDriverCheck').onclick=()=>check(true);
+ api.install=autoInstall;document.getElementById('usbDriverInstall').onclick=autoInstall;
+ document.getElementById('usbDriverCheck').onclick=()=>check(true);
  setInterval(()=>{if(!document.hidden)check();},1000);check();
 }
 root.PianoUsbDriver=api;

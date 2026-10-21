@@ -4,7 +4,7 @@
 
 **[下载源码 ZIP](https://github.com/cdh66666/piano-glove/archive/refs/heads/main.zip)** · **[图解使用指南](docs/ILLUSTRATED-GUIDE.md)** · **[完整操作与维护](docs/LLM-START-HERE.md)**
 
-**给客户使用：[下载 Windows 免 Python 运行包](https://github.com/cdh66666/piano-glove/releases/download/windows-driver-20261021/PianoGlove-Windows-20261021.zip)**。解压后双击 `01-打开软件.bat`；缺驱动时在网页点“自动安装并连接”，其余自动处理。
+**给客户使用：[下载 Windows 免 Python 运行包](https://github.com/cdh66666/piano-glove/releases/download/windows-driver-20261021-r2/PianoGlove-Windows-20261021.zip)**。解压后双击 `01-打开软件.bat`；缺驱动时在网页点“自动安装并连接”，其余自动处理。
 
 ![六台已完成编号的真实调试台，2026-10-21](docs/images/debug-console-20261021.png)
 
