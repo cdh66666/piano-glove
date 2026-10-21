@@ -50,6 +50,8 @@ HTTP API（页面同源直接 fetch，不需要 CORS 头）
 """
 
 from firmware_flash import FirmwareManager, exclusive
+from usb_driver import get_driver_status
+from usb_driver_install import USBDriverInstaller
 from calibration_recordings import save_recording, read_recording
 
 import argparse
@@ -1084,6 +1086,7 @@ class SoftwareConsole:
 
 def make_handler(bridge):
     software = SoftwareConsole(bridge)
+    driver_installer = USBDriverInstaller()
     class Handler(BaseHTTPRequestHandler):
         server_version = "piano-glove-bridge"
         protocol_version = "HTTP/1.1"
@@ -1200,6 +1203,9 @@ def make_handler(bridge):
                     return self._json({"ok":False,"error":"轨迹记录不存在"},404)
             if u.path == "/api/firmware":
                 return self._json(bridge.firmware.status())
+            if u.path == "/api/driver":
+                diagnostic = get_driver_status(list_ports.comports(), refresh=(q.get('refresh') or ['0'])[0] == '1')
+                return self._json(dict(diagnostic, installation=driver_installer.status()))
             if u.path == "/api/status":
                 return self._json(bridge.status())
             if u.path == "/api/ports":
@@ -1305,6 +1311,13 @@ def make_handler(bridge):
                         return self._json({"ok":False,"error":str(e)},400)
                 if bridge.firmware.serialExclusive:
                     return self._json({"ok": False, "error": "固件维护中：串口操作已锁定"}, 409)
+                if u.path == "/api/driver/install":
+                    if b:
+                        return self._json({'ok':False, 'error':'驱动安装不接受自定义路径或下载地址'},400)
+                    try:
+                        return self._json(driver_installer.start(),202)
+                    except (ValueError, RuntimeError) as error:
+                        return self._json({'ok':False,'error':str(error)},409)
                 if u.path == "/api/scan":
                     bridge._reload_ports()
                     ok, why = (None, "") if not b.get("probe") else bridge.autoconnect_once()

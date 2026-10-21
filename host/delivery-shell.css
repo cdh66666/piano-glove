@@ -1,6 +1,6 @@
 /* Delivery console: quiet system surfaces, compact controls, piano-key feedback. */
 body.delivery-compact{margin:0!important;padding:0!important;height:100dvh;overflow:hidden;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
-body.delivery-compact>:not(#demoRoot):not(.mountDialog):not(.validationDialog):not(script):not(style):not(link){display:none!important}
+body.delivery-compact>:not(#demoRoot):not(.mountDialog):not(.validationDialog):not(.usbDriverDialog):not(script):not(style):not(link){display:none!important}
 #demoRoot{box-sizing:border-box;position:fixed;inset:0;display:grid;grid-template-rows:58px 46px minmax(0,1fr) 24px;gap:10px;padding:14px 20px 8px;overflow:hidden;max-width:1500px;margin:auto}
 #demoRoot *{box-sizing:border-box}#demoRoot button,#demoRoot select,#demoRoot input{font:inherit}#demoRoot button{cursor:pointer;transition:background .14s,color .14s,box-shadow .14s}#demoRoot button:disabled{opacity:.36;cursor:not-allowed}#demoRoot button:focus-visible,#demoRoot select:focus-visible{outline:3px solid #007aff66;outline-offset:2px}
 #demoTop{display:flex;align-items:center;gap:9px;padding:9px 13px 9px 18px;background:#ffffffd9;border:1px solid #e5e5ea;border-radius:17px;box-shadow:0 3px 12px #00000005;position:relative;z-index:15;backdrop-filter:blur(18px)}

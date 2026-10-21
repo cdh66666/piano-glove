@@ -14,7 +14,7 @@ from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 import webbrowser
 
-BUILD_DATE = '20261014'
+BUILD_DATE = '20261021'
 if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
@@ -73,10 +73,11 @@ def self_test():
     from pypdf import PdfWriter
     from pypdf.generic import DecodedStreamObject, NameObject
     import bridge
+    from usb_driver import get_driver_status
     from score_codec import encode, decode
     asset_root = resources()
     required = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'web_piano_glove.html',
-                'delivery-demo.js', 'delivery-shell.js', 'delivery-shell.css']
+                'delivery-demo.js', 'delivery-shell.js', 'delivery-shell.css', 'usb-driver.js', 'usb-driver.css']
     for name in required:
         if not (asset_root / name).is_file():
             raise RuntimeError('运行文件缺失：' + name)
@@ -102,11 +103,12 @@ def self_test():
         data = base64.b64decode(preview['data'].split(',', 1)[1])
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise RuntimeError('PDF 页面不是 PNG')
+    driver = get_driver_status(list(serial.tools.list_ports.comports()), refresh=True)
     output = dict(ok=True, build_date=BUILD_DATE, python=sys.version.split()[0],
                   serial_version=serial.__version__, pdfium_version=importlib.metadata.version('pypdfium2'),
                   pypdf_version=importlib.metadata.version('pypdf'),
                   assets=len(required), pgl_roundtrip=True, pdf_pipeline=True,
-                  pdf_preview_png=True, serial_opened=False)
+                  pdf_preview_png=True, driver_helper=True, driver_diagnostics=driver['state'], serial_opened=False)
     print(json.dumps(output, ensure_ascii=False))
     return output
 
