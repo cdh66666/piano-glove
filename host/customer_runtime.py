@@ -14,7 +14,7 @@ from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 import webbrowser
 
-BUILD_DATE = '20261021'
+BUILD_DATE = '20261022'
 if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
@@ -76,7 +76,7 @@ def self_test():
     from usb_driver import get_driver_status
     from score_codec import encode, decode
     asset_root = resources()
-    required = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'web_piano_glove.html',
+    required = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'software-tempo.js', 'software-tempo.css', 'software-upload.js', 'software-upload.css', 'web_piano_glove.html',
                 'delivery-demo.js', 'delivery-shell.js', 'delivery-shell.css', 'usb-driver.js', 'usb-driver.css']
     for name in required:
         if not (asset_root / name).is_file():

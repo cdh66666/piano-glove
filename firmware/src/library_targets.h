@@ -29,4 +29,11 @@ inline int softwareTarget(int slot,bool scs,int calibratedLo,int calibratedHi,in
  const int released=pressMaximum(slot,scs)?low:high,down=pressMaximum(slot,scs)?high:low;
  return pressed?released+(down-released)*amplitude/100:released;
 }
+// A repeated piano finger may use its recorded lift endpoint, never beyond
+// calibration or hardware travel. The pose axis and normal goals stay inset.
+inline int repeatedReleaseTarget(int slot,bool scs,int calibratedLo,int calibratedHi,int hardwareLo,int hardwareHi){
+ const int normal=softwareTarget(slot,scs,calibratedLo,calibratedHi,hardwareLo,hardwareHi,false,100);
+ if(normal<0||slot==0)return normal;
+ return pressMaximum(slot,scs)?(calibratedLo>hardwareLo?calibratedLo:hardwareLo):(calibratedHi<hardwareHi?calibratedHi:hardwareHi);
+}
 }

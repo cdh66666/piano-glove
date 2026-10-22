@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
 
 root = Path(__file__).resolve().parent
 source = (root.parent / 'src/device_library.cpp').read_text(encoding='utf-8')
@@ -22,6 +23,7 @@ cpp.write_text(r'''
 #include "../src/library_pattern.h"
 #include "../src/library_score_clock.h"
 #include "../src/library_targets.h"
+#include "../src/library_controller.h"
 #include "../src/score_format.h"
 #include <assert.h>
 #include <stdint.h>
@@ -57,6 +59,7 @@ uint32_t started=0,keepAt=0,positionsAt=0,feedbackAt=0,poseAt=0,lastPoseMs=0;
 bool boundaryPending=false,boundaryReleaseStarted=false;
 uint32_t boundaryAt=0,lastScoreBoundary=0,candidateEnds[5]={};
 uint8_t candidateMask=0,boundaryRepeatMask=0,boundaryReleaseMask=0;
+uint8_t repeatLiftMask=0,candidateLiftMask=0;
 libraryclock::WallClock scoreClock;pgl::Event nextEvent;librarypattern::Sequence patternSequence;
 struct Reader{std::vector<pgl::Event>events;size_t at=0;void reset(){at=0;}bool event(uint32_t,pgl::Event&out){if(at>=events.size())return false;out=events[at++];return true;}}playReader;
 struct File{bool seek(int){return true;}void close(){}}playing;
@@ -77,7 +80,7 @@ static void tickScoreTimeline();
 void reset(const std::vector<pgl::Event>&events,int rate,uint32_t end){
  now=0;running=true;training=initializing=nextReady=patternRunning=false;glove::isArmed=true;mask=0;positionsReady=0;positionValidMask=63;hold=50;enabledMask=63;healthValidMask=0;outputOk=true;resistanceSupported=true;
  index=previousEvent=playedEventCount=candidateEventCount=0;count=events.size();duration=fileDuration=end;tempo=rate;
- boundaryPending=boundaryReleaseStarted=false;lastScoreBoundary=0;memset(endTimes,0,sizeof(endTimes));
+ boundaryPending=boundaryReleaseStarted=false;repeatLiftMask=candidateLiftMask=0;lastScoreBoundary=0;memset(endTimes,0,sizeof(endTimes));
  scs::busError=0;scs::readCount=6;scs::healthOk=true;scs::healthVoltage=50;scs::healthTemp=25;
  for(int s=0;s<6;++s){glove::slots[s].lo=500;glove::slots[s].hi=900;hardwareMinimum[s]=0;hardwareMaximum[s]=scs::pf.range;poseFrom[s]=actual[s]=scs::samples[s]=1000;poseTargets[s]=target(s,false,100);speeds[s]=scs::pf.family==scs::Family::SCS?1000:8000;positionSampleMs[s]=healthSampleMs[s]=axisPoseAt[s]=0;}
  playReader.events=events;playReader.at=0;stopped.clear();writes.clear();Serial.lines.clear();armingSpeeds.clear();preparedMask=-1;scoreClock.start(0);
@@ -99,8 +102,18 @@ int main(int argc,char**argv){
  assert(stopped=="completed"&&now==4000&&actual[1]==1000&&poseTargets[1]==880);
  reset(simple,100,400);tick(0);scs::samples[1]=1300;tick(220);assert(running&&playedEventCount==2);tick(400);assert(stopped=="completed");
  std::vector<pgl::Event>repeat={{0,200,60,1,96,100},{200,200,62,1,96,100},{200,200,65,3,96,100}};
- reset(repeat,100,400);tick(0);tick(159);assert(mask==1);tick(160);assert(boundaryReleaseStarted&&mask==0&&playedEventCount==1);tick(199);assert(mask==0);tick(200);assert(mask==5&&playedEventCount==3);assert(hasWrite(160,1,880)&&hasWrite(200,1,520));tick(400);assert(stopped=="completed");
- reset(repeat,1000,400);tick(0);tick(9);assert(mask==1);tick(10);assert(mask==0);tick(20);assert(mask==5);assert(hasWrite(10,1,880)&&hasWrite(20,1,520));tick(40);assert(stopped=="completed");
+ reset(repeat,100,400);tick(0);tick(159);assert(mask==1);tick(160);assert(boundaryReleaseStarted&&mask==0&&playedEventCount==1);tick(199);assert(mask==0);tick(200);assert(mask==5&&playedEventCount==3);assert(hasWrite(160,1,900)&&hasWrite(200,1,520));tick(400);assert(stopped=="completed");
+ reset(repeat,1000,400);tick(0);tick(9);assert(mask==1);tick(10);assert(mask==0);tick(20);assert(mask==5);assert(hasWrite(10,1,900)&&hasWrite(20,1,520));tick(40);assert(stopped=="completed");
+ // Same-finger taps with explicit gaps lift to the recorded endpoint;
+ // different-finger releases remain inset, and downstroke timing is unchanged.
+ reset({{0,400,60,2,96,40},{1000,650,60,2,96,40}},100,2000);tick(0);tick(400);
+ assert(mask==0&&repeatLiftMask==2&&hasWrite(400,2,900));tick(999);assert(mask==0);
+ tick(1000);assert(mask==2&&repeatLiftMask==0&&hasWrite(1000,2,520));tick(1650);
+ assert(hasWrite(1650,2,880));tick(2000);assert(stopped=="completed");
+ reset({{0,650,60,2,96,40},{1000,650,64,3,96,40}},100,2000);tick(0);tick(650);
+ assert(repeatLiftMask==0&&hasWrite(650,2,880)&&!hasWrite(650,2,900));
+ reset({{0,650,60,2,96,40},{1000,650,60,2,96,40}},100,2000);hardwareMaximum[2]=890;scs::samples[2]=actual[2]=700;tick(0);tick(650);
+ assert(hasWrite(650,2,890));stop("stopped");assert(train(2,50,100,"usb"));assert(repeatLiftMask==0&&candidateLiftMask==0);
  reset({{0,200,60,1,96,100},{0,400,64,2,96,100},{200,200,62,1,96,100}},100,400);tick(0);tick(160);assert(mask==2&&poseTargets[2]==520);tick(200);assert(mask==3);tick(400);assert(stopped=="completed");
  // Missed pre-release has no fabricated same-tick UP/DOWN or tempo delay.
  reset(repeat,1000,400);tick(0);tick(25);assert(mask==5&&playedEventCount==3);assert(!hasWrite(25,1,880));tick(40);assert(stopped=="completed");
@@ -129,7 +142,16 @@ int main(int argc,char**argv){
  reset(simple,100,400);tick(0);scs::healthOk=false;tick(100);assert(stopped=="health_feedback_lost");
  for(int voltage:{39,66}){reset(simple,100,400);tick(0);scs::healthVoltage=voltage;tick(100);assert(stopped=="temperature_or_voltage");}
  reset(simple,100,400);tick(0);scs::healthTemp=65;tick(100);assert(stopped=="temperature_or_voltage");
- reset(simple,100,400);tick(0);now=2001;serviceMotion();assert(stopped=="controller_disconnected");
+ reset(simple,100,400);owner="usb";tick(0);now=2001;serviceMotion();assert(stopped=="controller_disconnected");
+ // A brief phone Wi-Fi request stall does not stop an on-board score. The
+ // lease still expires after five seconds, without resuming a stopped song.
+ reset({{0,10000,60,1,96,100}},100,10000);owner="wifi";tick(0);
+ now=2001;serviceMotion();assert(running&&playedEventCount==1&&scoreClock.elapsed()==2001);
+ now=5000;serviceMotion();assert(running&&scoreClock.elapsed()==5000);
+ now=5001;serviceMotion();assert(stopped=="controller_disconnected");
+ const auto disconnectedWrites=writes.size();keepAt=now;now+=50;serviceMotion();assert(!running&&writes.size()==disconnectedWrites);
+ reset({{0,10000,60,1,96,100}},100,10000);owner="wifi";training=true;tick(0);now=2001;serviceMotion();assert(stopped=="controller_disconnected");
+ reset({{0,10000,60,1,96,100}},100,10000);owner="wifi";tick(0);now=1800;keepAt=now;now=6000;serviceMotion();assert(running);now=6801;serviceMotion();assert(stopped=="controller_disconnected");
  reset(simple,100,400);tick(0);glove::isArmed=false;tick(20);assert(stopped=="external_stop");
  reset(simple,100,400);tick(0);stop("stopped");auto written=writes.size();tick(1000);assert(stopped=="stopped"&&writes.size()==written);
  reset(simple,100,400);scs::busError=1;tick(0);assert(stopped=="sync_write_failed");
@@ -157,5 +179,6 @@ compiler=shutil.which('cl.exe',path=environment['PATH']);assert compiler
 subprocess.run([compiler,'/nologo','/EHsc','/std:c++17',str(cpp),'/Fe:'+str(exe)],cwd=root,env=environment,check=True)
 fixtures=root.parents[2]/'evidence/software-20261011/reviewed-pdf-excerpts'
 paths=[fixtures/(name+'.pgl') for name in ('1007271','969886','1003497','1002169','feature-hold-rest-chord-repeat')]
+paths.extend(Path(value) for value in sys.argv[1:])
 assert all(path.exists() for path in paths),paths
 subprocess.run([str(exe),*map(str,paths)],check=True)

@@ -18,7 +18,7 @@ import zipfile
 
 REPO = Path(__file__).resolve().parents[1]
 HOST = REPO / 'host'
-DATE = '20261021'
+DATE = '20261022'
 if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
@@ -102,7 +102,7 @@ class FirmwareManager:
 ''', encoding='utf-8')
     web = stage / 'web'
     web.mkdir()
-    assets = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'web_piano_glove.html', 'calibration_trace.html', 'usb-driver.js', 'usb-driver.css']
+    assets = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'software-tempo.js', 'software-tempo.css', 'software-upload.js', 'software-upload.css', 'web_piano_glove.html', 'calibration_trace.html', 'usb-driver.js', 'usb-driver.css']
     assets += [p.name for p in HOST.glob('delivery-*.js')]
     assets += [p.name for p in HOST.glob('delivery-*.css')]
     for name in assets:

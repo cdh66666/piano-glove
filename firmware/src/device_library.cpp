@@ -59,6 +59,7 @@ static libraryclock::WallClock scoreClock;
 static bool boundaryPending=false,boundaryReleaseStarted=false;
 static uint32_t boundaryAt=0,lastScoreBoundary=0,candidateEnds[5]={};
 static uint8_t candidateMask=0,boundaryRepeatMask=0,boundaryReleaseMask=0;
+static uint8_t repeatLiftMask=0,candidateLiftMask=0;
 static uint32_t playedEventCount=0,candidateEventCount=0;
 static bool initializing=false;
 static uint32_t feedbackAt=0,poseAt=0;
@@ -212,7 +213,7 @@ static String compactState(){
  return json+"],\"pv\":"+String(positionValidMask)+",\"si\":"+String(playedEventCount)+",\"sn\":"+String(count)+"}";
 }
 static bool writeLimit(int s,uint16_t limit){uint8_t data[2]={uint8_t(limit),uint8_t(limit>>8)},back[2]={};if(!scs::writeRegs(s+1,48,data,2)||scs::lastError()||!scs::readRegs(s+1,48,2,back)||scs::lastError()||pgl::u16(back)!=limit)return false;appliedLimit[s]=limit;return true;}
-void stop(const char *reason){bool wasActive=running;if(wasActive)recordStop(reason);running=false;training=false;patternRunning=false;patternChangedMask=0;initializing=false;boundaryPending=boundaryReleaseStarted=false;mask=0;recoveryMask=0;movingMask=0;nextReady=false;if(playing)playing.close();owner="none";controller="";failure=reason;if(wasActive)glove::safe();for(int s=0;s<6;++s)if(limitsSaved&(1<<s)){if(writeLimit(s,originalLimit[s]))limitsSaved&=~(1<<s);else{failure="hold_limit_restore_failed";recordStop(failure);}}enabledMask=0;}
+void stop(const char *reason){bool wasActive=running;if(wasActive)recordStop(reason);running=false;training=false;patternRunning=false;patternChangedMask=0;initializing=false;boundaryPending=boundaryReleaseStarted=false;repeatLiftMask=candidateLiftMask=0;mask=0;recoveryMask=0;movingMask=0;nextReady=false;if(playing)playing.close();owner="none";controller="";failure=reason;if(wasActive)glove::safe();for(int s=0;s<6;++s)if(limitsSaved&(1<<s)){if(writeLimit(s,originalLimit[s]))limitsSaved&=~(1<<s);else{failure="hold_limit_restore_failed";recordStop(failure);}}enabledMask=0;}
 bool active(){return running;}
 static bool keep(const char *who){if(!motionOwnerMatches(who))return false;if(running)keepAt=millis();return true;}
 static void tickScoreTimeline();
@@ -255,11 +256,11 @@ static bool prepare(int selected=0,int amplitude=100){
 // Validate the complete candidate before any target, timer or output changes.
 // Arrival and recorded calibration feedback do not veto bounded software goals.
 // -1 is an invalid commanded target; 1 can be committed immediately.
-static int poseTransition(uint8_t selected,uint16_t computed[6]){
- for(int s=0;s<6;++s){int goal=s==0?target(0,false,100):target(s,bool(selected&(1<<(s-1))),amp);if(goal<0)return -1;computed[s]=goal;}
+static int poseTransition(uint8_t selected,uint16_t computed[6],uint8_t lifted=0){
+ for(int s=0;s<6;++s){const uint8_t bit=s?1<<(s-1):0;int goal=s==0?target(0,false,100):target(s,bool(selected&bit),amp);if(s&&!(selected&bit)&&(lifted&bit)){const auto&slot=glove::slot(s);goal=librarytargets::repeatedReleaseTarget(s,scs::profile().family==scs::Family::SCS,slot.lo,slot.hi,hardwareMinimum[s],hardwareMaximum[s]);}if(goal<0)return -1;computed[s]=goal;}
  return 1;
 }
-static bool sendPose(bool forceAll=false){const uint32_t poseStart=millis();uint16_t computed[6];if(poseTransition(mask,computed)<0){stop("working_target_invalid");return false;}if(patternRunning)patternChangedMask=0;scs::SyncItem items[6];int n=0;for(int s=0;s<6;++s){uint16_t pos=computed[s];if(pos!=poseTargets[s]||forceAll){poseFrom[s]=actual[s];poseTargets[s]=pos;axisPoseAt[s]=millis();positionsReady&=~(1<<s);movingMask|=1<<s;if(patternRunning)patternChangedMask|=1<<s;items[n++]={uint8_t(s+1),pos,speeds[s],0};}
+static bool sendPose(bool forceAll=false){const uint32_t poseStart=millis();uint16_t computed[6];if(poseTransition(mask,computed,repeatLiftMask)<0){stop("working_target_invalid");return false;}if(patternRunning)patternChangedMask=0;scs::SyncItem items[6];int n=0;for(int s=0;s<6;++s){uint16_t pos=computed[s];if(pos!=poseTargets[s]||forceAll){poseFrom[s]=actual[s];poseTargets[s]=pos;axisPoseAt[s]=millis();positionsReady&=~(1<<s);movingMask|=1<<s;if(patternRunning)patternChangedMask|=1<<s;items[n++]={uint8_t(s+1),pos,speeds[s],0};}
   if(!applyOutput(s))return false;
  }if(n)scs::syncMove(items,n,true);poseAt=millis();lastPoseMs=millis()-poseStart;if(scs::lastError()){failure="sync_write_failed";stop("sync_write_failed");return false;}return true;}
 static bool startPlay(int slot,int rate,int amplitude,const char *who,int resistance=100){
@@ -272,7 +273,7 @@ static bool startPlay(int slot,int rate,int amplitude,const char *who,int resist
  if(!playing.seek(132)){playing.close();failure="score_read_error";return false;}playReader.reset();
  if(!prepare(0,amplitude)){playing.close();return false;}
  if(!resistanceSupported&&resistance!=0&&resistance!=100){glove::safe();playing.close();failure="hold_register_not_verified";return false;}
- playReader.reset();currentSlot=slot;tempo=rate;amp=amplitude;requestedHold=hold=resistance;count=pgl::u32(h+8);duration=pgl::u32(h+12);index=previousEvent=playedEventCount=0;memset(endTimes,0,sizeof(endTimes));boundaryPending=boundaryReleaseStarted=false;lastScoreBoundary=0;mask=firstMask;training=false;running=true;initializing=false;nextReady=false;owner=who;controller=requestController(who);failure="none";
+ playReader.reset();currentSlot=slot;tempo=rate;amp=amplitude;requestedHold=hold=resistance;count=pgl::u32(h+8);duration=pgl::u32(h+12);index=previousEvent=playedEventCount=0;memset(endTimes,0,sizeof(endTimes));boundaryPending=boundaryReleaseStarted=false;repeatLiftMask=candidateLiftMask=0;lastScoreBoundary=0;mask=firstMask;training=false;running=true;initializing=false;nextReady=false;owner=who;controller=requestController(who);failure="none";
  // The canonical clock and first six-axis musical broadcast begin together
  // after hardware arming. Force all axes even if a goal is already identical.
  started=keepAt=millis();scoreClock.start(started);
@@ -283,14 +284,14 @@ static bool train(int selected,int resistance,int amplitude,const char *who){
  if(scs::profile().family==scs::Family::SCS&&resistance!=0&&resistance!=100){failure="sc09_hold_supports_0_or_100";return false;}
  const bool freshStart=!running;if(freshStart&&!prepare(selected,amplitude))return false;
  if(!resistanceSupported&&resistance!=0&&resistance!=100){glove::safe();failure="hold_register_not_verified";return false;}
- training=true;running=true;initializing=false;currentSlot=0;tempo=100;amp=amplitude;mask=selected;hold=resistance;duration=0;owner=who;controller=requestController(who);failure="none";started=keepAt=millis();return sendPose(freshStart);
+ repeatLiftMask=candidateLiftMask=0;training=true;running=true;initializing=false;currentSlot=0;tempo=100;amp=amplitude;mask=selected;hold=resistance;duration=0;owner=who;controller=requestController(who);failure="none";started=keepAt=millis();return sendPose(freshStart);
 }
 static bool startPattern(int id,int repeats,int rate,int amplitude,int resistance,const char *who){
  if(!motionOwnerMatches(who))return false;if(running){failure="motion_busy";return false;}if(id<0||id>2||repeats<1||repeats>20||!librarypattern::validPatternRate(rate)||amplitude<1||amplitude>100||resistance<0||resistance>100){failure="pattern_parameters_invalid";return false;}
  if(scs::profile().family==scs::Family::SCS&&resistance!=0&&resistance!=100){failure="sc09_hold_supports_0_or_100";return false;}
  if(!prepare(0,amplitude))return false;
  if(!resistanceSupported&&resistance!=0&&resistance!=100){glove::safe();failure="hold_register_not_verified";return false;}
- patternSequence.begin(id,repeats,rate,millis());patternRunning=true;training=true;running=true;initializing=true;currentSlot=0;tempo=rate;amp=amplitude;requestedHold=resistance;hold=100;mask=0;duration=patternSequence.minimumDuration();owner=who;controller=requestController(who);failure="none";started=keepAt=millis();return sendPose(true);
+ repeatLiftMask=candidateLiftMask=0;patternSequence.begin(id,repeats,rate,millis());patternRunning=true;training=true;running=true;initializing=true;currentSlot=0;tempo=rate;amp=amplitude;requestedHold=resistance;hold=100;mask=0;duration=patternSequence.minimumDuration();owner=who;controller=requestController(who);failure="none";started=keepAt=millis();return sendPose(true);
 }
 static bool peekScoreEvent(){if(index>=count)return true;if(!nextReady){if(!playReader.event(previousEvent,nextEvent)){stop("score_read_error");return false;}nextReady=true;}return true;}
 static bool prepareBoundary(){
@@ -308,6 +309,9 @@ static bool prepareBoundary(){
   previousEvent=nextEvent.t;++index;nextReady=false;if(!peekScoreEvent())return false;
  }
  boundaryReleaseMask=mask&~boundaryRepeatMask;
+ candidateLiftMask=boundaryAt>=duration?0:uint8_t(repeatLiftMask&~candidateMask);
+ // Explicit rests in a monophonic score can separate two same-finger taps.
+ if(index<count&&nextEvent.t>boundaryAt)candidateLiftMask|=(mask&~candidateMask)&(1<<(nextEvent.finger-1));
  boundaryPending=true;boundaryReleaseStarted=false;return true;
 }
 static void tickScoreTimeline(){
@@ -322,15 +326,15 @@ static void tickScoreTimeline(){
   const uint32_t releaseLead=min(uint32_t(40)*tempo/100,(boundaryAt-lastScoreBoundary)/2);
   if(desired<boundaryAt){
    if(boundaryRepeatMask&&!boundaryReleaseStarted&&releaseLead&&desired>=boundaryAt-releaseLead){
-    mask=boundaryReleaseMask;if(!sendPose())return;boundaryReleaseStarted=true;
+    repeatLiftMask|=boundaryRepeatMask;mask=boundaryReleaseMask;if(!sendPose())return;boundaryReleaseStarted=true;
    }
    return;
   }
   uint16_t checked[6];
-  if(poseTransition(candidateMask,checked)<0){stop("working_target_invalid");return;}
+  if(poseTransition(candidateMask,checked,candidateLiftMask)<0){stop("working_target_invalid");return;}
   const bool finalReturn=boundaryAt>=duration;
   if(finalReturn)hold=100; // Submit the final lifted pose, then release torque; no arrival wait.
-  const uint8_t old=mask;mask=candidateMask;if((mask!=old||boundaryRepeatMask)&&!sendPose())return;
+  const uint8_t old=mask,oldLift=repeatLiftMask;repeatLiftMask=candidateLiftMask;mask=candidateMask;if((mask!=old||boundaryRepeatMask||repeatLiftMask!=oldLift)&&!sendPose())return;
   memcpy(endTimes,candidateEnds,sizeof(endTimes));playedEventCount+=candidateEventCount;
   if(finalReturn){Serial.printf("LIB_SCORE_COMPLETE {\"slot\":%d,\"score_index\":%u,\"score_total\":%u,\"score_clock\":\"continuous-v1\",\"timeline_complete\":true,\"arrival_checked\":false}\n",currentSlot,unsigned(playedEventCount),unsigned(count));stop("completed");return;}
   lastScoreBoundary=boundaryAt;boundaryPending=false;
@@ -419,7 +423,9 @@ void begin(){
   directory=SPIFFS.open("/");file=directory.openNextFile();
   while(file){String name=file.name();int start=name.startsWith("/")?2:1;int slot=name.substring(start).toInt();file.close();if(name.endsWith(".pgc")&&validSlot(slot)){File candidate;uint8_t h[128];if(openScore(slot,candidate,h))cacheEntry(slot,h,candidate.size());candidate.close();}file=directory.openNextFile();}directory.close();
  }
- uint64_t mac=ESP.getEfuseMac();snprintf(apName,sizeof(apName),"PIANO_GLOVE_%06X",unsigned(mac&0xffffff));WiFi.mode(WIFI_AP);ap=WiFi.softAP(apName,"piano1234");
+ uint64_t mac=ESP.getEfuseMac();snprintf(apName,sizeof(apName),"PIANO_GLOVE_%06X",unsigned(mac&0xffffff));
+ // Phone setup uses an open AP; Arduino clears the previous AP password for nullptr.
+ WiFi.mode(WIFI_AP);ap=WiFi.softAP(apName,nullptr);
  const char*headers[]={"X-Piano-Controller","Host","User-Agent"};web.collectHeaders(headers,3);
  web.setWaitHandler([]{serviceHttpWait();});
  if(ap){portalDnsReady=portalDns.begin(53)==1;portalDhcpReady=configurePortalDhcp();Serial.printf("LIB_PORTAL_READY dhcp_dns=%d dns=%d offer_before=%u offer_after=%u error=%d\n",portalDhcpReady,portalDnsReady,unsigned(portalDnsOfferBefore),unsigned(portalDnsOfferAfter),portalDhcpError);}
@@ -433,6 +439,11 @@ void begin(){
  web.on("/software-review.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_REVIEW_JS);});
  web.on("/software-review.css",HTTP_GET,[]{web.send_P(200,"text/css; charset=utf-8",SOFTWARE_REVIEW_CSS);});
  web.on("/software.css",HTTP_GET,[]{web.send_P(200,"text/css; charset=utf-8",SOFTWARE_CSS);});
+ web.on("/software-tempo.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_TEMPO_JS);});
+ web.on("/software-tempo.css",HTTP_GET,[]{web.send_P(200,"text/css; charset=utf-8",SOFTWARE_TEMPO_CSS);});
+ web.on("/software-upload.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_UPLOAD_JS);});
+ web.on("/software-upload.css",HTTP_GET,[]{web.send_P(200,"text/css; charset=utf-8",SOFTWARE_UPLOAD_CSS);});
+
  web.on("/api/library",HTTP_GET,[]{web.send(200,"application/json",listing());});
  web.on("/api/state",HTTP_GET,[]{web.send(200,"application/json",statusJson());});
  web.on("/api/software/status",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",statusJson());});
@@ -463,7 +474,7 @@ void tick(){
 static void serviceMotion(){
  if(!running)return;
  if(!glove::armed()){stop("external_stop");return;}
- if(millis()-keepAt>2000){stop("controller_disconnected");return;}
+ if(librarycontroller::leaseExpired(millis(),keepAt,owner=="wifi",!training&&!patternRunning)){stop("controller_disconnected");return;}
  if(millis()-positionsAt>=20){
   const uint32_t sampled=positionsAt=millis();uint8_t ids[6]={1,2,3,4,5,6};uint16_t positions[6];
   if(scs::syncReadPos(ids,6,positions,scs::positionReadBudget(6))!=6||scs::lastError()){positionValidMask=0;stop("position_feedback_lost");return;}

@@ -30,5 +30,11 @@ int main(){
  assert(librarytargets::target(1,false,1920,2422,0,4095,true,100)==1945);
  assert(librarytargets::target(1,false,1920,2422,0,4095,false,100)==2397);
  assert(librarytargets::target(0,false,1276,2287,0,4095,false,100)==2237);
+ for(bool scs:{true,false}){
+  assert(librarytargets::repeatedReleaseTarget(2,scs,500,900,0,1023)==900);
+  assert(librarytargets::repeatedReleaseTarget(2,scs,500,900,0,890)==890);
+  assert(librarytargets::repeatedReleaseTarget(2,scs,500,900,950,1023)==-1);
+  assert(librarytargets::repeatedReleaseTarget(0,scs,500,900,0,1023)==880);
+ }
  puts("PASS actual LIB fixed targets: both models press low, STS thumb correction; all six amplitudes and hardware bounds");
 }

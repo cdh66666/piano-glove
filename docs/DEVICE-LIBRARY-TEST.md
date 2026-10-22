@@ -46,9 +46,11 @@ USB commands (newline-terminated at 115200):
 * `LIB TEST OFFHAND` / `LIB TEST NORMAL` — explicit USB-only temporary bare-hand
   bench mode; switching first stops/SAFE, is not saved, and boot defaults NORMAL.
 
-Hotspot: real MAC-based `PIANO_GLOVE_xxxxxx`, password `piano1234`, IP
+Hotspot: real MAC-based `PIANO_GLOVE_xxxxxx`, open network (no password), IP
 192.168.4.1. The same offline `host/software.html`, JS and CSS are embedded by
 `firmware/embed_ui.py`; phone operation needs no running desktop bridge.
+Repeated score taps may lift the repeated finger to its calibrated release endpoint,
+clipped to hardware travel. Normal press depth and training targets stay unchanged.
 DHCP advertises the glove DNS server. The bounded DNS responder accepts EDNS
 queries and resolves A queries to the glove, while AAAA/HTTPS return NODATA.
 Android/vendor, Apple and Windows connectivity-check routes and unknown HTTP

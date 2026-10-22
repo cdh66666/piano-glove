@@ -1,0 +1,15 @@
+/* Keep the actual file input visible and directly clickable by the user. */
+#pgl.score-file-native{min-width:0;max-width:100%;flex:1 1 300px;min-height:46px;padding:3px 0;color:var(--muted);font-size:14px}
+#pgl.score-file-native::file-selector-button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;min-height:44px;padding:10px 15px;margin-right:12px;font:inherit;cursor:pointer}
+#pgl.score-file-native:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.score-file-help-area{flex:1 0 100%;min-width:0}
+.score-file-selection{font-size:13px;color:var(--accent);margin:0 0 7px;overflow-wrap:anywhere}
+.score-file-selection:empty{display:none}
+.score-file-help{font-size:12px;color:var(--muted)}
+.score-file-help summary{cursor:pointer;display:inline-block;padding:5px 0;text-decoration:underline;text-underline-offset:3px}
+.score-file-help p{margin:8px 0;max-width:620px;font-size:12px;line-height:1.6}
+.score-file-help .score-browser-address{display:block;width:min(100%,420px);padding:10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;font-size:14px}
+.score-browser-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.score-browser-actions button,.score-browser-actions a{padding:9px 12px;font-size:13px}
+.score-browser-actions a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+@media(max-width:720px){#pgl.score-file-native{flex-basis:100%;width:100%;font-size:13px}.score-file-help .score-browser-address{width:100%;max-width:420px}.score-browser-actions button,.score-browser-actions a{min-height:44px;display:inline-flex;align-items:center}}

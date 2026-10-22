@@ -24,6 +24,14 @@ bool running=false;String owner="none",controller,failure="none";
 struct Web {String token,form,value;bool hasHeader(const char*){return !token.empty();}String header(const char*){return token;}String arg(const char*name){return std::string(name)=="controller"?form:value;}}web;
 ''' + helpers + keep + integer + r'''
 int main(){
+ assert(librarycontroller::leaseTimeoutMs(true,true)==5000);
+ for(bool wireless:{false,true})for(bool score:{false,true}){
+  const uint32_t lease=wireless&&score?5000:2000;
+  assert(!librarycontroller::leaseExpired(100+lease,100,wireless,score));
+  assert(librarycontroller::leaseExpired(101+lease,100,wireless,score));
+  assert(!librarycontroller::leaseExpired(lease-4,0xfffffffcu,wireless,score));
+  assert(librarycontroller::leaseExpired(lease-3,0xfffffffcu,wireless,score));
+ }
  for(const char*token:{"","A","page-42_abc"})assert(librarycontroller::validToken(token,strlen(token)));
  for(const char*token:{"a b","a\nb","a:b","a/b","a\"b"})assert(!librarycontroller::validToken(token,strlen(token)));
  std::string limit(64,'a'),oversize(65,'a');assert(librarycontroller::validToken(limit.c_str(),64));assert(!librarycontroller::validToken(oversize.c_str(),65));
