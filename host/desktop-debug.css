@@ -1,0 +1,215 @@
+/* The native debug console shares the application's paper and steel-blue palette. */
+body.native-app.delivery-compact{--bg:#E5EBF1;--panel:#F5F8FB;--line:#BAC8D5;--ink:#24394C;--sub:#52687C;--blue:#365D7E;--blue-bg:#DDE6EF;--green:#376B57;--red:#A8394C;font-family:'Segoe UI Variable','Microsoft YaHei UI','Microsoft YaHei',sans-serif;background:#E5EBF1;color:#24394C;font-size:14px}
+body.native-app #demoRoot{max-width:1600px;grid-template-rows:66px 42px minmax(0,1fr) 40px;gap:13px;padding:0 28px 8px}
+body.native-app #demoTop{background:#F5F8FB;border:0;border-bottom:1px solid #E8EEF4;border-radius:0;box-shadow:none;backdrop-filter:none;padding:0 0;gap:14px;z-index:40}
+body.native-app #demoTop h1{font-size:18px;color:#24394C;letter-spacing:0;margin-right:auto}
+body.native-app #demoTop #native-back{position:static;display:inline-flex!important;align-items:center;flex-shrink:0;background:#DDE6EF;color:#365D7E;border:0;padding:9px 13px;border-radius:7px;font-size:12px;min-height:35px;white-space:nowrap}
+body.native-app #demoTop #native-back::before{content:'‹';font-size:19px;margin-right:7px;font-weight:350;line-height:1}
+body.native-app #demoConnection{font-size:11px;color:#52687C;background:transparent;min-width:0;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+body.native-app #demoConnection.connected{background:#DDE6EF;color:#365D7E}
+body.native-app #demoStop{color:#A8394C;background:#F8ECEE;padding:9px 17px;font-size:12px}
+body.native-app #demoRoot button:focus-visible,body.native-app #demoRoot select:focus-visible,body.native-app #demoRoot summary:focus-visible{outline:2px solid #365D7E;outline-offset:3px}
+body.native-app #demoTabs{justify-self:start;background:#EDF2F7;border-radius:9px;padding:4px}
+body.native-app #demoTabs button{height:32px;padding:0 20px;color:#52687C;border-radius:6px;font-weight:500}
+body.native-app #demoTabs button.active{background:#F5F8FB;color:#365D7E;box-shadow:0 1px 4px #24394C0D;font-weight:600}
+body.native-app #demoRoot .demoBlock,body.native-app #demoRoot .demoSongList,body.native-app #demoRoot .demoSongStage{background:#F5F8FB;color:#24394C;border:0;border-radius:14px;box-shadow:none}
+body.native-app #demoRoot .demoBlock{padding:25px;overflow:auto;scrollbar-width:thin;scrollbar-color:#CBD8E3 transparent}
+body.native-app #demoRoot .demoBlock h2{color:#24394C;font-size:20px;font-weight:600;letter-spacing:-.2px}
+body.native-app #demoRoot .demoBlock p{color:#52687C;font-size:12px;line-height:1.6}
+body.native-app #demoRoot .demoBlock button,body.native-app #demoRoot .demoBlock select{background:#DDE6EF;color:#365D7E;border:0;border-radius:7px;padding:9px 13px;font-size:12px;min-height:36px}
+body.native-app #demoRoot button.primary,body.native-app #demoRoot #demoCalStart,body.native-app #demoRoot #demoSongStart,body.native-app #demoRoot #demoShowAll{background:#365D7E;color:#fff;border:0;box-shadow:none}
+body.native-app #demoRoot button:disabled{opacity:1;cursor:default;background:#E2E7ED!important;color:#657586!important}
+body.native-app #demoRoot .demoColumns{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:22px}
+body.native-app #demoRoot #demoCalibration .demoBlock{display:flex;flex-direction:column;min-height:0;position:relative;background:#F5F8FB;color:#24394C;border:0}
+body.native-app #demoRoot #demoCalibration :is(h2,h3){color:#24394C}
+body.native-app #demoRoot #demoCalibration .demoBlock :is(button,select){background:#DDE6EF;color:#365D7E}
+body.native-app #demoRoot #demoCalibration .demoBlock button.primary{background:#365D7E;color:#fff}
+body.native-app #demoRoot #demoCalibration .demoChecks label,body.native-app #demoRoot #demoCalibration .demoMessage{color:#52687C}
+body.native-app #demoRoot #demoCalibrationWizard{gap:12px;flex:initial}
+body.native-app #demoRoot #demoCalibrationWizard h2{font-size:22px;font-weight:600;color:#24394C;letter-spacing:-.25px;min-height:0;margin:2px 0 0}
+body.native-app #demoRoot #demoCalibrationProgress{font-size:12px;color:#52687C}
+body.native-app #demoRoot #demoCalibrationSlots{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));min-height:0;max-height:none;flex:initial;gap:9px;margin:12px 0}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot{min-height:110px;gap:3px;border:1px solid #DEE7EF;background:#F8FAFD;color:#52687C;border-radius:8px;padding:10px 7px;text-shadow:none}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot::before{position:absolute;top:6px;right:8px;font-size:11px;color:#52687C;margin:0;font-weight:500}
+body.native-app #demoRoot .demoCalSlot b{font-size:12px;color:#365D7E;text-shadow:none;font-weight:600}
+body.native-app #demoRoot .demoCalSlot small{font-size:11px;color:#52687C;text-shadow:none}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot.current{border:2px solid #7F9EB5;background:#DDE6EF;box-shadow:none;transform:none}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot.done{border-color:#C2D5E0;background:#E7F0F5}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot.current::before,body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot.done::before{color:#365D7E}
+body.native-app #demoRoot .demoCalSlot.current small,body.native-app #demoRoot .demoCalSlot.done small{color:#52687C}
+body.native-app #demoRoot .demoCalSlot .demoCycleCount{font-size:11px;color:#52687C;background:#E9EFF5;border-radius:5px;padding:3px 7px;min-width:0;margin:6px 0 0;letter-spacing:0;box-shadow:none}
+body.native-app #demoRoot #demoCalibrationSlots .demoSlotCalibrate{min-height:24px;margin-top:3px;padding:4px 7px;font-size:11px;line-height:1.3;background:#DDE6EF;color:#365D7E;border:1px solid #D5E1EB}
+body.native-app #demoRoot .demoCalSlot.current .demoCycleCount,body.native-app #demoRoot .demoCalSlot.done .demoCycleCount{background:#D9E5EE;color:#365D7E;box-shadow:none}
+body.native-app #demoRoot #demoCalStart{min-height:38px;font-size:12px;padding:9px 15px;margin:0}
+body.native-app #demoRoot #demoCalibrationSlots :is(.demoSweep,.demoSweepWrap){background:#A8C2D635;border-block-color:#9FB8CB}
+body.native-app #demoRoot #demoCalibrationSlots .demoCursor{background:#6E91AD;box-shadow:none}
+body.native-app #demoRoot #demoCalibrationSlots :is(.demoScaleMax,.demoScaleMin){color:#52687C;background:#E5EBF1B8;font-family:inherit;font-size:11px}
+body.native-app #demoRoot #demoCalibrationSlots :is(.demoPosition,.demoDelta,.demoCycleCount,b){text-shadow:none}
+body.native-app #demoRoot .demoCalSlot.outside{border:2px solid #B86674!important;box-shadow:none}
+body.native-app #demoRoot .demoCalSlot.outside .demoPosition{color:#A8394C!important}
+body.native-app #demoRoot #demoMotionLive{color:#52687C!important;font-size:12px;min-height:20px;margin:11px 0}
+body.native-app #demoRoot #demoSpeedStart{background:#DDE6EF;border:0;color:#365D7E}
+body.native-app #demoRoot #demoSpeedResults p{background:#F1F5F9;border:1px solid #E0E8F0;color:#637F94!important;font-size:11px}
+body.native-app #demoRoot #demoSpeedResults.speedChart{display:flex;flex-direction:column;flex-wrap:nowrap;flex:none;gap:7px;width:100%;padding:12px;margin:8px 0;background:#F5F8FB;border:1px solid #E2EAF1;border-radius:10px;overflow:hidden}
+body.native-app #demoRoot .speedChartHead b{font-size:13px;color:#5E7A91}
+body.native-app #demoRoot .speedChartHead span{font-size:11px;color:#52687C}
+body.native-app #demoRoot .speedChartStatus{font-size:11px;color:#52687C;min-height:14px;margin:0}
+body.native-app #demoRoot .speedChartColumns{flex:1;min-height:70px;height:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;padding:3px;overflow:hidden}
+body.native-app #demoRoot #demoSpeedResults.speedChart .speedChartStage{height:100%;min-width:0;min-height:0;padding:5px 3px;display:grid;grid-template-rows:22px minmax(12px,1fr) 17px 11px;background:#F5F8FB;color:#52687C;border:1px solid #DFE8F0;border-radius:6px}
+body.native-app #demoRoot .speedChartStage.selected{outline:1px solid #7F9FB6;outline-offset:1px}
+body.native-app #demoRoot .speedChartStage.testing{background:#E3EDF4;border-color:#8DABBF;box-shadow:none}
+body.native-app #demoRoot .speedChartStage.measured{color:#365D7E}
+body.native-app #demoRoot .speedChartStage>b{font-size:11px}
+body.native-app #demoRoot .speedChartStage small{font-size:11px}
+body.native-app #demoRoot .speedChartHz{font-size:17px;font-weight:500}
+body.native-app #demoRoot .speedChartPlot{margin:0 6px;border-bottom-color:#D3DFE9}
+body.native-app #demoRoot .speedChartPlot i{background:#9EBACF;border-radius:3px 3px 0 0}
+body.native-app #demoRoot .speedChartDetail{flex:none;width:100%;margin:0;padding:9px 0 0;border-color:#DCE6EF;color:#52687C}
+body.native-app #demoRoot .speedChartSelectedTitle{font-size:12px;color:#5F7C93;gap:8px}
+body.native-app #demoRoot .speedChartSelectedTitle span{font-size:11px;color:#52687C}
+body.native-app #demoRoot .speedChartFingers{gap:5px;margin-top:8px}
+body.native-app #demoRoot .speedChartFingers small{font-size:11px;color:#52687C}
+body.native-app #demoRoot .speedChartFingers strong{font-size:11px;color:#365D7E;font-weight:500}
+body.native-app #demoRoot .speedChartDetail>small{font-size:11px;color:#52687C;margin-top:8px}
+body.native-app #demoRoot .speedChartNote{font-size:11px;color:#52687C;margin:0;line-height:1.3}
+body.native-app #demoRoot #demoActionProgress{flex:initial;min-height:0;gap:10px;margin:22px 0;order:initial}
+body.native-app #demoRoot #demoActionProgress>button.demoActionStep{height:40px;min-height:0;flex-direction:row;background:#F5F8FB;border:1px solid #DCE5EE;border-radius:7px;color:#5A768E;font-size:12px;gap:9px;padding:7px;box-shadow:none}
+body.native-app #demoRoot #demoActionProgress>.demoActionStep::before{font-size:17px;color:#7F9BB2;font-weight:450}
+body.native-app #demoRoot #demoActionProgress>button.demoActionStep:not(:disabled):hover{background:#DDE6EF;box-shadow:none}
+body.native-app #demoRoot #demoActionProgress>button.demoActionStep.current{background:#365D7E;border-color:#365D7E;color:#fff;box-shadow:none}
+body.native-app #demoRoot #demoActionProgress>button.demoActionStep.current::before{color:#E0EBF3}
+body.native-app #demoRoot #demoActionProgress>.demoActionStep.done{background:#E7F0F5;color:#365D7E}
+body.native-app #demoRoot #demoActionMessage{order:initial;font-size:11px;color:#52687C;min-height:22px;margin:0 0 12px}
+body.native-app #demoRoot #demoManualCalibration,body.native-app #demoRoot #demoManualActions{display:block!important;position:static;flex:initial;max-height:none;margin:16px 0 0;padding:13px 0 0;border:0;border-top:1px solid #E5EBF1;background:transparent;box-shadow:none;color:#52687C;overflow:visible;order:initial}
+body.native-app #demoRoot :is(#demoManualCalibration,#demoManualActions) summary{font-size:11px;color:#52687C;padding:3px 0;cursor:pointer}
+body.native-app #demoRoot .demoCalibrationTable th{color:#52687C}
+body.native-app #demoRoot .demoCalibrationTable td{color:#657F94;border-color:#EDF1F6}
+body.native-app #demoRoot #demoEnrollOpen{color:#365D7E!important;background:#DDE6EF!important}
+body.native-app #demoRoot .demoSetupEntries .demoMountEntry,body.native-app #demoRoot #demoValidationOpen{background:#DDE6EF!important;color:#365D7E!important;border:0!important;font-weight:500}
+body.native-app #demoRoot #demoEnrollment{background:#F5F8FB;border:0;border-radius:14px;padding:27px;color:#24394C;box-shadow:none}
+body.native-app #demoRoot #demoEnrollment #demoEnrollStatus{color:#365D7E;font-size:25px;font-weight:600;letter-spacing:-.3px;min-height:45px}
+body.native-app #demoRoot #demoEnrollment p{color:#52687C}
+body.native-app #demoRoot #demoEnrollSlots{gap:12px;margin:23px 0;min-height:170px}
+body.native-app #demoRoot .demoEnrollSlot{background:#E5EBF1;border:1px solid #DEE6EE;color:#52687C;box-shadow:none;border-radius:9px;min-height:150px;gap:13px}
+body.native-app #demoRoot .demoEnrollSlot b{color:#6F8EA6;font-size:30px;font-weight:350}
+body.native-app #demoRoot .demoEnrollSlot small{color:#52687C;font-size:11px}
+body.native-app #demoRoot .demoEnrollSlot.done{background:#E7F0F5;border-color:#BCD0DE;color:#365D7E;box-shadow:none}
+body.native-app #demoRoot .demoEnrollSlot.done b,body.native-app #demoRoot .demoEnrollSlot.current b{color:#365D7E}
+body.native-app #demoRoot .demoEnrollSlot.done small{background:#D3E2EC;color:#365D7E}
+body.native-app #demoRoot .demoEnrollSlot.current,body.native-app #demoRoot .demoEnrollSlot.active{background:#DDE6EF;border:2px solid #87A5BA;box-shadow:none;transform:none;color:#365D7E}
+body.native-app #demoRoot #demoEnrollment button{background:#DDE6EF;color:#365D7E;border:0;box-shadow:none}
+body.native-app #demoRoot #demoEnrollment button.primary{background:#365D7E;color:#fff}
+body.native-app #demoRoot .demoSongLayout{grid-template-columns:215px minmax(0,1fr);gap:22px}
+body.native-app #demoRoot .demoSongList{padding:23px 15px;overflow:auto}
+body.native-app #demoRoot .demoSongList h2{font-size:19px;color:#24394C;letter-spacing:-.2px;margin:0 6px 15px}
+body.native-app #demoRoot .demoSongList button{background:transparent;color:#6C8297;border:0;border-radius:8px;font-size:12px;padding:14px 12px;min-height:55px}
+body.native-app #demoRoot .demoSongList button.selected{background:#DDE6EF;color:#365D7E}
+body.native-app #demoRoot .demoSongList button small,body.native-app #demoRoot .demoSongList button.selected small{color:#52687C;font-size:11px}
+body.native-app #demoRoot #demoSongs .demoSongStage{grid-template-rows:auto minmax(130px,1fr) auto auto auto auto;gap:12px;padding:24px;overflow:auto}
+body.native-app #demoRoot #demoSongs #demoSelectedTitle{font-size:23px;font-weight:600;color:#24394C;letter-spacing:-.3px}
+body.native-app #demoRoot .demoSongHeading>div>small{font-size:11px;color:#52687C;margin-bottom:6px}
+body.native-app #demoRoot #demoSongStart{font-size:12px;min-height:36px;padding:9px 16px}
+body.native-app #demoRoot #demoScoreExcerpt{background:#E5EBF1;padding:12px;border-radius:10px}
+body.native-app #demoRoot #demoScoreCaption{color:#738B9F;font-size:11px;font-weight:500}
+body.native-app #demoRoot #demoScoreImage{flex:1 1 0;height:0;min-height:0;object-fit:contain;background:#F5F8FB;border-radius:5px}
+body.native-app #demoRoot #demoScoreSource{font-size:11px;color:#52687C;margin-top:7px}
+body.native-app #desktopDebugImageError{color:#A8394C;font-size:11px;margin:8px 0 0}
+body.native-app #demoRoot #demoSongs .demoFinger{border:1px solid #DCE5EE;border-bottom:3px solid #D7E2EB;background:#F5F8FB;color:#607C93;border-radius:7px 7px 11px 11px;height:110px;font-size:12px;gap:2px}
+body.native-app #demoRoot #demoSongs .demoFinger b{font-size:28px;font-weight:350}
+body.native-app #demoRoot #demoSongs .demoFinger>span{font-size:12px;color:#7890A4;margin:6px 0 0}
+body.native-app #demoRoot #demoSongs .demoFinger small{font-size:11px;color:#52687C}
+body.native-app #demoRoot #demoSongs .demoFinger.active{background:#365D7E;border-color:#365D7E;color:#fff;transform:none}
+body.native-app #demoRoot #demoSongs .demoFinger.active :is(small,span){color:#E3EDF4}
+body.native-app #demoRoot #demoSongProgress{font-size:11px;color:#52687C;min-height:18px}
+body.native-app #demoRoot #demoSongs #demoSongEvents{background:#F1F5F9;color:#52687C;border-radius:8px;height:64px;min-height:64px;max-height:64px;padding:7px;scrollbar-color:#BED0DE transparent}
+body.native-app #demoRoot #demoSongs #demoSongEvents .demoEvent{background:#F5F8FB;color:#52687C;font-size:11px;flex-basis:53px}
+body.native-app #demoRoot #demoSongs #demoSongEvents .demoEvent.active{background:#365D7E;color:#fff}
+body.native-app #demoRoot #demoSongs .demoSongNote{color:#52687C;font-size:11px}
+body.native-app #demoFoot{font-size:11px;color:#52687C;min-height:36px}
+body.native-app #demoFoot #demoEnrollNext{position:static;flex-shrink:0;background:#365D7E;color:#fff;border:0;border-radius:7px;min-height:33px;padding:7px 13px;font-size:12px;font-weight:500;box-shadow:none;max-width:none;margin-left:auto}
+body.native-app #demoRoot :is(#demoEnrollNext,#demoCalStart,#demoShowAll,#demoSongStart)::after{content:none;animation:none}
+body.native-app .desktop-debug-device{position:relative;color:#52687C;font-size:11px;flex-shrink:0}
+body.native-app .desktop-debug-device>summary{cursor:pointer;list-style:none;padding:9px 10px;border-radius:7px}
+body.native-app .desktop-debug-device>summary:hover,body.native-app .desktop-debug-device[open]>summary{background:#DDE6EF;color:#365D7E}
+body.native-app .desktop-debug-device-body{position:absolute;right:0;top:42px;z-index:100;width:260px;padding:17px;background:#F5F8FB;border:1px solid #E3EAF1;border-radius:11px;box-shadow:0 12px 40px #26394D17;display:flex;flex-direction:column;gap:13px}
+body.native-app .desktop-debug-device-body label{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#52687C}
+body.native-app #demoTop .desktop-debug-device-body button,body.native-app #demoTop .desktop-debug-device-body select{width:100%;background:#DDE6EF;color:#365D7E;margin:0;text-align:left}
+body.native-app #desktopDebugTools{display:flex;flex-direction:column;background:transparent;overflow:hidden;gap:14px}
+body.native-app.desktop-debug-tools-open #demoRoot>.demo-panel:not(#desktopDebugTools){display:none!important}
+body.native-app .desktop-debug-tools-nav{display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:4px;background:#DDE6EF;border-radius:8px;flex-shrink:0;align-self:flex-start}
+body.native-app .desktop-debug-tools-nav button{border:0;border-radius:5px;background:transparent;color:#7890A4;padding:8px 12px;font-size:12px;min-height:0}
+body.native-app .desktop-debug-tools-nav button.active{background:#F5F8FB;color:#365D7E}
+body.native-app #desktopDebugTools>main{flex:1;min-height:0;overflow:auto;max-width:none;margin:0;padding:0;scrollbar-width:thin}
+body.native-app #desktopDebugTools .page{max-width:none;padding:0}
+body.native-app #desktopDebugTools .card{border:0;background:#F5F8FB;border-radius:12px;padding:24px;margin-bottom:16px}
+body.native-app #desktopDebugTools .card>h2{font-size:18px;letter-spacing:-.2px;color:#24394C}
+body.native-app #desktopDebugTools .card .desc{font-size:12px;color:#52687C}
+body.native-app #desktopDebugTools button{font-size:12px;padding:9px 14px;border-radius:7px;background:#DDE6EF;color:#365D7E;border-color:transparent}
+body.native-app #desktopDebugTools button.primary{background:#365D7E;color:#fff}
+body.native-app #desktopDebugTools button.danger{background:#F8ECEE;color:#A8394C}
+body.native-app #desktopDebugTools :is(input,select){font-size:12px;border-radius:6px;border-color:#DCE5EE;color:#365D7E}
+body.native-app #desktopDebugTools .page .row{gap:11px;margin:13px 0}
+body.native-app #desktopDebugTools label{font-size:12px;color:#52687C}
+body.native-app #desktopDebugTools .hint{font-size:11px;color:#52687C}
+body.native-app #desktopDebugTools :is(.gate,.warnbox,.scanbox,.msg){border-color:#E0E8F0;background:#F3F6FA;color:#6E879C;border-radius:8px;font-size:12px}
+body.native-app #desktopDebugTools .msg.err{background:#FAEEF0;color:#A95264}
+body.native-app #desktopDebugTools pre#log{background:#EDF2F7;color:#5B748A;border-radius:8px;font:11px/1.6 'Segoe UI Variable','Microsoft YaHei UI',sans-serif}
+body.native-app #desktopDebugTools pre#log .err{color:#AA5061}
+body.native-app #desktopDebugTools pre#log :is(.d,.sys){color:#7B92A6}
+body.native-app #desktopDebugTools pre#log :is(.ok,.pl){color:#5C897A}
+body.native-app #desktopDebugTools .dep .bar i{background:#A9C3D6}
+body.native-app .mountDialog,body.native-app .validationDialog,body.native-app #demoFirmwareDialog{background:#F5F8FB;color:#24394C;border-color:#DCE5EE;box-shadow:0 18px 70px #26394D24;font-family:inherit}
+body.native-app .mountDialog button.primary,body.native-app .validationDialog button.primary{background:#365D7E;border-color:#365D7E;color:#fff}
+@media(max-width:1100px){body.native-app #demoRoot{padding:0 20px 6px;gap:11px;grid-template-rows:62px 41px minmax(0,1fr) 36px}body.native-app #demoRoot .demoBlock{padding:20px}body.native-app #demoTop{gap:10px}body.native-app #demoTabs button{padding:0 16px}body.native-app #demoRoot .demoColumns{gap:17px}body.native-app #demoRoot .demoSongLayout{grid-template-columns:185px minmax(0,1fr);gap:17px}body.native-app #demoRoot #demoSongs .demoSongStage{padding:20px}body.native-app #demoRoot #demoSongs #demoSelectedTitle{font-size:21px}body.native-app #demoConnection{max-width:160px}}
+@media(max-height:720px){body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot{min-height:100px}body.native-app #demoRoot #demoCalibrationWizard h2{font-size:20px}body.native-app #demoRoot #demoSongs .demoSongStage{gap:9px;padding-top:20px}body.native-app #demoRoot #demoSongs .demoFinger{height:90px}body.native-app #demoRoot #demoSongs #demoSongEvents{height:58px;min-height:58px;max-height:58px}}
+/* Calibration and action tests occupy their own first-level pages. */
+body.native-app #demoRoot #demoCalibration .demoColumns{grid-template-columns:minmax(0,1fr)}
+body.native-app #demoRoot #demoCalibration .demoBlock{padding:28px 32px;border:1px solid #C5D0DA}
+body.native-app #demoRoot #demoCalibrationWizard{max-width:1280px;width:100%;margin:auto}
+body.native-app #demoRoot #demoCalibrationSlots{margin:24px 0;gap:14px}
+body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot{min-height:180px;padding:20px 10px;gap:8px;background:#E9EFF5;border-color:#BFCEDB}
+body.native-app #demoRoot .demoCalSlot b{font-size:14px}
+body.native-app #demoRoot #demoManualCalibration{margin-top:20px}
+body.native-app #demoRoot #demoManualCalibration[open]{position:static;padding:16px;background:#E9EFF5;border:1px solid #C5D0DA;border-radius:9px;overflow:auto}
+body.native-app #demoRoot #demoCalibration .demoBlock:has(#demoManualCalibration[open])>#demoCalibrationWizard{display:none}
+body.native-app #demoRoot #demoManualCalibration[open]{margin:0;padding:0;border:0;background:transparent;overflow:visible}
+body.native-app #demoRoot #demoManualCalibration[open]>summary{padding:4px 0 14px;font-size:12px;color:#365D7E}
+body.native-app #demoRoot #demoManualCalibration .demoCalibrationHeading{margin:12px 0}
+body.native-app #demoRoot #demoManualCalibration .demoCalibrationTable{margin:12px 0}
+body.native-app #demoRoot #demoManualCalibration .demoCalibrationTable :is(td,th){padding:7px 8px;font-size:12px}
+body.native-app #demoRoot #demoCalibration #demoManualCalibration .demoCalibrationHeading{display:flex;align-items:center;gap:10px;margin:8px 0}
+body.native-app #demoRoot #demoCalibration #demoManualCalibration .demoCalibrationHeading h2{margin:0 auto 0 0;font-size:20px}
+body.native-app #demoRoot #demoManualCalibration #demoEnrollOpen{float:none!important;margin:0!important}
+body.native-app #demoRoot #demoCalibration #demoManualCalibration .demoCalibrationTable :is(td,th){padding:5px 8px;line-height:1.3;color:#52687C;border-color:#CBD6E0}
+body.native-app #demoRoot #demoCalibration #demoManualCalibration p{font-size:12px;color:#52687C;margin:8px 0;line-height:1.5}
+body.native-app #desktopDebugActions{display:flex;min-height:0}
+body.native-app.desktop-debug-actions-open #demoRoot>.demo-panel:not(#desktopDebugActions){display:none!important}
+body.native-app #desktopDebugActions>.demoBlock{width:100%;display:grid;grid-template-columns:minmax(295px,.85fr) minmax(0,1.35fr);grid-template-rows:28px 42px minmax(0,1fr) 24px;gap:16px 28px;border:1px solid #C5D0DA}
+body.native-app #desktopDebugActions h2{grid-area:1/1;margin:0}
+body.native-app #desktopDebugActions>.demoBlock>.demoRow{grid-area:1/2;justify-self:end;margin:0}
+body.native-app #desktopDebugActions #demoMotionLive{grid-area:4/2;margin:0;align-self:center}
+body.native-app #desktopDebugActions #demoActionProgress{grid-area:2/1;margin:0;gap:8px}
+body.native-app #desktopDebugActions #demoActionProgress>button{font-size:12px;padding:6px}
+body.native-app #desktopDebugActions #demoActionProgress>button::before{display:none}
+body.native-app #desktopDebugActions #demoManualActions{grid-area:3/1;position:static;display:flex!important;flex-direction:column;gap:12px;margin:0;padding:0;border:0}
+body.native-app #desktopDebugActions #demoManualActions>summary{display:none}
+body.native-app #desktopDebugActions .demoActionGroup{padding:12px 14px;background:#E9EFF5;border:1px solid #C5D0DA;border-radius:8px;margin:0}
+body.native-app #desktopDebugActions .demoActionGroup h3{font-size:13px;color:#24394C;margin:0 0 8px}
+body.native-app #desktopDebugActions .demoActionGroup .demoRow{margin:0;gap:10px}
+body.native-app #desktopDebugActions .demoActionGroup .demoChecks{margin-bottom:9px;gap:14px}
+body.native-app #desktopDebugActions .demoActionGroup label{color:#36516A;font-size:13px}
+body.native-app #desktopDebugActions #demoSpeedResults{grid-area:2/2/4/3;min-height:0;margin:0!important;padding:18px!important;background:#E9EFF5!important;border-color:#C5D0DA!important}
+body.native-app #desktopDebugActions #demoActionMessage{grid-area:4/1;align-self:center;margin:0;line-height:1.5}
+body.native-app #demoRoot .speedChartHead b,body.native-app #demoRoot .speedChartSelectedTitle{color:#36516A}
+body.native-app #demoRoot .speedChartFingers strong{font-size:13px;color:#36516A}
+body.native-app #demoRoot #demoScoreImage{background:#fff}
+body.native-app #demoRoot :is(.demoSongList,.demoSongStage),body.native-app #demoRoot #demoEnrollment{border:1px solid #C5D0DA}
+body.native-app #demoRoot .demoChecks input{accent-color:#365D7E}
+body.native-app #demoRoot #demoFoot{color:#52687C}
+body.native-app.desktop-debug-actions-open #demoEnrollNext{display:none!important}
+body.native-app #demoRoot #demoActionProgress>button:disabled{opacity:1}
+@media(max-width:1100px){body.native-app #demoRoot #demoCalibrationSlots{gap:9px}body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot{padding:14px 6px;min-height:170px}body.native-app #demoRoot #demoCalibration .demoBlock{padding:24px}body.native-app #desktopDebugActions>.demoBlock{gap:12px 18px;grid-template-columns:310px minmax(0,1fr)}}
+@media(max-height:720px){body.native-app #demoRoot #demoCalibrationSlots{margin:16px 0}body.native-app #demoRoot #demoCalibrationSlots .demoCalSlot{min-height:150px;gap:5px}body.native-app #desktopDebugActions>.demoBlock{gap:10px 18px;grid-template-rows:26px 38px minmax(0,1fr) 22px}body.native-app #desktopDebugActions .demoActionGroup{padding:8px 12px}body.native-app #desktopDebugActions #demoManualActions{gap:8px}body.native-app #desktopDebugActions .demoActionGroup h3{margin-bottom:5px}body.native-app #desktopDebugActions #demoSpeedResults{padding:12px!important}}
+
+/* 11-04 用户：按钮要精简。串口在主界面设置里，烧录不给客户；手动端点用「开始调」代替 */
+html body.native-app .desktop-debug-device,html body.native-app #demoRoot #demoManualCalibration{display:none!important}

@@ -58,6 +58,7 @@ import argparse
 import base64
 import tempfile
 import json
+import math
 import os
 import re
 import sys
@@ -306,8 +307,7 @@ class Bridge(object):
             self.paused = False
             return True, "已连接 " + target
         if self.connected:
-            reply = self.send('SAFE', timeout_ms=1500, quiet_ms=25)
-            if not any(line.startswith('OK SAFE') and re.search(r'\barmed=0\b', line) for line in reply.get('lines', [])):
+            if not self._safe_confirmed():
                 return False, "原设备停止未确认，未切换串口"
         self.paused = True
         self.close()
@@ -316,6 +316,33 @@ class Bridge(object):
         ok, message = self.open(target, baud)
         self.paused = False  # Retry only this explicitly selected board after an open failure.
         return ok, message
+
+    def _safe_confirmed(self, timeout=1.5):
+        # A late tail of the previous reply can end send()'s quiet window before
+        # OK SAFE arrives, so watch everything logged after the write instead.
+        start = self._seq
+        reply = self.send('SAFE', timeout_ms=int(timeout * 1000), quiet_ms=25)
+        deadline = time.time() + timeout
+        while True:
+            lines = reply.get('lines', []) + [item['line'] for item in self.lines_since(start)[0]]
+            if any(line.startswith('OK SAFE') and re.search(r'\barmed=0\b', line) for line in lines):
+                return True
+            if time.time() >= deadline or not self.connected:
+                return False
+            time.sleep(0.03)
+
+    @exclusive
+    def use_auto(self):
+        """Drop an explicit port choice and go back to finding the CP210x board."""
+        if self.connected:
+            if not self._safe_confirmed():
+                return False, "原设备停止未确认，未切换串口"
+        self.paused = True
+        self.close()
+        self.url = None
+        self.recording_root = os.path.join(HOST_DIR, "calibration_recordings")
+        self.paused = False
+        return self.autoconnect_once()
 
     @exclusive
     def open(self, target=None, baud=None):
@@ -332,7 +359,10 @@ class Bridge(object):
             self.ser = self._open_raw(target)
         except Exception as e:
             code = getattr(e, "winerror", None)
-            hint = {5: "端口被别的程序占着（串口监视器？另一个浏览器标签？），关掉它或拔插一次",
+            text = str(e)
+            if code is None and ("PermissionError" in text or "拒绝访问" in text or "Access is denied" in text):
+                code = 5  # pyserial 报这个错时不带 winerror
+            hint = {5: "USB 口被卡住（别的程序占着，或软件被强关后驱动没放），拔插一下 USB 线",
                     31: "驱动栈卡住了，拔插一次 USB 基本就好"}.get(code, "")
             self.last_error = "打不开 %s：%s" % (target, e) + ("｜" + hint if hint else "")
             return False, self.last_error
@@ -682,6 +712,9 @@ class SoftwareConsole:
         self.control_revision = 0
         from score_sources import ScoreSources
         self.sources = ScoreSources()
+        # slot -> (connection, LIB_ITEM metadata, blob). LIB READ of a long score takes
+        # seconds over serial; LIB LIST is ~0.4 s, so re-check the listing every time.
+        self.score_cache = {}
 
     @staticmethod
     def fields(line):
@@ -717,7 +750,7 @@ class SoftwareConsole:
         result = self.bridge.status()
         result.update(upload_protocol='chunks-v1', upload_chunk_max=self.chunk_max,
                       upload_active=self.upload_session is not None, controller_id=self.controller_id or '')
-        result.update(score_clock=None, calibration_advisory=None)
+        result.update(score_clock=None, calibration_advisory=None, play_from=False)
         if result.get('connected'):
             r = self.bridge.send('INFO', timeout_ms=3000, quiet_ms=25)
             result['device_info'] = ' '.join(r.get('lines', []))
@@ -725,15 +758,29 @@ class SoftwareConsole:
             result['software_ready'] = info.get('software_protocol') == 1
             result['calibration_ready'] = info.get('calibrated') == 1
             result['motion_busy'] = info.get('auto_active') == 1 or info.get('enroll_active') == 1
+            result['enrollment_active'] = info.get('enroll_active') == 1
             result['motion_ready'] = bool(result['software_ready'] and result['calibration_ready'] and info.get('online') == 6
                                           and not result['motion_busy'] and self.upload_session is None)
-            if result['software_ready']:
+            if result['software_ready'] and not result['enrollment_active']:
                 library_info = self.command('LIB INFO')
                 capabilities = self.fields(next(line for line in library_info if line.startswith('OK LIB INFO')))
+                announced = capabilities.get('chunk_max')
+                self.chunk_max = announced if type(announced) is int and 1 <= announced <= 384 else 96
+                result['upload_chunk_max'] = self.chunk_max
                 if capabilities.get('score_clock') == 'continuous-v1':
                     result['score_clock'] = 'continuous-v1'
                 if capabilities.get('calibration_advisory') in (0, 1):
                     result['calibration_advisory'] = bool(capabilities['calibration_advisory'])
+                result['play_from'] = capabilities.get('play_from') == 1
+            elif result['software_ready']:
+                # r29.3+ keeps score files readable while boot-time servo
+                # discovery waits for motor power; older firmware rejects LIB.
+                try:
+                    library_info = self.command('LIB INFO')
+                    capabilities = self.fields(next(line for line in library_info if line.startswith('OK LIB INFO')))
+                    result['library_during_wait'] = capabilities.get('boot_wait_files') == 1
+                except (RuntimeError, StopIteration):
+                    result['library_during_wait'] = False
         else:
             result.update(software_ready=False, calibration_ready=False, motion_busy=False, motion_ready=False)
         return result
@@ -741,7 +788,17 @@ class SoftwareConsole:
     def state(self):
         # KEEP and read-only STATE must remain available during a long transfer.
         revision = self.control_revision
-        lines = self.command('LIB STATE')
+        try:
+            lines = self.command('LIB STATE')
+        except RuntimeError as error:
+            # This reply proves the USB transport is alive. Boot-time servo
+            # discovery can persist while motor power is off; do not label it
+            # a disconnected cable or pretend positions are available.
+            if str(error) != 'ERR LIB enrollment_active':
+                raise
+            return dict(ok=True, active=False, device_ready=False,
+                        connection_state='waiting_servos', connected=self.bridge.connected,
+                        port=self.bridge.port, feedback=[], error='enrollment_active')
         for line in lines:
             if line.startswith('LIB_STATE '):
                 value = json.loads(line[len('LIB_STATE '):])
@@ -783,9 +840,14 @@ class SoftwareConsole:
             lines = self.command('LIB STOP')
             reply = self.bridge.send('SAFE', timeout_ms=1000, quiet_ms=25)
             safe_lines = reply.get('lines', [])
-            if (not reply.get('ok') or any(line.startswith('ERR ') for line in safe_lines) or
-                    not any(line.startswith('OK SAFE') for line in safe_lines)):
+            if not reply.get('ok') or any(line.startswith('ERR ') for line in safe_lines):
                 raise RuntimeError('设备未确认电脑控制已释放')
+            if not any(line.startswith('OK SAFE') for line in safe_lines):
+                # The reply can land after send()'s quiet window; confirm from the log.
+                confirm = getattr(self.bridge, '_safe_confirmed', None)
+                if confirm is None or not confirm(1.0):
+                    raise RuntimeError('设备未确认电脑控制已释放')
+                safe_lines = safe_lines + ['OK SAFE']
             return {'ok': True, 'skipped': False, 'lines': lines + safe_lines}
 
     @staticmethod
@@ -914,8 +976,20 @@ class SoftwareConsole:
         slot = self.number(slot, 1, 100, '曲目位置')
         from score_codec import decode
         with self.lock:
-            lines = self.command('LIB READ %d' % slot, 15000)
-        blob = bytes.fromhex(''.join(self.fields(line)['hex'] for line in lines if line.startswith('LIB_DATA ')))
+            connection = (getattr(self.bridge, 'port', None), getattr(self.bridge, 'connected_at', None))
+            listing = self.command('LIB LIST', 6000)
+            meta = next((self.fields(line) for line in listing
+                         if line.startswith('LIB_ITEM ') and self.fields(line).get('slot') == slot), None)
+            cached = self.score_cache.get(slot)
+            if meta is not None and cached is not None and cached[:2] == (connection, meta):
+                blob = cached[2]
+            else:
+                lines = self.command('LIB READ %d' % slot, 15000)
+                blob = bytes.fromhex(''.join(self.fields(line)['hex'] for line in lines if line.startswith('LIB_DATA ')))
+                if meta is not None and len(blob) == meta.get('bytes'):
+                    self.score_cache[slot] = (connection, meta, blob)
+                else:
+                    self.score_cache.pop(slot, None)
         return dict(ok=True, base64=base64.b64encode(blob).decode('ascii'),
                     source_preview=self.sources.lookup(blob), **decode(blob))
 
@@ -983,6 +1057,7 @@ class SoftwareConsole:
                 raise ValueError('upload_incomplete')
             try:
                 score = decode(session['data'])
+                self.score_cache.clear()
                 self.command('LIB COMMIT', 15000)
             except Exception:
                 try:
@@ -1022,15 +1097,18 @@ class SoftwareConsole:
     def action(self, action, b, controller=None):
         if action == 'play':
             cmd = 'LIB PLAY %d %d %d %d' % (self.number(b.get('slot'),1,100,'曲目位置'), self.number(b.get('tempo',100),50,1000,'速度'), self.number(b.get('amplitude',100),1,100,'幅度'), self.number(b.get('hold',100),0,100,'保持阻力'))
+            start = self.number(b.get('from_ms', 0), 0, 86400000, '继续位置')
+            if start:  # r29.5+: continue a paused score from this score time
+                cmd += ' %d' % start
         elif action == 'train':
-            cmd = 'LIB TRAIN %d %d %d' % (self.number(b.get('mask'),0,31,'手指组合'), self.number(b.get('hold',50),0,100,'保持阻力'), self.number(b.get('amplitude',100),1,100,'幅度'))
+            cmd = 'LIB TRAIN %d %d %d' % (self.number(b.get('mask'),0,31,'手指组合'), self.number(b.get('hold',100),0,100,'保持阻力'), self.number(b.get('amplitude',100),1,100,'幅度'))
         elif action == 'pattern':
             rate = self.number(b.get('tempo',0),0,1000,'训练速度')
             if rate and rate < 50:
                 raise ValueError('训练速度须为最快0或50至1000')
             cmd = 'LIB PATTERN %d %d %d %d %d' % (
                 self.number(b.get('pattern'),0,2,'训练方式'), self.number(b.get('repeats',3),1,20,'重复次数'),
-                rate, self.number(b.get('amplitude',100),1,100,'幅度'), self.number(b.get('hold',50),0,100,'保持阻力'))
+                rate, self.number(b.get('amplitude',100),1,100,'幅度'), self.number(b.get('hold',100),0,100,'保持阻力'))
         elif action == 'tempo': cmd = 'LIB TEMPO %d' % self.number(b.get('tempo'),50,1000,'速度')
         elif action == 'delete': cmd = 'LIB DELETE %d' % self.number(b.get('slot'),1,100,'曲目位置')
         elif action in ('stop','keep'): cmd = 'LIB ' + action.upper()
@@ -1057,6 +1135,8 @@ class SoftwareConsole:
                     raise RuntimeError('controller_mismatch')
             if self.upload_session is not None and action not in ('stop','keep'):
                 raise RuntimeError('upload_active_finish_or_abort_first')
+            if action == 'delete':
+                self.score_cache.clear()
             lines = self.command(cmd)
             if action in ('play','train','pattern'):
                 self.control_revision += 1
@@ -1068,6 +1148,7 @@ class SoftwareConsole:
 
     def convert(self, b):
         from score_converter import recognize_pdf
+        from conversion_progress import notify
         name = str(b.get('filename', ''))
         if not name.lower().endswith('.pdf'): raise ValueError('请选择PDF曲谱')
         data = base64.b64decode(b.get('base64',''), validate=True)
@@ -1076,10 +1157,20 @@ class SoftwareConsole:
         with tempfile.TemporaryDirectory(prefix='piano-score-') as root:
             path = os.path.join(root, os.path.basename(name))
             with open(path,'wb') as f: f.write(data)
+            notify("loading",label="打开PDF")
             project = recognize_pdf(path, bpm=bpm)
+            source_tempo = project.get('source_tempo_bpm')
+            if (b.get('use_source_tempo',True) is True and type(source_tempo) in (int,float)
+                    and math.isfinite(source_tempo) and 10<=source_tempo<=240):
+                project['selection']['bpm']=source_tempo
+            from score_automatic import prepare_automatic_project
+            notify("arranging",label="整理右手演奏")
+            prepare_automatic_project(project)
             from pdf_preview import render_pdf_pages
+            notify("preview",label="生成原谱预览")
             project['page_previews'] = render_pdf_pages(path)
             if re.fullmatch(r'[0-9a-f]{64}', str(project.get('source_sha256', ''))):
+                notify("saving",label="保存原谱定位")
                 self.sources.record_document(project['source_sha256'], project['page_previews'], project.get('pages'))
         return {'ok': True, 'project': project}
 
@@ -1270,16 +1361,42 @@ def make_handler(bridge):
                 if u.path == '/api/software/convert':
                     try: return self._json(software.convert(b))
                     except (ValueError, TypeError) as e: return self._json({'ok':False,'error':str(e)},400)
+                if u.path == '/api/software/check':
+                    from score_automatic import check_project
+                    try:return self._json(dict(ok=True,**check_project(b.get('project'))))
+                    except (ValueError,TypeError,AttributeError) as e:return self._json({'ok':False,'error':str(e)},400)
                 if u.path == '/api/software/export':
                     from score_converter import export_reviewed
                     from score_codec import encode
                     try:
-                        score = export_reviewed(b.get('project'))
+                        project = b.get('project')
+                        if isinstance(project,dict) and project.get('automatic_mode') is True:
+                            from score_automatic import export_automatic
+                            score = export_automatic(project,skip_pending=b.get('skip_pending',False))
+                        else:
+                            score = export_reviewed(project)
+                            from score_performance import performance_notice, source_ids
+                            from score_converter import export_scope
+                            notice=performance_notice(export_scope(project)['notes'],source_ids(score),exported=True)
+                            if notice:score['performance_notice']=notice
                         blob = encode(score)
                     except (ValueError, TypeError, AttributeError) as e: return self._json({'ok':False,'error':str(e)},400)
-                    associated = software.sources.associate(blob, b.get('project'), score)
+                    try:
+                        associated = software.sources.associate(blob, b.get('project'), score)
+                    except (ValueError, TypeError, OSError) as error:
+                        return self._json({'ok':False,'error':str(error)},400)
                     result = {'ok': True, 'base64': base64.b64encode(blob).decode('ascii'), 'bytes': len(blob),
                               'source_preview_available':associated}
+                    if score.get('partial_export'):
+                        result.update(partial_export=score['partial_export'],
+                                      skipped_pending_count=score['partial_export']['skipped_pending_count'])
+                    if score.get('performance_notice'):
+                        result['performance_notice']=score['performance_notice']
+                    if score.get('performance') is not None:
+                        performance = score['performance']
+                        result.update(performance_summary={key:performance[key] for key in
+                            ('version','mode','duration_ms','coverage','estimates','features','arrangement_id') if key in performance},
+                            preferred_extension='pglpack', motion_only_pgl=True)
                     if associated:
                         try:
                             package = software.sources.package(blob)
@@ -1290,6 +1407,9 @@ def make_handler(bridge):
                             # A valid compact score remains exportable if its
                             # optional preview bundle exceeds the phone limit.
                             result['package_error'] = str(error)
+                    if score.get('performance') is not None and not result.get('package_base64'):
+                        return self._json({'ok':False,'error':result.get('package_error') or
+                            '练习编排需要随谱包保存完整琴声，当前未能生成，请检查或分段导出'},400)
                     return self._json(result)
                 if u.path in ("/api/firmware/build", "/api/firmware/flash"):
                     origin = self.headers.get("Origin")
@@ -1323,6 +1443,10 @@ def make_handler(bridge):
                     ok, why = (None, "") if not b.get("probe") else bridge.autoconnect_once()
                     return self._json({"ok": True, "ports": bridge.ports,
                                        "connect": ({"ok": ok, "msg": why} if ok is not None else None)})
+                if u.path == "/api/connect" and b.get("auto"):
+                    bridge._reload_ports()
+                    ok, msg = bridge.use_auto()
+                    return self._json({"ok": ok, "msg": msg, "port": bridge.port, "ports": bridge.ports})
                 if u.path == "/api/connect":
                     port = (b.get("port") or "").strip()
                     baud = b.get("baud")
@@ -1334,8 +1458,10 @@ def make_handler(bridge):
                     bridge.paused = False
                     if port:
                         bridge._reload_ports()
-                        if not any(p['device'] == port and p['candidate'] for p in bridge.ports):
-                            return self._json({'ok': False, 'error': '仅支持 10C4:EA60 CP210x 主控串口'}, 400)
+                        # Auto-connect only trusts the current CP210x board; an explicit choice may
+                        # be another USB serial board (INFO still confirms the firmware).
+                        if not any(p['device'] == port and (p.get('candidate') or p.get('score', 0) != SCORE_BLACKLISTED) for p in bridge.ports):
+                            return self._json({'ok': False, 'error': '这个串口不是 USB 主控（蓝牙或主板自带串口），请换一个'}, 400)
                         ok, msg = bridge.select_port(port, baud)
                         if ok:
                             bridge.probe_ok = port

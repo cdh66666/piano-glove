@@ -1,0 +1,251 @@
+/* Native Windows shell. The hotspot page keeps the original presentation. */
+body.native-app{
+ --bg:#F7F9FC;--panel:#fff;--line:#DFE6EE;--ink:#202B3C;--muted:#83909E;--accent:#466D8B;--error:#AF4B5C;
+ color-scheme:light;font-family:'Segoe UI Variable','Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+ font-size:14px;height:100dvh;min-width:760px;margin:0;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);
+}
+body.native-app button,body.native-app input,body.native-app select{font:inherit}
+body.native-app button{border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink);padding:9px 14px;line-height:1.4;cursor:pointer;box-shadow:none}
+body.native-app button:hover{background:#EAF0F6;color:var(--accent);border-color:transparent}
+body.native-app button:disabled{opacity:.42;cursor:default}
+body.native-app :is(button,input,select,a,summary):focus-visible{outline:2px solid #466D8B;outline-offset:3px}
+body.native-app input[type=number],body.native-app input:not([type]),body.native-app select{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:6px}
+body.native-app input[type=range]{accent-color:var(--accent);height:20px;cursor:pointer}
+body.native-app label{color:#657587}
+body.native-app p{color:#728091}
+body.native-app h2{letter-spacing:-.35px;font-weight:600}
+body.native-app>.desktop-header{display:flex;align-items:center;gap:28px;min-height:76px;height:76px;flex-shrink:0;padding:0 28px;background:#fff;border-bottom:1px solid #E9EEF4}
+body.native-app .desktop-brand{display:flex;align-items:center;gap:11px;flex-shrink:0}
+body.native-app .desktop-brand>svg{width:31px;height:31px;color:var(--accent)}
+body.native-app .desktop-brand h1{font-size:18px;font-weight:650;letter-spacing:.2px;margin:0}
+body.native-app .desktop-navigation{display:flex;align-items:center;gap:2px;margin:0 auto 0 0;padding:4px;background:#EDF2F7;border:0;border-radius:10px}
+body.native-app .desktop-navigation button{font-size:13px;min-width:86px;padding:8px 15px;white-space:nowrap;border-radius:7px}
+body.native-app .desktop-navigation button.selected{background:#fff;color:#355A78;box-shadow:0 1px 4px #202B3C0D;border-color:transparent;font-weight:600}
+body.native-app .desktop-navigation>a{display:none}
+body.native-app .desktop-header-actions{display:flex;align-items:center;gap:10px;min-width:0;margin-left:auto}
+body.native-app #connection{max-width:235px;min-width:0;flex:initial;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:#7C8A98}
+body.native-app #connection::before{content:'';display:inline-block;width:6px;height:6px;background:#B3BFCA;border-radius:50%;margin-right:8px;vertical-align:1px}
+body.native-app #connection.desktop-ready::before{background:#5A8C7A}
+body.native-app .desktop-icon-button{width:36px;height:36px;padding:8px;color:#677B8E}
+body.native-app .desktop-icon-button svg{display:block;width:20px;height:20px}
+body.native-app button.stop{background:#F8ECEE;color:#AC4C5D;font-size:12px;font-weight:600;padding:9px 17px;border:0}
+body.native-app button.stop:hover{background:#F3DEE3;color:#963C4C}
+body.native-app>main{width:100%;max-width:1600px;flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 258px;grid-template-rows:minmax(0,1fr) auto 32px;column-gap:24px;row-gap:0;margin:0 auto;padding:26px 28px 10px}
+body.native-app #feedback-home{grid-column:1;grid-row:1;min-height:0;background:#fff;border-radius:16px;padding:28px 32px 26px;overflow:hidden}
+body.native-app #feedback-panel{display:flex;flex-direction:column;height:100%;padding:0}
+body.native-app #feedback-panel>.heading h2{font-size:23px;margin:0}
+body.native-app #feedback-panel>.heading{min-height:32px}
+body.native-app .fingers{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:26px 0 0;min-height:170px;flex:1;max-height:340px;align-items:stretch}
+body.native-app .fingers .finger-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;min-height:0;height:auto;border:1px solid #E0E7EF;border-bottom:4px solid #D9E2EB;border-radius:7px 7px 13px 13px;background:#fff;padding:25px 9px 16px;color:var(--ink)}
+body.native-app .fingers .finger-card:hover{border-color:#A7BCCB;background:#F8FAFD}
+body.native-app .fingers .finger-card:disabled{opacity:.68}
+body.native-app .desktop-finger-number{font-size:29px;line-height:1.2;font-weight:350;color:#466D8B;margin-bottom:3px}
+body.native-app .finger-name{font-size:15px;font-weight:600}
+body.native-app .finger-name small{display:none}
+body.native-app .finger-action{font-size:11px;color:#98A4B0}
+body.native-app .fingers .position-meter{margin-top:auto;text-align:center;width:auto}
+body.native-app .fingers .meter-scale,body.native-app .fingers .meter-range{display:none}
+body.native-app .desktop-finger-reading{display:block;color:#9DA9B5;font-size:10px;white-space:nowrap}
+body.native-app .desktop-finger-reading .meter-value{position:static;transform:none;display:inline;font-size:11px;font-weight:400;line-height:1.4;letter-spacing:0;color:inherit;text-shadow:none;background:transparent;padding:0}
+body.native-app .fingers .meter-status{display:block;margin:5px 0 0;font-size:10px;font-weight:400;line-height:1.4;color:#8A99A6;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.native-app .fingers .meter-status:empty{display:none}
+body.native-app .fingers .finger-card.down{background:#466D8B;color:#fff;border-color:#466D8B;border-bottom-color:#355772}
+body.native-app .finger-card.down :is(.desktop-finger-number,.finger-action,.desktop-finger-reading,.meter-status){color:#DCE7EF}
+body.native-app .position-meter.calibration-warning :is(.desktop-finger-reading,.meter-status){color:#A2773B}
+body.native-app .position-meter.outside :is(.desktop-finger-reading,.meter-status){color:#AF4B5C}
+body.native-app #train{grid-column:1;grid-row:2;padding:22px 2px 12px}
+body.native-app #train h2{font-size:13px;letter-spacing:0;color:#778798;margin:0 0 12px}
+body.native-app #train .actions{gap:9px;flex-wrap:nowrap}
+body.native-app #train [data-pattern]{background:#fff;border:1px solid #E1E7EE;min-width:115px;padding:11px 15px;font-size:13px}
+body.native-app #train [data-pattern]:hover{background:#EAF0F6;border-color:#CFDBE5}
+body.native-app #train .actions>label{margin-left:auto;font-size:12px;gap:8px;white-space:nowrap}
+body.native-app #train #repeats{width:58px;padding:8px}
+body.native-app #fastest-training{order:4;font-size:11px;color:#8B98A7;padding:8px 9px;white-space:nowrap}
+body.native-app #fastest-training.selected{background:#EAF0F6;color:#466D8B}
+body.native-app #training-status{font-size:11px;color:#83909E;margin:11px 0 0;min-height:18px}
+body.native-app .desktop-parameters{grid-column:2;grid-row:1/3;min-height:0;display:flex;flex-direction:column;padding:25px 23px;background:#EDF2F7;border-radius:14px;overflow:auto}
+body.native-app .desktop-parameters h2{font-size:14px;letter-spacing:0;margin:0 0 28px}
+body.native-app .settings{display:flex;flex-direction:column;flex-wrap:nowrap;gap:28px;padding:0;border:0}
+body.native-app .settings>label:not(.sound){display:flex;flex-direction:column;align-items:stretch;gap:10px;font-size:12px;min-width:0;width:100%;flex:initial}
+body.native-app .desktop-range-caption{display:flex;align-items:center;justify-content:space-between;gap:12px}
+body.native-app .desktop-range-caption output{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:#466D8B}
+body.native-app .settings :is(#tempo,#amplitude,#hold){width:100%;min-width:0;flex:initial;height:20px}
+body.native-app .settings #tempo-label{min-width:0;padding:0;text-align:right;border-bottom:1px dotted #9FB1BE}
+body.native-app .settings .sound{font-size:12px;gap:8px;margin-top:1px}
+body.native-app .settings input[type=checkbox]{margin:0;width:14px;height:14px}
+body.native-app .settings #audio-status{font-size:10px;align-self:stretch;margin-top:-16px}
+body.native-app #audio-status:empty{display:none}
+body.native-app .desktop-position-details{border-top:1px solid #DAE3ED;margin-top:auto;padding-top:17px;font-size:11px;color:#83909E}
+body.native-app .desktop-position-details summary{cursor:pointer}
+body.native-app .desktop-position-details .pose-feedback{border:0;background:transparent;padding:15px 0 0;margin:0;display:block}
+body.native-app .desktop-position-details .pose-feedback>span{font-size:10px;color:#83909E}
+body.native-app .desktop-position-details #thumb-pose{display:block;margin-top:10px}
+body.native-app .desktop-position-details .meter-scale{height:85px;background:#F7F9FC;border-color:#D4DFE8}
+body.native-app .desktop-position-details .meter-water{background:#D5E2EB}
+body.native-app .desktop-position-details .meter-value{color:#466D8B;font-size:20px}
+body.native-app .desktop-position-details .meter-range{color:#8B9AA8;font-size:10px}
+body.native-app main>footer{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:16px;min-width:0;border:0;padding:4px 2px 0;font-size:11px}
+body.native-app #activity{font-weight:500;color:#6E879C;white-space:nowrap}
+body.native-app #sync{display:block;margin:0;font-size:10px;color:#A2ADBA;white-space:nowrap}
+body.native-app #message{margin:0 0 0 auto;max-width:70%;font-size:11px;text-align:right;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.native-app #message:empty{display:none}
+
+body.native-app main:has(#train[hidden])>#feedback-home{display:none}
+body.native-app #library{grid-column:1;grid-row:1/3;min-height:0;display:flex;flex-direction:column;background:#fff;border-radius:16px;padding:27px 30px 20px;margin-bottom:14px}
+body.native-app #library .heading{gap:7px}
+body.native-app #library h2{font-size:23px}
+body.native-app #library .heading button{font-size:11px;color:#7A8DA0;padding:7px 10px}
+body.native-app #capacity{font-size:11px;color:#9AA7B5;margin:10px 0 18px}
+body.native-app #songs{flex:1;min-height:120px;overflow:auto}
+body.native-app #songs:not(:has(.song)){display:grid;place-items:center;text-align:center;color:#83909E;font-size:13px}
+body.native-app #songs:empty::before{content:'连接手套后，曲谱会显示在这里';color:#A0ACB9;font-size:12px}
+body.native-app .song{padding:17px 0;gap:8px;border-bottom:1px solid #EEF2F6;flex-wrap:wrap}
+body.native-app .song-title{font-size:14px;font-weight:550;min-width:150px}
+body.native-app .song small{font-size:11px;font-weight:400;color:#A0ACB9;margin-top:7px}
+body.native-app .song button{font-size:11px;padding:8px 10px}
+body.native-app .song button:nth-of-type(1){background:#EAF0F6;color:#466D8B;font-weight:600}
+body.native-app .song button:nth-of-type(2){color:#A0ACB9;order:3}
+body.native-app .song button:nth-of-type(3){color:#7F92A4}
+body.native-app .song .song-state{flex-basis:100%;font-size:11px}
+body.native-app .song .song-state:empty{display:none}
+body.native-app .upload{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;background:#F7F9FC;padding:15px;border-radius:10px;margin:20px 0 0}
+body.native-app .upload>label{font-size:11px;gap:7px;white-space:nowrap}
+body.native-app #slot{width:50px;padding:7px}
+body.native-app #pgl{width:100%;min-width:0;font-size:11px;color:#83909E;min-height:34px}
+body.native-app #pgl::file-selector-button{font:inherit;font-size:11px;padding:8px 10px;min-height:34px;margin-right:10px;background:#E7EEF5;border:0;color:#466D8B;border-radius:6px;cursor:pointer}
+body.native-app #upload{background:#466D8B;color:white;font-size:12px;padding:9px 14px}
+body.native-app .pack-hint{font-size:10px;color:#A0ACB9;margin-top:12px}
+body.native-app .score-file-help-area{grid-column:1/-1}
+body.native-app .score-file-selection{font-size:11px}
+
+body.native-app.playing-view .desktop-navigation{display:none}
+body.native-app #player{grid-column:1;grid-row:1/3;display:flex;flex-direction:column;min-height:0;padding:22px 26px;background:#fff;border-radius:14px;margin-bottom:12px;overflow:auto}
+body.native-app .player-heading h2{font-size:20px}
+body.native-app .player-heading button{font-size:11px;color:#6E859A}
+body.native-app .play-progress{font-size:11px;color:#8D9BA8;gap:12px;margin-bottom:20px}
+body.native-app #player-note{color:#466D8B;font-size:12px}
+body.native-app .player-body{display:flex;flex-direction:column;gap:20px;min-height:0}
+body.native-app .score-stage,body.native-app #player-feedback{width:100%;min-width:0}
+body.native-app .score-toolbar{font-size:12px;color:#71869A}
+body.native-app #player-source{border-color:#E3EAF0;max-height:34vh}
+body.native-app #player-timeline{background:#F4F7FA;border-color:#E7EDF3;height:190px}
+body.native-app #player-source:not([hidden])+#player-timeline{height:105px}
+body.native-app .timeline-note{fill:#E0E9F1;stroke:#A7BECE}
+body.native-app .timeline-note.current{fill:#466D8B;stroke:#466D8B}
+body.native-app .timeline-text{fill:#526B80}
+body.native-app .timeline-note.current+.timeline-text{fill:white}
+body.native-app .timeline-lane{stroke:#DCE5ED}
+body.native-app .timeline-current{stroke:#8DA6BB}
+body.native-app .timeline-finger{fill:#8EA1B2}
+body.native-app #player-source-hint{font-size:10px;color:#95A2B0}
+body.native-app #player-hand{display:none}
+body.native-app #player-feedback #feedback-panel>.heading h2{font-size:13px;color:#8997A6}
+body.native-app #player-feedback .fingers{height:125px;min-height:100px;max-height:125px;margin-top:12px}
+body.native-app #player-feedback .finger-card{padding:12px 7px 10px;gap:5px;border-bottom-width:3px}
+body.native-app #player-feedback .desktop-finger-number{font-size:18px;margin:0}
+body.native-app #player-feedback .finger-name{font-size:12px}
+body.native-app #player-feedback .finger-action{font-size:10px}
+body.native-app #player-finger-cue{font-size:11px;color:#466D8B}
+
+body.native-app.review-view main{display:flex;flex-direction:column;padding:22px 28px 8px;gap:0}
+body.native-app.review-view .desktop-parameters{display:none}
+body.native-app.review-view #convert{flex:1;width:100%;padding:0;gap:10px;min-height:0}
+body.native-app.review-view .review-title{min-height:35px;margin-bottom:2px}
+body.native-app.review-view .review-title h2{font-size:23px}
+body.native-app.review-view .review-toolbar{gap:6px}
+body.native-app.review-view .review-title :is(button,.review-file-label){font-size:11px;padding:8px 11px}
+body.native-app .review-file-label{background:#EAF0F6;border-color:transparent;color:#466D8B}
+body.native-app .review-choose,body.native-app #convert :is(#export,#review-row-confirm,.review-confirm){background:#466D8B;color:#fff;border-color:transparent;font-weight:600}
+body.native-app #review-step{color:#A3AEBA;font-size:10px}
+body.native-app #review-help{color:#8A9BAD}
+body.native-app .review-statusbar{border-color:#E3EAF1}
+body.native-app .review-summary strong{color:#466D8B;font-weight:600}
+body.native-app #review-filename{color:#72859A}
+body.native-app .review-row-toolbar{background:transparent}
+body.native-app #review-row-select{background:#EAF0F6;color:#466D8B;border-color:transparent}
+body.native-app #review-row-position{color:#8395A6}
+body.native-app #review-row-boundary{color:#A0ACBA}
+body.native-app #review-row-panel{background:#EDF2F7;border-color:transparent;border-radius:12px}
+body.native-app .review-row-label{background:#F8FAFD;border-color:#CDDAE5;color:#5E7489}
+body.native-app .review-row-label.uncertain{background:#FBF4E8;border-color:#EAD9B7;color:#907344}
+body.native-app .review-row-label.confirmed{background:#E1EBF2;border-color:#A6BECE;color:#466D8B}
+body.native-app .review-row-label.current{box-shadow:0 0 0 2px #466D8B}
+body.native-app .review-row-link{background:#A9BCCA}
+body.native-app .review-row-link.confirmed{background:#7F9CB1}
+body.native-app .review-row-link.uncertain{background:#CAB68C}
+body.native-app #convert #review-row-confirm:disabled{background:#DDE6EF;color:#8F9EAC;border-color:transparent}
+body.native-app .review-row-key{color:#97A6B4}
+body.native-app .review-row-legend .done{background:#7D9DB3}
+body.native-app .review-row-legend .uncertain{background:#CFB27A}
+body.native-app.review-view #review-inspector{background:#fff;border-color:#E3EAF0;border-radius:12px}
+body.native-app .review-row-hit.current,body.native-app .review-row-hit:hover{border-color:#466D8B;background:#466D8B14}
+body.native-app .review-hit.current{border-color:#466D8B;background:#466D8B28}
+body.native-app #review-note-warning{color:#9B7B43}
+body.native-app .review-fingers button.selected{background:#E1EBF2;color:#466D8B}
+body.native-app #review-more[open]{background:#fff;border-color:#DFE6EE;box-shadow:0 10px 42px #26394D18}
+body.native-app #review-more>summary{background:#EAF0F6;color:#657E93;border-color:transparent}
+body.native-app .review-bottom{border-color:#E2E9F1}
+body.native-app .review-time-note{background:#E8EFF5;color:#566F84;border-color:#C3D3E0}
+body.native-app .review-time-note.current{background:#466D8B;color:#fff}
+body.native-app .score-guide{background:#fff;border-color:#DFE6EE;box-shadow:0 12px 70px #26394D24}
+body.native-app.review-view .guide-heading{background:white;border-color:#E6ECF2}
+body.native-app .guide-copy p,body.native-app .guide-copy small{color:#65798C}
+body.native-app .guide-scenes button{background:#EDF2F7;border-color:transparent;color:#657E93}
+body.native-app .guide-scenes button.selected,body.native-app .guide-demo-controls #guide-play{background:#466D8B;color:white;border-color:transparent}
+body.native-app #guide-demo-status{color:#466D8B}
+body.native-app #guide-progress{background-color:#EAF0F6;background-image:linear-gradient(#7897AF,#7897AF)}
+body.native-app .tempo-precision{background:white;color:var(--ink);border-color:#DFE6EE;box-shadow:0 12px 50px #26394D24}
+body.native-app .song-delete-dialog{background:#293D5050}
+body.native-app .song-delete-card{background:white;border-color:transparent;box-shadow:0 18px 70px #26394D24}
+body.native-app #song-delete-status{color:#AA4E5F}
+
+body.native-app .desktop-settings{position:fixed;inset:0;z-index:180;display:flex;justify-content:flex-end;background:#293D5029}
+body.native-app .desktop-settings-card{width:330px;margin:14px;align-self:flex-start;background:white;border:1px solid #E5EBF2;border-radius:14px;box-shadow:0 14px 60px #26394D20;padding:22px}
+body.native-app .desktop-settings-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+body.native-app .desktop-settings-heading h2{font-size:18px;margin:0}
+body.native-app .desktop-settings-heading button{font-size:11px;color:#8A9CAC;padding:5px 7px}
+body.native-app .desktop-device-summary{padding:0 2px 22px;border-bottom:1px solid #EAF0F5;margin-bottom:10px}
+body.native-app .desktop-device-summary>span{color:#9AA7B5;font-size:11px}
+body.native-app .desktop-device-summary p{font-size:12px;color:#6E8498;margin:8px 0 0;overflow-wrap:anywhere;line-height:1.7}
+body.native-app .desktop-settings-link{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;padding:14px 8px;color:#4F6B83;text-decoration:none;border-radius:7px;font-size:13px}
+body.native-app .desktop-settings-link:hover{background:#F0F4F8}
+body.native-app .desktop-settings-link>span:last-child{font-size:20px;color:#A5B4C1;font-weight:300}
+body.native-app #usbDriverHelpEntry{margin:0;width:100%;border:0;padding:14px 8px;color:#4F6B83;background:transparent;font-size:13px;border-radius:7px}
+body.native-app #usbDriverHelpEntry:hover{background:#F0F4F8}
+body.native-app #usbDriverDialog{font-family:inherit;color:var(--ink);border-color:#E1E7EF;box-shadow:0 18px 70px #26394D24}
+body.native-app #usbDriverGuideState{background:#EAF0F6;color:#526F86}
+body.native-app #usbDriverDialog .usbDriverPrimary{background:#466D8B;border-color:#466D8B;color:white}
+@media(max-width:1100px){
+ body.native-app>.desktop-header{padding:0 20px;gap:20px}
+ body.native-app #connection{max-width:180px}
+ body.native-app>main{grid-template-columns:minmax(0,1fr) 224px;gap:0 18px;padding:20px 20px 8px}
+ body.native-app #feedback-home{padding:24px}
+ body.native-app .desktop-parameters{padding:24px 20px}
+ body.native-app .desktop-navigation button{min-width:75px;padding:8px 12px}
+ body.native-app #train [data-pattern]{min-width:0;padding:10px 13px;font-size:12px}
+ body.native-app #train .actions{gap:6px}
+ body.native-app #train .actions>label{font-size:11px}
+ body.native-app #fastest-training{font-size:10px}
+ body.native-app .upload{grid-template-columns:auto 1fr;gap:10px}
+ body.native-app #pgl{grid-row:2;grid-column:1/-1}
+ body.native-app #upload{justify-self:end}
+ body.native-app.review-view main{padding:18px 20px 8px}
+}
+@media(max-height:740px){
+ body.native-app>.desktop-header{min-height:66px;height:66px}
+ body.native-app>main{padding-top:18px}
+ body.native-app #feedback-home{padding-top:23px;padding-bottom:20px}
+ body.native-app .fingers{margin-top:20px}
+ body.native-app .fingers .finger-card{padding-top:20px;gap:9px}
+ body.native-app .desktop-finger-number{font-size:25px}
+ body.native-app #train{padding-top:17px}
+ body.native-app .desktop-parameters{padding-top:23px}
+ body.native-app .desktop-parameters h2{margin-bottom:22px}
+ body.native-app .settings{gap:22px}
+ body.native-app.review-view main{padding-top:16px}
+ body.native-app #library{padding-top:23px}
+}
+
+body.native-app .desktop-debug-link{color:#466D8B;text-decoration:none;white-space:nowrap;font-size:12px;padding:8px 10px;border-radius:7px;background:#EAF0F6}
+body.native-app .desktop-debug-link:hover{background:#DDE6EF}
+@media(max-width:1100px){body.native-app .desktop-header-actions{gap:7px}body.native-app .desktop-header-actions #connection{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}

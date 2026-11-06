@@ -1,0 +1,1291 @@
+/* 钢琴手套 · 漫画风桌面主题（R29 comic）。
+   只改变 EXE 窗口内的外观与布局；所有控件 ID、事件和设备逻辑沿用原实现。
+   手机热点页面由固件内置的 phone-ui 提供，不受本文件影响。 */
+body.native-app{
+ --paper:#FFF6E3;--paper-dot:#F3DDB1;--card:#FFFFFF;--ink:#1E1A2E;--ink-2:#3B3552;--muted:#6C6584;
+ --sun:#FFC83D;--sun-2:#FFEBB0;--sun-3:#FFF6D6;--sky:#3D7BFF;--sky-2:#DEE8FF;--sky-ink:#1F4FC2;
+ --mint:#14A585;--mint-2:#CFF4EA;--coral:#FF5A5A;--coral-2:#FFE2DE;--coral-ink:#C42B2B;--grape:#8B5CF6;--grape-2:#EFE8FF;
+ --f1:#FF8A5B;--f2:#FFC83D;--f3:#35C98F;--f4:#5B95FF;--f5:#B583FF;
+ --f1-2:#FFE3D7;--f2-2:#FFF0C4;--f3-2:#D3F5E6;--f4-2:#DFE9FF;--f5-2:#EFE3FF;
+ --line-w:2.5px;--radius:16px;--shadow:4px 4px 0 var(--ink);--shadow-sm:2px 2px 0 var(--ink);--shadow-lg:6px 6px 0 var(--ink);
+ --font:'Microsoft YaHei UI','Microsoft YaHei','PingFang SC','Noto Sans SC','Segoe UI',sans-serif;
+ --digits:'Segoe UI Black','Arial Black','Microsoft YaHei UI',sans-serif;
+ --accent:var(--sky);--error:var(--coral-ink);--bg:var(--paper);--panel:var(--card);--line:var(--ink);
+}
+html body.native-app{
+ font-family:var(--font);color:var(--ink);font-size:14px;
+ background-color:var(--paper);
+ background-image:radial-gradient(var(--paper-dot) 1.15px,transparent 1.35px);
+ background-size:15px 15px;background-position:0 0;
+}
+html body.native-app ::selection{background:var(--sun);color:var(--ink)}
+html body.native-app p,html body.native-app label{color:var(--ink-2)}
+html body.native-app small{color:var(--muted)}
+html body.native-app h2{font-weight:900;letter-spacing:.5px;color:var(--ink)}
+
+/* ---------- 基础控件 ---------- */
+html body.native-app button:not(:where(.review-row-hit,.review-hit,.review-symbol-hit,.review-time-note)),html body.native-app .comic-button{
+ font-family:var(--font);font-weight:700;color:var(--ink);background:var(--card);
+ border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow-sm);
+ transition:transform .08s ease,box-shadow .08s ease,background-color .12s ease;
+}
+html body.native-app button:not(:where(.review-row-hit,.review-hit,.review-symbol-hit,.review-time-note)):hover:not(:disabled),html body.native-app .comic-button:hover{background:var(--sun-3);color:var(--ink);border-color:var(--ink);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+html body.native-app button:not(:where(.review-row-hit,.review-hit,.review-symbol-hit,.review-time-note)):active:not(:disabled),html body.native-app .comic-button:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--ink)}
+html body.native-app button:disabled{opacity:.42;box-shadow:none;cursor:not-allowed;filter:saturate(.4)}
+html body.native-app :is(button,input,select,a,summary,[tabindex]):focus-visible{outline:3px solid var(--sky);outline-offset:3px;border-radius:10px}
+html body.native-app :is(input[type=number],input[type=text],input:not([type]),select){
+ font-family:var(--font);background:var(--card);border:2px solid var(--ink);border-radius:10px;color:var(--ink);font-weight:600;
+}
+html body.native-app select{cursor:pointer}
+html body.native-app input[type=checkbox]{accent-color:var(--mint);width:17px;height:17px;cursor:pointer}
+html body.native-app details>summary{cursor:pointer;font-weight:700}
+html body.native-app input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:26px;cursor:pointer}
+html body.native-app input[type=range]::-webkit-slider-runnable-track{height:12px;border:2px solid var(--ink);border-radius:99px;background:linear-gradient(90deg,var(--sun) 0 var(--fill,50%),#fff var(--fill,50%))}
+html body.native-app input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-8px;border:2.5px solid var(--ink);border-radius:50%;background:#fff;box-shadow:2px 2px 0 var(--ink)}
+html body.native-app input[type=range]:hover::-webkit-slider-thumb{background:var(--sun-2)}
+html body.native-app input[type=range]:disabled{opacity:.5}
+html body.native-app .comic-icon{width:18px;height:18px;flex:none;vertical-align:-3px}
+
+/* ---------- 顶栏 ---------- */
+html body.native-app>.desktop-header{
+ height:74px;min-height:74px;gap:22px;padding:0 24px;background:var(--sun);
+ border-bottom:3px solid var(--ink);box-shadow:0 4px 0 #1E1A2E22;position:relative;z-index:20;
+ background-image:radial-gradient(#F5B21E 1.3px,transparent 1.5px);background-size:9px 9px;
+}
+html body.native-app .desktop-brand{gap:8px}
+html body.native-app .desktop-brand>svg:not(.comic-mascot){display:none}
+html body.native-app .desktop-brand .comic-mascot{width:50px;height:50px;margin:2px -2px -6px -6px;transform:rotate(-8deg)}
+html body.native-app .desktop-brand h1{font-size:22px;font-weight:900;letter-spacing:2px;color:var(--ink);text-shadow:2px 2px 0 #fff}
+html body.native-app .desktop-navigation{background:transparent;padding:0;gap:8px;border-radius:0}
+html body.native-app .desktop-navigation button{
+ display:inline-flex;align-items:center;gap:7px;min-width:0;padding:9px 16px;font-size:14px;font-weight:800;
+ background:#fff;border:2.5px solid var(--ink);border-radius:13px;box-shadow:var(--shadow-sm);
+}
+html body.native-app .desktop-navigation button.selected{background:var(--ink);color:#fff;box-shadow:3px 3px 0 #fff,4px 4px 0 var(--ink);transform:rotate(-1.5deg)}
+html body.native-app .desktop-navigation button.selected:hover{background:var(--ink);color:var(--sun)}
+html body.native-app .desktop-navigation button.selected .comic-icon{color:var(--sun)}
+html body.native-app .desktop-header-actions{gap:10px}
+html body.native-app #connection{
+ display:inline-block;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px;padding:7px 13px 7px 11px;font-size:12px;font-weight:700;color:var(--ink);
+ background:#fff;border:2px solid var(--ink);border-radius:99px;box-shadow:var(--shadow-sm);cursor:default;
+}
+html body.native-app #connection::before{display:inline-block;box-sizing:border-box;width:11px;height:11px;border:2px solid var(--ink);background:var(--coral);margin-right:8px;vertical-align:-1px}
+html body.native-app #connection.comic-conn-wait::before{background:var(--sun);animation:comic-blink 1.1s steps(2) infinite}
+html body.native-app #connection.comic-conn-ready::before,html body.native-app #connection.desktop-ready::before{background:var(--mint)}
+html body.native-app .desktop-debug-link{
+ display:inline-flex;align-items:center;gap:6px;padding:8px 12px;font-size:13px;font-weight:800;color:var(--ink);text-decoration:none;
+ background:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow-sm);
+}
+html body.native-app .desktop-debug-link:hover{background:var(--sun-3);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+html body.native-app .desktop-icon-button{width:40px;height:40px;padding:7px;color:var(--ink);display:grid;place-items:center}
+html body.native-app .desktop-icon-button svg{width:22px;height:22px}
+html body.native-app button.stop,html body.native-app #stop{
+ display:inline-flex;align-items:center;gap:8px;padding:9px 20px 9px 16px;font-size:16px;font-weight:900;letter-spacing:2px;
+ color:#fff;background:var(--coral);border:2.5px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);
+}
+html body.native-app #stop:hover:not(:disabled){background:#FF4040;color:#fff}
+html body.native-app #stop .comic-key{font-size:10px;font-weight:800;letter-spacing:0;padding:1px 5px;border:1.5px solid #fff;border-radius:5px;opacity:.9}
+html body.native-app.comic-running #stop{animation:comic-pulse 1.2s ease-in-out infinite}
+@keyframes comic-pulse{0%,100%{box-shadow:3px 3px 0 var(--ink),0 0 0 0 #FF5A5A88}50%{box-shadow:3px 3px 0 var(--ink),0 0 0 8px #FF5A5A00}}
+@keyframes comic-blink{50%{opacity:.35}}
+
+/* ---------- 主区域与面板 ---------- */
+html body.native-app>main{padding:24px 26px 8px;column-gap:22px}
+html body.native-app :is(#feedback-home,#library,#player){
+ background:var(--card);border:var(--line-w) solid var(--ink);border-radius:20px;box-shadow:var(--shadow-lg);
+}
+html body.native-app #feedback-home{padding:22px 26px 22px}
+html body.native-app :is(#feedback-panel>.heading h2,#library>.heading h2,.player-heading h2,.review-title h2){
+ display:inline-block;font-size:22px;font-weight:900;margin:0;padding:0 6px;
+ background:linear-gradient(transparent 58%,var(--sun) 58% 92%,transparent 92%);
+}
+html body.native-app .comic-subtitle{display:block;margin:6px 0 0;font-size:13px;font-weight:600;color:var(--muted)}
+
+/* 参数侧栏 */
+html body.native-app .desktop-parameters{
+ background:var(--sky-2);border:var(--line-w) solid var(--ink);border-radius:20px;box-shadow:var(--shadow-lg);padding:20px 20px 18px;
+ background-image:radial-gradient(#C8D7FF 1.1px,transparent 1.3px);background-size:12px 12px;
+}
+html body.native-app .desktop-parameters h2{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-size:15px;margin:0 0 18px;padding:5px 12px;background:#fff;border:2px solid var(--ink);border-radius:10px;box-shadow:var(--shadow-sm);transform:rotate(-2deg)}
+html body.native-app .settings{gap:18px}
+html body.native-app .settings>label:not(.sound){gap:6px;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:14px;padding:11px 12px 9px;box-shadow:var(--shadow-sm)}
+html body.native-app .desktop-range-caption{font-weight:800;color:var(--ink)}
+html body.native-app .desktop-range-caption output{font-family:var(--digits);font-size:15px;color:var(--sky-ink);font-weight:900}
+html body.native-app .settings #tempo-label{border-bottom:2px dotted var(--sky-ink)}
+html body.native-app .comic-hint{display:block;font-size:11px;font-weight:500;line-height:1.45;color:var(--muted);margin:0}
+html body.native-app .settings .sound{display:flex;flex-wrap:wrap;align-items:center;gap:9px;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:2px solid var(--ink);border-radius:14px;padding:10px 12px;box-shadow:var(--shadow-sm);margin:0}
+html body.native-app .settings #audio-status{margin-top:-10px;font-size:11px}
+html body.native-app .desktop-position-details{border-top:2px dashed var(--ink);color:var(--ink-2);font-size:12px}
+html body.native-app .desktop-position-details .meter-scale{background:#fff;border:2px solid var(--ink)}
+html body.native-app .desktop-position-details .meter-water{background:var(--f1-2)}
+html body.native-app .desktop-position-details .meter-value{color:var(--ink);font-family:var(--digits)}
+
+/* ---------- 五指卡片 ---------- */
+html body.native-app #finger-0{--fc:var(--f1);--fc2:var(--f1-2)}
+html body.native-app #finger-1{--fc:var(--f2);--fc2:var(--f2-2)}
+html body.native-app #finger-2{--fc:var(--f3);--fc2:var(--f3-2)}
+html body.native-app #finger-3{--fc:var(--f4);--fc2:var(--f4-2)}
+html body.native-app #finger-4{--fc:var(--f5);--fc2:var(--f5-2)}
+html body.native-app .fingers{gap:14px;margin-top:16px}
+html body.native-app .fingers .finger-card{
+ gap:8px;padding:16px 8px 14px;background:#fff;color:var(--ink);overflow:hidden;
+ border:var(--line-w) solid var(--ink);border-top-width:14px;border-top-color:var(--fc,var(--sun));border-bottom:var(--line-w) solid var(--ink);
+ border-radius:18px 18px 22px 22px;box-shadow:var(--shadow);
+}
+html body.native-app .fingers .finger-card::after{content:'';position:absolute;inset:auto 0 0 0;height:42%;background:var(--fc2,var(--sun-3));border-top:2px dashed #1E1A2E33;z-index:0;pointer-events:none}
+html body.native-app .fingers .finger-card>*{position:relative;z-index:1}
+html body.native-app .fingers .finger-card:hover:not(:disabled):not(.down){background:#fff;transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink)}
+html body.native-app .fingers .finger-card:disabled{opacity:.6;filter:saturate(.5)}
+html body.native-app .desktop-finger-number{
+ display:grid;place-items:center;width:52px;height:52px;margin:0 0 2px;font-family:var(--digits);font-size:28px;font-weight:900;line-height:1;color:var(--ink);
+ background:var(--fc,var(--sun));border:2.5px solid var(--ink);border-radius:50%;box-shadow:var(--shadow-sm);
+}
+html body.native-app .finger-name{font-size:17px;font-weight:900;color:var(--ink)}
+html body.native-app .finger-action{font-size:12px;font-weight:800;color:var(--muted);padding:2px 10px;border:2px solid transparent;border-radius:99px}
+html body.native-app .desktop-finger-reading{color:var(--ink-2);font-size:11px;font-weight:600}
+html body.native-app .desktop-finger-reading .meter-value{font-family:var(--digits);font-size:12px}
+html body.native-app .fingers .meter-status{font-size:11px;font-weight:700;color:var(--coral-ink)}
+html body.native-app .fingers .finger-card.down,html body.native-app .fingers .finger-card.down:hover{background:var(--fc);color:var(--ink);border-color:var(--ink);border-top-color:var(--ink);transform:translateY(4px);box-shadow:0 0 0 var(--ink)}
+html body.native-app .fingers .finger-card.down::after{background:#ffffff55}
+html body.native-app .finger-card.down .desktop-finger-number{background:#fff}
+html body.native-app .finger-card.down :is(.finger-action){color:var(--ink);background:#fff;border-color:var(--ink)}
+html body.native-app .finger-card.down :is(.desktop-finger-reading,.meter-status){color:var(--ink)}
+html body.native-app .finger-card.down .finger-action::before{content:'★ '}
+
+/* ---------- 连续练习 ---------- */
+html body.native-app #train{padding:18px 2px 8px}
+html body.native-app #train h2{display:inline-block;font-size:15px;color:var(--ink);margin:0 0 12px;padding:3px 10px;background:#fff;border:2px solid var(--ink);border-radius:9px;box-shadow:var(--shadow-sm)}
+html body.native-app #train .actions{gap:12px;align-items:stretch}
+html body.native-app #train [data-pattern],html body.native-app #fastest-training{
+ display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:132px;padding:9px 14px;
+ font-size:15px;font-weight:900;text-align:left;background:#fff;border:2.5px solid var(--ink);border-radius:14px;box-shadow:var(--shadow);color:var(--ink);
+}
+html body.native-app #train [data-pattern] small,html body.native-app #fastest-training small{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+html body.native-app #train [data-pattern]:hover:not(:disabled){background:var(--sun-3)}
+html body.native-app #fastest-training{order:0;min-width:120px;background:#fff;color:var(--ink)}
+html body.native-app #fastest-training[aria-pressed=true],html body.native-app #fastest-training.selected{
+ background:var(--sun);color:var(--ink);
+ background-image:repeating-linear-gradient(100deg,transparent 0 10px,#ffffff66 10px 13px);
+}
+html body.native-app #fastest-training[aria-pressed=true] small{color:var(--ink)}
+html body.native-app #train .actions>label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--ink)}
+html body.native-app #train #repeats{width:62px;padding:8px;text-align:center;font-family:var(--digits)}
+html body.native-app #training-status{font-size:12px;font-weight:700;color:var(--ink-2)}
+
+/* ---------- 底部状态（旁白框） ---------- */
+html body.native-app main>footer{gap:12px;padding-top:6px}
+html body.native-app #activity{padding:3px 10px;font-size:12px;font-weight:900;color:var(--ink);background:var(--sun);border:2px solid var(--ink);border-radius:6px;box-shadow:var(--shadow-sm)}
+html body.native-app #sync{font-size:11px;font-weight:600;color:var(--muted)}
+html body.native-app #message{font-size:12px;font-weight:700;color:var(--ink-2);padding:3px 12px;background:#fff;border:2px solid var(--ink);border-radius:99px}
+html body.native-app #message.error,html body.native-app #message[data-error=true]{color:var(--coral-ink);background:var(--coral-2)}
+
+/* ---------- 曲库 ---------- */
+html body.native-app #library{padding:22px 26px 18px}
+html body.native-app #library .heading{gap:9px;align-items:center}
+html body.native-app #library .heading button{font-size:12px;padding:7px 12px;color:var(--ink)}
+html body.native-app #native-ready-library{
+ background:var(--sun-3);border:2.5px solid var(--ink);border-radius:18px;box-shadow:var(--shadow);padding:14px 16px;margin-top:6px;
+ background-image:radial-gradient(#FFE08A 1.2px,transparent 1.4px);background-size:11px 11px;
+}
+html body.native-app #native-ready-library strong{font-size:17px;font-weight:900;color:var(--ink)}
+html body.native-app #native-ready-library span{color:var(--ink-2);font-weight:600}
+html body.native-app #native-ready-select{border:2px solid var(--ink);background:#fff;font-weight:700;color:var(--ink);border-radius:12px}
+html body.native-app #native-ready-play{display:inline-flex;align-items:center;gap:6px;background:var(--sky);color:#fff;border:2.5px solid var(--ink);border-radius:13px;font-weight:900;font-size:15px;box-shadow:var(--shadow-sm)}
+html body.native-app #native-ready-play:hover:not(:disabled){background:var(--sky-ink);color:#fff}
+html body.native-app #native-ready-export{border:2px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);font-weight:800}
+html body.native-app #capacity{display:inline-block;font-size:12px;font-weight:700;color:var(--ink-2);margin:14px 0 10px}
+html body.native-app #capacity .comic-capacity-bar{display:inline-block;vertical-align:-3px;width:120px;height:14px;margin-left:10px;border:2px solid var(--ink);border-radius:99px;background:#fff;overflow:hidden}
+html body.native-app #capacity .comic-capacity-bar i{display:block;height:100%;background:var(--mint)}
+html body.native-app #songs{display:flex;flex-direction:column;gap:10px;padding:4px 6px 8px 2px}
+html body.native-app .song{align-items:center;padding:12px 14px;gap:10px;background:#fff;border:2px solid var(--ink);border-radius:14px;box-shadow:var(--shadow-sm)}
+html body.native-app .song:hover{background:var(--sun-3)}
+html body.native-app .song-title{font-size:15px;font-weight:800;color:var(--ink)}
+html body.native-app .song-title small,html body.native-app .song small{color:var(--muted);font-weight:600}
+html body.native-app .song button{font-size:12px;padding:7px 12px}
+html body.native-app .song button:nth-of-type(1){background:var(--sky);color:#fff;font-weight:900;font-size:13px;padding:8px 14px}
+html body.native-app .song button:nth-of-type(1):hover:not(:disabled){background:var(--sky-ink);color:#fff}
+html body.native-app .song button:nth-of-type(2){color:var(--coral-ink);box-shadow:none;border-color:transparent;background:transparent}
+html body.native-app .song button:nth-of-type(2):hover:not(:disabled){background:var(--coral-2);border-color:var(--ink)}
+html body.native-app #songs:empty::before{content:'手套曲库还是空的：连接手套后会显示在这里，也可以把 .pgl/.pglpack 上传进来。';font-size:13px;font-weight:700;color:var(--muted);max-width:320px}
+html body.native-app.comic-servo-wait #songs:empty::before{content:'舵机通电后才能读取手套里的曲谱。曲谱存在手套里，不会丢。'}
+html body.native-app .upload{background:#fff;border:2.5px dashed var(--ink);border-radius:16px;padding:14px}
+html body.native-app #pgl::file-selector-button{font-family:var(--font);font-weight:800;background:var(--sun-2);color:var(--ink);border:2px solid var(--ink);border-radius:10px}
+html body.native-app #upload{background:var(--mint);color:#fff;font-weight:900;border:2.5px solid var(--ink)}
+html body.native-app #upload:hover:not(:disabled){background:#0E8C70;color:#fff}
+html body.native-app .pack-hint{font-size:11px;font-weight:600;color:var(--muted)}
+html body.native-app .song-delete-dialog{background:#1E1A2E66;backdrop-filter:blur(1px)}
+html body.native-app .song-delete-card{background:#fff;border:3px solid var(--ink);border-radius:20px;box-shadow:var(--shadow-lg);color:var(--ink)}
+html body.native-app .song-delete-card h2{font-size:20px}
+html body.native-app #song-delete-confirm{background:var(--coral);color:#fff}
+
+/* ---------- 播放 ---------- */
+html body.native-app #player{padding:20px 24px}
+html body.native-app .player-heading{gap:12px;align-items:center}
+html body.native-app .player-heading button{font-size:13px;color:var(--ink)}
+html body.native-app #player-replay{background:var(--sun)}
+html body.native-app .play-progress{font-size:12px;font-weight:700;color:var(--ink-2);margin:14px 0 16px}
+html body.native-app #player-progress{-webkit-appearance:none;appearance:none;height:16px;border:2px solid var(--ink);border-radius:99px;background:#fff;overflow:hidden}
+html body.native-app #player-progress::-webkit-progress-bar{background:#fff}
+html body.native-app #player-progress::-webkit-progress-value{background:repeating-linear-gradient(135deg,var(--sun) 0 10px,#FFD96B 10px 20px);border-right:2px solid var(--ink)}
+html body.native-app #player-note{font-weight:900;color:var(--ink);background:var(--sun-2);padding:2px 10px;border:2px solid var(--ink);border-radius:8px}
+html body.native-app #player-timeline{background:#fff;border:2.5px solid var(--ink);border-radius:14px}
+html body.native-app #player-source{border:2.5px solid var(--ink);border-radius:14px}
+html body.native-app .timeline-lane{stroke:#1E1A2E22;stroke-width:2}
+html body.native-app .timeline-finger{fill:var(--ink);font-weight:800}
+html body.native-app .timeline-note{stroke:var(--ink);stroke-width:2;fill:#eee}
+html body.native-app .timeline-note[y="9"]{fill:var(--f1-2)}
+html body.native-app .timeline-note[y="55"]{fill:var(--f2-2)}
+html body.native-app .timeline-note[y="101"]{fill:var(--f3-2)}
+html body.native-app .timeline-note[y="147"]{fill:var(--f4-2)}
+html body.native-app .timeline-note[y="193"]{fill:var(--f5-2)}
+html body.native-app .timeline-note.current[y="9"]{fill:var(--f1)}
+html body.native-app .timeline-note.current[y="55"]{fill:var(--f2)}
+html body.native-app .timeline-note.current[y="101"]{fill:var(--f3)}
+html body.native-app .timeline-note.current[y="147"]{fill:var(--f4)}
+html body.native-app .timeline-note.current[y="193"]{fill:var(--f5)}
+html body.native-app .timeline-note.past{opacity:.45}
+html body.native-app .timeline-note.current{stroke-width:3}
+html body.native-app .timeline-text,html body.native-app .timeline-note.current+.timeline-text{fill:var(--ink);font-weight:800}
+html body.native-app .timeline-current{stroke:var(--coral);stroke-width:3}
+html body.native-app #player-source-hint{font-size:11px;font-weight:600;color:var(--muted)}
+html body.native-app #player-source-cursor{border-color:var(--coral)!important}
+html body.native-app #player-feedback .finger-card{border-top-width:9px;box-shadow:var(--shadow-sm);height:auto;min-height:max-content;overflow:visible}
+html body.native-app #player-feedback .desktop-finger-number{width:32px;height:32px;font-size:17px}
+html body.native-app #player-feedback .fingers .finger-card::after{display:none}
+html body.native-app #player-finger-cue{font-weight:900;color:var(--ink);background:var(--sun-2);padding:2px 10px;border:2px solid var(--ink);border-radius:8px}
+
+/* ---------- 设置抽屉与对话框 ---------- */
+html body.native-app .desktop-settings{background:#1E1A2E55}
+html body.native-app .desktop-settings-card{background:var(--paper);border:3px solid var(--ink);border-radius:22px;box-shadow:var(--shadow-lg);color:var(--ink)}
+html body.native-app .desktop-settings-heading h2{font-size:20px}
+html body.native-app .desktop-settings-link{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin:0 0 10px;font-weight:800;color:var(--ink);text-decoration:none;background:#fff;border:2px solid var(--ink);border-radius:14px;box-shadow:var(--shadow-sm)}
+html body.native-app .desktop-settings-link:hover{background:var(--sun-3)}
+html body.native-app .desktop-device-summary{background:#fff;border:2px dashed var(--ink);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+html body.native-app .desktop-device-summary span{font-weight:900}
+html body.native-app .desktop-device-summary p{margin:6px 0 0;font-size:12px;word-break:break-all}
+html body.native-app .desktop-port{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font-size:12px;font-weight:800}
+html body.native-app .desktop-port select{flex:1;min-width:0;font:inherit;font-weight:600;border:2px solid var(--ink);border-radius:10px;padding:4px 6px;background:#fff}
+html body.native-app .desktop-port small{flex-basis:100%;font-weight:600;color:var(--muted)}
+.native-phone-dialog,dialog.comic-dialog{background:#FFF6E3!important;border:3px solid #1E1A2E!important;border-radius:22px!important;box-shadow:6px 6px 0 #1E1A2E!important;color:#1E1A2E!important;font-family:'Microsoft YaHei UI',sans-serif!important}
+.native-phone-dialog button,dialog.comic-dialog button{background:#fff!important;border:2px solid #1E1A2E!important;border-radius:12px!important;box-shadow:2px 2px 0 #1E1A2E!important;color:#1E1A2E!important;font-weight:700!important;padding:8px 16px!important}
+.native-phone-dialog img{border:2.5px solid #1E1A2E;border-radius:12px;padding:6px}
+.native-phone-dialog strong{color:#1E1A2E!important}
+
+/* ---------- 首页 ---------- */
+html body.native-app #comic-home{grid-column:1/-1;grid-row:1/3;min-height:0;overflow:auto;padding:2px 6px 14px 2px;display:flex;flex-direction:column;gap:20px}
+html body.native-app #comic-home>*{flex:none}
+html body.native-app #comic-home[hidden]{display:none!important}
+html body.native-app.comic-home-view>main>:not(#comic-home):not(footer){display:none!important}
+html body.native-app.comic-home-view>main{grid-template-columns:minmax(0,1fr)}
+.comic-hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:22px;padding:20px 26px;background:#fff;border:3px solid var(--ink);border-radius:24px;box-shadow:var(--shadow-lg);overflow:hidden}
+.comic-hero::before{content:'';position:absolute;inset:0;background:repeating-conic-gradient(from 0deg at 9% 50%,#FFF1C7 0 8deg,transparent 8deg 18deg);opacity:.85;pointer-events:none}
+.comic-hero>*{position:relative}
+.comic-hero .comic-mascot{width:128px;height:128px;animation:comic-bob 2.8s ease-in-out infinite}
+.comic-bubble{position:relative;padding:16px 20px;background:#fff;border:2.5px solid var(--ink);border-radius:20px;box-shadow:var(--shadow-sm);font-size:15px;line-height:1.7;color:var(--ink)}
+.comic-bubble::before{content:'';position:absolute;left:-17px;top:30px;border:9px solid transparent;border-right:15px solid var(--ink)}
+.comic-bubble::after{content:'';position:absolute;left:-11px;top:32px;border:7px solid transparent;border-right:12px solid #fff}
+.comic-bubble h2{margin:0 0 4px;font-size:24px;font-weight:900}
+.comic-bubble p{margin:0;color:var(--ink-2);font-weight:600}
+.comic-hero-status{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:190px}
+.comic-hero-status .comic-chip{display:inline-block;line-height:20px;padding:7px 14px;font-weight:800;font-size:13px;background:#fff;border:2px solid var(--ink);border-radius:99px;box-shadow:var(--shadow-sm);max-width:290px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comic-chip::before{content:'';display:inline-block;box-sizing:border-box;vertical-align:-1px;margin-right:8px;width:11px;height:11px;border:2px solid var(--ink);border-radius:50%;background:var(--coral)}
+.comic-chip.ready::before{background:var(--mint)}.comic-chip.wait::before,.comic-chip.servo::before{background:var(--sun)}
+.comic-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.comic-step{position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 16px;background:#fff;border:3px solid var(--ink);border-radius:22px;box-shadow:var(--shadow-lg);min-width:0}
+.comic-step:nth-child(1){background:var(--sky-2)}.comic-step:nth-child(2){background:var(--sun-3)}.comic-step:nth-child(3){background:var(--coral-2)}
+.comic-step-number{position:absolute;top:-16px;left:16px;display:grid;place-items:center;width:38px;height:38px;font-family:var(--digits);font-size:20px;font-weight:900;color:var(--ink);background:var(--sun);border:2.5px solid var(--ink);border-radius:50%;box-shadow:var(--shadow-sm)}
+.comic-step h3{margin:10px 0 0;font-size:19px;font-weight:900}
+.comic-step>p{margin:0;font-size:13px;font-weight:600;color:var(--ink-2);line-height:1.6}
+.comic-step-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:auto}
+.comic-step-actions button,.comic-step-actions a{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;font-size:13px}
+.comic-choice{display:grid;gap:9px}
+html body.native-app .comic-choice button{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:2px 10px;padding:10px 12px;text-align:left;width:100%}
+.comic-choice button .comic-icon{grid-row:1/3;width:26px;height:26px;padding:5px;background:var(--sun);border:2px solid var(--ink);border-radius:10px;box-sizing:content-box}
+.comic-choice button b{font-size:15px;font-weight:900}
+.comic-choice button small{font-size:11px;font-weight:600;color:var(--muted)}
+html body.native-app .comic-big-stop{justify-content:center;width:100%;padding:14px 18px!important;font-size:20px!important;font-weight:900;letter-spacing:3px;color:#fff!important;background:var(--coral)!important;border:3px solid var(--ink)!important;box-shadow:var(--shadow)!important}
+.comic-activity{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800}
+.comic-activity b{padding:2px 10px;background:#fff;border:2px solid var(--ink);border-radius:8px}
+.comic-tips{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 16px;background:#fff;border:2.5px dashed var(--ink);border-radius:18px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.comic-tips strong{font-weight:900;color:var(--ink)}
+.comic-tips button{padding:6px 11px;font-size:12px}
+.comic-continue{display:none}
+.comic-continue.available{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--mint-2);border:2.5px solid var(--ink);border-radius:18px;box-shadow:var(--shadow-sm);font-weight:700}
+.comic-continue.available span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@keyframes comic-bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-6px) rotate(3deg)}}
+.comic-mascot-notes{animation:comic-float 1.6s ease-in-out infinite}
+@keyframes comic-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.comic-burst{position:relative;display:inline-grid;place-items:center;width:92px;height:60px}
+.comic-burst svg{position:absolute;inset:0;width:100%;height:100%}
+.comic-burst b{position:relative;font-size:15px;font-weight:900;color:var(--ink)}
+
+/* ---------- PDF 识谱与校对 ---------- */
+html body.native-app.review-view main{padding:16px 22px 6px}
+html body.native-app .review-title{align-items:center;gap:10px}
+html body.native-app .review-title h2{font-size:20px}
+html body.native-app .review-toolbar{gap:8px}
+html body.native-app .review-file-label.review-choose{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;font-weight:900;color:#fff;background:var(--sky);border:2.5px solid var(--ink);border-radius:13px;box-shadow:var(--shadow-sm);cursor:pointer}
+html body.native-app .review-file-label.review-choose:hover{background:var(--sky-ink);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--ink)}
+html body.native-app #review-current-file{font-weight:800;color:var(--ink);max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.native-app #review-simple-status{padding:3px 12px;font-weight:900;color:var(--ink);background:var(--sun-2);border:2px solid var(--ink);border-radius:99px}
+html body.native-app #review-simple-status:empty{display:none}
+html body.native-app #review-simple-status.comic-clear{background:var(--mint-2)}
+html body.native-app #review-tools>summary{padding:7px 12px;font-weight:800;background:#fff;border:2px solid var(--ink);border-radius:12px;box-shadow:var(--shadow-sm);list-style:none}
+html body.native-app #review-tools>summary::-webkit-details-marker{display:none}
+html body.native-app #review-tools-panel{background:var(--paper)!important;border:3px solid var(--ink)!important;border-radius:20px!important;box-shadow:var(--shadow-lg)!important;color:var(--ink)}
+html body.native-app .native-review-save{font-weight:700;color:var(--mint)}
+html body.native-app .native-review-save.error{color:var(--coral-ink)}
+html body.native-app #native-drop-blank{position:relative;background:#fff;border:3px dashed var(--ink);border-radius:24px;gap:6px}
+html body.native-app #native-drop-blank .comic-mascot{width:120px;height:120px;margin-bottom:6px}
+html body.native-app #native-drop-blank strong{font-size:24px;font-weight:900;color:var(--ink)}
+html body.native-app #native-drop-blank p{font-weight:600;color:var(--ink-2)}
+html body.native-app #native-drop-blank .comic-drop-actions{display:flex;gap:10px;margin-top:8px}
+html body.native-app #native-drop-blank .comic-drop-actions button{display:inline-flex;align-items:center;gap:7px;padding:10px 16px}
+html body.native-app #native-drop-blank .comic-drop-note{max-width:560px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);line-height:1.6}
+html body.native-app #native-drop-overlay{background:#FFF6E3EE;border:4px dashed var(--ink);border-radius:24px;font-size:26px;font-weight:900;color:var(--ink)}
+html body.native-app #native-conversion-panel{background:#fff;border:3px solid var(--ink);border-radius:20px;box-shadow:var(--shadow)}
+html body.native-app #native-conversion-panel progress{-webkit-appearance:none;appearance:none;height:16px;border:2px solid var(--ink);border-radius:99px;overflow:hidden;background:#fff;width:100%}
+html body.native-app #native-conversion-panel progress::-webkit-progress-bar{background:#fff}
+html body.native-app #native-conversion-panel progress::-webkit-progress-value{background:repeating-linear-gradient(135deg,var(--sky) 0 10px,#6E9BFF 10px 20px)}
+html body.native-app #native-conversion-title{font-weight:900}
+html body.native-app .review-source,html body.native-app #review-score-region{border-radius:16px}
+html body.native-app #review-row-panel,html body.native-app #original{background:#fff;border:2.5px solid var(--ink)!important;border-radius:16px;box-shadow:var(--shadow-sm)}
+html body.native-app .review-row-toolbar button,html body.native-app .review-paper-tools button{padding:6px 11px;font-size:12px}
+html body.native-app #review-row-select{font-weight:800;border-radius:10px}
+html body.native-app .review-row-lens{position:absolute;top:4px;z-index:6;width:min(32%,280px);aspect-ratio:95/60;overflow:hidden;background:#fff;border:3px solid var(--ink);border-radius:14px;box-shadow:var(--shadow);pointer-events:none}
+html body.native-app .review-row-lens.on-right{right:4px}html body.native-app .review-row-lens.on-left{left:4px}
+html body.native-app .review-row-lens svg{display:block;width:100%;height:100%}
+html body.native-app.comic-no-lens .review-row-lens{display:none}
+html body.native-app #comic-lens-toggle[aria-pressed=true]{background:var(--sun)}
+html body.native-app #review-issue-next,html body.native-app #review-next-problem{background:var(--sun);font-weight:900}
+html body.native-app #review-inspector{background:#fff!important;border:2.5px solid var(--ink)!important;border-radius:18px!important;box-shadow:var(--shadow)!important;color:var(--ink)}
+html body.native-app #review-inspector .review-compact-heading strong{font-weight:900;font-size:15px}
+html body.native-app #review-inspector .review-edit-field{background:var(--paper)!important;border:2px solid var(--ink)!important;border-radius:14px!important}
+html body.native-app #review-inspector .review-edit-label{font-weight:900;color:var(--ink)}
+html body.native-app #review-inspector .review-edit-field.review-needs-action{background:var(--sun-2)!important;box-shadow:0 0 0 3px var(--sun)}
+html body.native-app #review-inspector .review-fingers button{border:2px solid var(--ink)!important;border-radius:11px!important;font-family:var(--digits);font-weight:900;color:var(--ink)!important;box-shadow:var(--shadow-sm)}
+html body.native-app #review-inspector #review-finger-1{background:var(--f1-2)}
+html body.native-app #review-inspector #review-finger-2{background:var(--f2-2)}
+html body.native-app #review-inspector #review-finger-3{background:var(--f3-2)}
+html body.native-app #review-inspector #review-finger-4{background:var(--f4-2)}
+html body.native-app #review-inspector #review-finger-5{background:var(--f5-2)}
+html body.native-app #review-inspector #review-finger-1.selected{background:var(--f1)!important}
+html body.native-app #review-inspector #review-finger-2.selected{background:var(--f2)!important}
+html body.native-app #review-inspector #review-finger-3.selected{background:var(--f3)!important}
+html body.native-app #review-inspector #review-finger-4.selected{background:var(--f4)!important}
+html body.native-app #review-inspector #review-finger-5.selected{background:var(--f5)!important}
+html body.native-app #review-inspector .review-fingers button.selected{transform:translateY(2px);box-shadow:inset 0 -3px 0 #1E1A2E44!important;outline:3px solid var(--ink);outline-offset:-1px}
+html body.native-app #review-inspector :is(.review-note-values,.review-note-modifiers) button{border:2px solid var(--ink)!important;border-radius:10px!important;background:#fff!important;color:var(--ink)!important;box-shadow:var(--shadow-sm)}
+html body.native-app #review-inspector :is(.review-note-values,.review-note-modifiers) button.selected{background:var(--ink)!important;color:#fff!important;box-shadow:none}
+html body.native-app #review-inspector #review-note-warning.is-problem{color:#8A3A00;background:var(--sun-2);border:2px solid var(--ink);border-radius:10px;padding:4px 10px}
+html body.native-app #review-exclude-note{color:var(--coral-ink)}
+html body.native-app.review-view #review-row-annotations .review-row-label{border-width:2px;border-radius:9px;font-weight:900;color:var(--ink);background:#fff;border-color:var(--ink);box-shadow:1.5px 1.5px 0 var(--ink)}
+html body.native-app.review-view #review-row-annotations .review-row-label[data-finger="1"]{background:var(--f1-2)}
+html body.native-app.review-view #review-row-annotations .review-row-label[data-finger="2"]{background:var(--f2-2)}
+html body.native-app.review-view #review-row-annotations .review-row-label[data-finger="3"]{background:var(--f3-2)}
+html body.native-app.review-view #review-row-annotations .review-row-label[data-finger="4"]{background:var(--f4-2)}
+html body.native-app.review-view #review-row-annotations .review-row-label[data-finger="5"]{background:var(--f5-2)}
+html body.native-app.review-view #review-row-annotations .review-row-label.unfingered{background:#F1EFF5;border-style:dashed;border-color:#6C6584;color:#6C6584;box-shadow:none}
+html body.native-app.review-view #review-row-annotations .review-row-label.attention{background:var(--sun);border-color:var(--ink);color:var(--ink);box-shadow:0 0 0 2px #fff,0 0 0 4px #E07A00}
+html body.native-app.review-view #review-row-annotations .review-row-label.excluded{background:#ECEAF0;border-color:#A7A1B8;color:#8E88A3;text-decoration:line-through;box-shadow:none}
+html body.native-app.review-view #review-row-annotations .review-row-label.current{outline:3px solid var(--sky);outline-offset:2px}
+html body.native-app.review-view .review-row-legend i{border:1.5px solid var(--ink)}
+html body.native-app.review-view .review-row-legend .unfingered{background:#F1EFF5;border-style:dashed}
+html body.native-app.review-view .review-row-legend .uncertain,html body.native-app.review-view .review-row-legend .attention{background:var(--sun)}
+html body.native-app.review-view .review-hit.current,html body.native-app.review-view .review-row-hit.current{border:2.5px solid var(--sky)!important;background:#3D7BFF33!important}
+html body.native-app .review-bottom{gap:10px}
+html body.native-app #review-export{gap:10px;align-items:center}
+html body.native-app #convert #export{background:var(--mint);color:#fff;font-weight:900;font-size:14px;padding:9px 18px;border:2.5px solid var(--ink)}
+html body.native-app #convert #export:hover:not(:disabled){background:#0E8C70;color:#fff}
+/* 小白主路径：识谱后一步送到手套；导出文件降为次要按钮 */
+html body.native-app #convert #review-play-glove,#review-play-glove{background:var(--mint);color:#fff;font-weight:900;font-size:15px;padding:10px 20px;border:2.5px solid var(--ink);border-radius:12px;cursor:pointer}
+html body.native-app #convert #review-play-glove:hover:not(:disabled){background:#0E8C70}
+html body.native-app #convert #review-play-glove:disabled{opacity:.55;cursor:default}
+html body.native-app #convert #export{background:#fff;color:var(--ink);font-weight:700;font-size:13px;padding:7px 12px}
+html body.native-app #convert #export:hover:not(:disabled){background:#EEF3F7;color:var(--ink)}
+.review-play-status{font-size:13px;font-weight:700;color:var(--ink)}
+html body.native-app #review-export-skip-pending{background:var(--sun-2)}
+html body.native-app #review-export-preset{border-radius:12px;font-weight:800}
+html body.native-app #review-more>summary,html body.native-app #review-full-list>summary,html body.native-app #review-range-options>summary{font-weight:800}
+html body.native-app #review-global-warning{font-weight:800;color:var(--coral-ink)}
+
+/* 读谱小课 */
+html body.native-app .score-guide{background:var(--paper)!important;border:3px solid var(--ink)!important;border-radius:24px!important;box-shadow:var(--shadow-lg)!important;color:var(--ink)}
+html body.native-app .score-guide .guide-heading strong{font-size:20px;font-weight:900}
+html body.native-app .score-guide .guide-picture{background:#fff;border:2.5px solid var(--ink);border-radius:16px}
+html body.native-app .score-guide #guide-title{font-weight:900}
+html body.native-app .score-guide #guide-next{background:var(--sun)}
+
+/* USB 驱动提示条 */
+html body.native-app #usbDriverNotice{background:var(--coral-2)!important;border:2.5px solid var(--ink)!important;border-radius:14px!important;box-shadow:var(--shadow-sm)!important;color:var(--ink)!important;font-weight:700}
+html body.native-app #usbDriverQuickInstall{background:var(--sun)!important;color:var(--ink)!important}
+
+/* 首次使用：可关闭的入门气泡 */
+.comic-coach{position:fixed;right:22px;bottom:46px;z-index:60;display:flex;align-items:flex-end;gap:10px;max-width:420px;animation:comic-pop .25s ease-out}
+.comic-coach .comic-mascot{width:86px;height:86px;flex:none}
+.comic-coach .comic-bubble{font-size:13px;line-height:1.6;padding:12px 14px}
+.comic-coach .comic-bubble::before{left:auto;right:-17px;top:auto;bottom:22px;border:9px solid transparent;border-left:15px solid var(--ink)}
+.comic-coach .comic-bubble::after{left:auto;right:-11px;top:auto;bottom:24px;border:7px solid transparent;border-left:12px solid #fff}
+.comic-coach .comic-bubble button{margin-top:8px;padding:5px 12px;font-size:12px}
+.comic-coach{flex-direction:row-reverse}
+@keyframes comic-pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+
+@media (max-width:1100px){
+ html body.native-app .desktop-navigation button{padding:8px 11px;font-size:13px}
+ html body.native-app .desktop-navigation button .comic-icon{display:none}
+ html body.native-app #connection{max-width:150px}
+ html body.native-app .desktop-brand h1{font-size:19px;letter-spacing:1px}
+ .comic-steps{grid-template-columns:1fr 1fr}
+ .comic-step:nth-child(3){grid-column:1/-1}
+ .comic-hero{grid-template-columns:auto minmax(0,1fr)}
+ .comic-hero-status{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:flex-start}
+}
+@media (max-height:740px){
+ html body.native-app>.desktop-header{height:64px;min-height:64px}
+ html body.native-app .desktop-brand .comic-mascot{width:42px;height:42px}
+ html body.native-app .desktop-finger-number{width:42px;height:42px;font-size:22px}
+ .comic-hero .comic-mascot{width:96px;height:96px}
+}
+@media (prefers-reduced-motion:reduce){
+ html body.native-app *,html body.native-app *::before,html body.native-app *::after{animation:none!important;transition:none!important}
+}
+@media (forced-colors:active){
+ html body.native-app button,html body.native-app .finger-card{border:2px solid ButtonText!important}
+}
+html body.native-app .settings .sound .comic-hint{flex-basis:100%;margin-left:26px}
+/* 识谱校对页需要更多纵向空间：顶栏同风格但更紧凑 */
+html body.native-app.review-view>.desktop-header{height:60px;min-height:60px;padding:0 18px;gap:16px}
+html body.native-app.review-view .desktop-brand .comic-mascot{width:42px;height:42px;margin:0 -2px -4px -4px}
+html body.native-app.review-view .desktop-brand h1{font-size:19px}
+html body.native-app.review-view .desktop-navigation button{min-width:0;padding:6px 13px;font-size:13px}
+html body.native-app.review-view #stop{padding:6px 14px 6px 12px;font-size:14px}
+html body.native-app.review-view .desktop-debug-link{padding:6px 10px;font-size:12px}
+html body.native-app.review-view .desktop-icon-button{width:36px;height:36px}
+html body.native-app.review-view #connection{padding:5px 11px 5px 9px;font-size:11px}
+html body.native-app.review-view main>footer #message{border:0;border-radius:0;background:transparent;padding:3px 0;font-weight:700}
+html body.native-app.review-view main>footer #activity{display:none}
+html body.native-app .fingers .finger-card{transition:transform .06s ease,box-shadow .06s ease}
+html body.native-app #player-title{flex:0 1 auto;margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body.native-app .desktop-finger-number{flex-shrink:0}
+html body.native-app #player-feedback .comic-subtitle{display:none}
+/* 看图核对向导 */
+html body.native-app #review-inspector.guide-compact .review-dock-fields{display:none}
+html body.native-app button.guide-more{display:block;margin-top:5px;padding:0;background:none;border:0;box-shadow:none;font-size:12px;font-weight:600;color:var(--sky-ink);text-decoration:underline}
+html body.native-app .comic-fix-guide .guide-head{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+html body.native-app .comic-fix-guide .guide-head b{font-size:14px;font-weight:900}
+html body.native-app .comic-fix-guide .guide-head span{font-size:12.5px;color:var(--ink-2)}
+html body.native-app .comic-fix-guide .guide-note-text{margin:3px 0 0;font-size:12px;color:var(--ink-2)}
+html body.native-app .guide-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+html body.native-app .guide-inline{align-items:center;flex-wrap:nowrap;margin:0}
+html body.native-app .guide-card{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:84px;padding:5px 8px;background:#fff;box-shadow:none;border:1.5px solid var(--ink)}
+html body.native-app .guide-card.selected{background:var(--sun-3)}
+html body.native-app .guide-card-label{font-size:11.5px;font-weight:600;line-height:1.3;text-align:center;color:var(--ink)}
+html body.native-app .guide-card-label b{font-weight:900}
+html body.native-app .guide-big{font-size:26px;line-height:40px}
+html body.native-app .guide-staff{width:78px;height:60px;display:block}
+html body.native-app .guide-staff line{stroke:var(--ink);stroke-width:.9}
+html body.native-app .guide-staff .ledger{stroke-width:1.1}
+html body.native-app .guide-staff .head{fill:#C2410C}
+html body.native-app .guide-staff .stem{stroke:#C2410C;stroke-width:1.3}
+html body.native-app .guide-staff text{fill:var(--ink)}
+html body.native-app .guide-staff .clef{font:30px 'Segoe UI Symbol','Noto Music',serif}
+html body.native-app .guide-staff .sign{font:15px 'Segoe UI Symbol',serif;fill:#C2410C}
+html body.native-app .guide-staff .tag{font:italic 700 11px serif}
+html body.native-app .guide-note{width:34px;height:40px;display:block}
+html body.native-app .guide-note .head{fill:var(--ink)}
+html body.native-app .guide-note .open{fill:#fff;stroke:var(--ink);stroke-width:2.2}
+html body.native-app .guide-note .stem{stroke:var(--ink);stroke-width:1.8}
+html body.native-app .guide-note .flag{fill:none;stroke:var(--ink);stroke-width:2.6}
+html body.native-app .guide-beats{display:flex;gap:2px}
+html body.native-app .guide-beats i{display:block;width:13px;height:8px;border:1px solid var(--ink);border-radius:2px;background:#fff;overflow:hidden}
+html body.native-app .guide-beats b{display:block;height:100%;background:#C2410C}
+html body.native-app .guide-modes{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+html body.native-app .guide-modes button{padding:3px 10px;font-size:12px;box-shadow:none;border-width:1.5px}
+html body.native-app .guide-modes button.selected{background:var(--ink);color:#fff}
+html body.native-app .guide-relation{width:70px;height:40px;display:block}
+html body.native-app .guide-relation line{stroke:#8A8596;stroke-width:1}
+html body.native-app .guide-relation .bar{stroke:var(--ink);stroke-width:2}
+html body.native-app .guide-relation .head{fill:#8A8596}
+html body.native-app .guide-relation .now{fill:#C2410C}
+html body.native-app .guide-timeline{display:block;width:100%;max-width:560px;height:auto;margin-top:6px}
+html body.native-app .guide-timeline .frame{fill:#fff;stroke:var(--ink)}
+html body.native-app .guide-timeline .beat{stroke:#C9C5D2}
+html body.native-app .guide-timeline .num{font-size:10px;fill:var(--muted);text-anchor:middle}
+html body.native-app .guide-timeline .block{fill:#B4B0BE}
+html body.native-app .guide-timeline .now{fill:#C2410C}
+html body.native-app .guide-timeline .unknown{fill:none;stroke:#C2410C;stroke-dasharray:3 2}
+html body.native-app .guide-hand{flex:none;width:76px;height:62px}
+html body.native-app .guide-hand path{fill:#fff;stroke:var(--ink);stroke-width:5;stroke-linejoin:round}
+html body.native-app .guide-hand .palm{fill:#EFEBE2}
+html body.native-app .guide-hand text{font:800 32px var(--font);fill:#C2410C;text-anchor:middle}
+html body.native-app .comic-do-here{outline:3px solid #E8590C!important;outline-offset:2px;animation:guide-attend 1s ease-out 2}
+@keyframes guide-attend{0%{outline-offset:7px}100%{outline-offset:2px}}
+html body.native-app .comic-fix-guide{margin:6px 0;padding:8px 12px 8px 12px;background:#fff;border:2.5px solid var(--ink);border-left:10px solid var(--sun);border-radius:12px;box-shadow:var(--shadow-sm);font-size:12.5px;line-height:1.6;color:var(--ink)}
+html body.native-app .comic-fix-guide[hidden]{display:none}
+html body.native-app .comic-fix-guide ol{margin:2px 0 2px 18px;padding:0}
+html body.native-app .comic-fix-guide small{color:var(--ink-2);font-weight:600}
+html body.native-app .comic-fix-guide{padding:5px 10px;font-size:12px;line-height:1.5}
+html body.native-app .comic-fix-guide ol{display:flex;flex-wrap:wrap;gap:2px 14px;margin:2px 0;list-style:none;counter-reset:fix}
+html body.native-app .comic-fix-guide li{counter-increment:fix}
+html body.native-app .comic-fix-guide li::before{content:counter(fix);display:inline-grid;place-items:center;width:17px;height:17px;margin-right:5px;font-size:11px;font-weight:900;background:var(--sun);border:1.5px solid var(--ink);border-radius:50%}
+html body.native-app .comic-fix-guide small{display:none}
+
+/* 成熟版配色：保留描边和分格的漫画骨架，去掉波点、晃动和大色块。放在最后统一覆盖。 */
+body.native-app{
+ --paper:#F5F1E8;--paper-dot:#F5F1E8;--ink:#23212B;--ink-2:#45424F;--muted:#6F6B78;
+ --sun:#E2A93B;--sun-2:#F3E3BC;--sun-3:#FAF3E0;--sky:#2F5FB3;--sky-2:#E9EDF3;--sky-ink:#234A8F;
+ --mint:#2F8F75;--mint-2:#DCEBE5;--coral:#C8453F;--coral-2:#F4E1DE;--coral-ink:#A5322D;--grape:#6F5BA8;--grape-2:#E9E5F1;
+ --f1:#C9764F;--f2:#C99A35;--f3:#4C9A7E;--f4:#4F7DBB;--f5:#8671B3;
+ --f1-2:#F2E2D9;--f2-2:#F5ECD3;--f3-2:#DCEDE6;--f4-2:#DFE7F2;--f5-2:#E8E3F1;
+ --line-w:1.5px;--radius:10px;--shadow:2px 2px 0 var(--ink);--shadow-sm:1px 1px 0 var(--ink);--shadow-lg:3px 3px 0 var(--ink);
+}
+html body.native-app,html body.native-app .desktop-parameters{background-image:none}
+html body.native-app>.desktop-header{height:58px;min-height:58px;background:var(--ink);background-image:none;border-bottom:0;box-shadow:none}
+html body.native-app .desktop-brand h1{font-size:18px;letter-spacing:1px;color:#F5F1E8;text-shadow:none}
+html body.native-app .desktop-brand .comic-mascot{width:34px;height:34px;margin:0;transform:none}
+html body.native-app .desktop-navigation button{padding:6px 13px;font-size:13px;font-weight:700;border-width:1.5px;border-radius:8px;box-shadow:none}
+html body.native-app .desktop-navigation button.selected{background:var(--sun);color:var(--ink);border-color:var(--sun);box-shadow:none;transform:none}
+html body.native-app .desktop-navigation button.selected:hover{background:var(--sun);color:var(--ink)}
+html body.native-app .desktop-navigation button.selected .comic-icon{color:var(--ink)}
+html body.native-app #connection,html body.native-app .desktop-debug-link{padding:5px 10px;border-width:1.5px;border-radius:8px;box-shadow:none}
+html body.native-app .desktop-icon-button{width:34px;height:34px;padding:5px;border-radius:8px;box-shadow:none}
+html body.native-app button.stop,html body.native-app #stop{padding:6px 14px;font-size:14px;letter-spacing:1px;border:1.5px solid #fff;border-radius:8px;box-shadow:none}
+html body.native-app #stop:hover:not(:disabled){background:#B23A35}
+html body.native-app button:not(:where(.review-row-hit,.review-hit,.review-symbol-hit,.review-time-note)),html body.native-app .comic-button{border-width:1.5px;border-radius:8px;box-shadow:var(--shadow-sm);font-weight:600}
+html body.native-app .desktop-parameters{border-radius:12px}
+html body.native-app :is(#feedback-home,#library,#player,.comic-step,.comic-hero,#review-row-panel,#original){border-radius:12px}
+html body.native-app :is(#feedback-panel>.heading h2,#library>.heading h2,.player-heading h2,.review-title h2){background:none;padding:0;font-size:19px}
+html body.native-app .desktop-parameters h2{transform:none;border:0;box-shadow:none;background:none;padding:0}
+html body.native-app .settings>label:not(.sound){border-width:1.5px;border-radius:10px;box-shadow:none}
+.comic-hero::before{display:none}
+.comic-hero .comic-mascot{width:84px;height:84px;animation:none}
+.comic-step:nth-child(n){background:#fff}
+.comic-step-number{width:30px;height:30px;font-size:15px;top:-13px;box-shadow:none;border-width:1.5px}
+.comic-step h3{font-size:16px;font-weight:800}
+.comic-bubble{border-width:1.5px;border-radius:10px;box-shadow:none}
+.comic-bubble h2{font-size:19px}
+html body.native-app .comic-big-stop{background:var(--coral)!important;border-width:1.5px!important;font-size:16px!important;box-shadow:none!important;padding:10px 14px!important}
+html body.native-app.comic-running #stop{animation:none}
+html body.native-app .comic-fix-guide{border:1.5px solid var(--ink);border-left:6px solid #E8590C;border-radius:8px;box-shadow:none;padding:7px 11px}
+html body.native-app .review-row-lens{border-width:2px;border-radius:8px;box-shadow:var(--shadow)}
+html body.native-app.review-view #review-row-annotations .review-row-label{border-width:1.5px;border-radius:6px;box-shadow:none}
+html body.native-app .comic-coach{animation:none}
+/* 校对页：一次只问一个问题。谱面在上，问题卡片在下，其余控件收进「更多选项」。 */
+html body.native-app .comic-fix-guide{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:16px;align-items:start;margin:0;padding:12px;border:0;border-radius:0;background:none;box-shadow:none}
+html body.native-app .comic-fix-guide[hidden]{display:none}
+html body.native-app #comic-guide-lens .review-row-lens{position:static;width:100%;aspect-ratio:95/60;border:1.5px solid var(--ink);border-radius:8px;box-shadow:none}
+html body.native-app #comic-guide-body{min-width:0}
+html body.native-app .comic-fix-guide .guide-head{display:block}
+html body.native-app .comic-fix-guide .guide-head b{display:block;font-size:19px;font-weight:800;line-height:1.3}
+html body.native-app .comic-fix-guide .guide-head span{display:block;margin-top:2px;font-size:13px}
+html body.native-app .guide-row{gap:10px;margin-top:10px}
+html body.native-app .guide-card{min-width:92px;padding:8px 10px;border-radius:8px}
+html body.native-app .guide-card:hover:not(:disabled){background:var(--sun-3)}
+html body.native-app .guide-card:disabled{opacity:.4}
+html body.native-app .guide-card.selected{background:var(--sun-2);border-color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+html body.native-app .guide-card-label{font-size:12.5px}
+html body.native-app .guide-digit{display:block;font:800 30px/40px var(--digits);width:44px;text-align:center}
+html body.native-app .guide-digit.f1{color:var(--f1)}html body.native-app .guide-digit.f2{color:var(--f2)}html body.native-app .guide-digit.f3{color:var(--f3)}html body.native-app .guide-digit.f4{color:var(--f4)}html body.native-app .guide-digit.f5{color:var(--f5)}
+html body.native-app .guide-big{display:block;font-size:26px;font-weight:800;line-height:40px}
+html body.native-app .comic-fix-guide .guide-note-text{margin-top:8px;font-size:12.5px;color:var(--muted)}
+html body.native-app button.guide-more{margin-top:10px;font-size:12.5px}
+/* 收起旧的多块控件和重复提示 */
+html body.native-app #review-inspector.guide-compact :is(.review-dock-fields,.review-dock-secondary),
+html body.native-app #review-inspector :is(#review-edit-instruction,#review-note-warning,#review-action-help),
+html body.native-app #review-inspector .review-compact-heading #review-editor-close{display:none!important}
+html body.native-app #review-inspector.guide-compact #review-hand-repair{display:none!important}
+html body.native-app #review-inspector .review-compact-heading{padding:0 12px;min-height:0}
+html body.native-app #review-inspector .review-compact-heading strong{display:none}
+html body.native-app #review-inspector #review-selected-note{font-size:12px;color:var(--muted)}
+html body.native-app #review-editor-actions{justify-content:flex-end;padding:0 12px 10px}
+/* 谱面：只有当前音最显眼，其他待看的音用浅色 */
+html body.native-app.review-view #review-row-annotations .review-row-label small,html body.native-app.review-view #review-row-annotations .review-note-alert{display:none}
+html body.native-app.review-view #review-row-annotations .review-row-label.attention{background:var(--sun-2);border-color:#B98A22;color:var(--ink);box-shadow:none}
+html body.native-app.review-view #review-row-annotations .review-row-label.current,html body.native-app.review-view #review-row-annotations .review-row-label.current.attention{background:#E8590C;border-color:#E8590C;color:#fff;box-shadow:none;outline:none}
+html body.native-app #comic-lens-toggle{display:none}
+html body.native-app #review-row-panel{box-shadow:none;border-width:1.5px!important}
+html body.native-app .review-title h2{display:none}
+@media(max-width:1100px){html body.native-app .comic-fix-guide{grid-template-columns:200px minmax(0,1fr);gap:10px;padding:8px}html body.native-app .guide-card{min-width:74px;padding:5px 6px}}
+
+/* 开始页：顶栏已有停止按钮，只留「连接」和「选练习」两块 */
+.comic-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+.comic-steps>.comic-step:nth-child(3){display:none}
+.comic-hero-status .comic-activity{display:none}html body.native-app.comic-home-view .desktop-navigation [data-tab].selected{background:#fff;color:var(--ink);border-color:var(--ink)}
+html body.native-app.comic-home-view .desktop-navigation [data-tab].selected .comic-icon{color:var(--ink)}
+html body.native-app.comic-home-view #comic-home-tab{background:var(--sun);border-color:var(--sun)}
+/* 小白校对说明：工具栏里一个按钮，展开后浮在谱面上方，不挤占校对区 */
+.proof-guide{display:inline-block;position:relative}
+.proof-guide summary{cursor:pointer;font-weight:900;font-size:13px;padding:5px 10px;border:2px solid var(--ink,#24394c);border-radius:10px;background:#FFE58A;list-style:none}
+.proof-guide summary::-webkit-details-marker{display:none}
+.proof-guide-card{position:fixed;top:96px;left:50%;transform:translateX(-50%);width:min(620px,calc(100vw - 32px));z-index:60;padding:12px 18px;border:2.5px solid var(--ink,#24394c);border-radius:14px;background:#FFF8E1;box-shadow:0 8px 28px rgba(0,0,0,.25);font-size:14px;line-height:1.65;text-align:left}
+.proof-guide ol{margin:2px 0 4px;padding-left:22px}
+.proof-guide li{margin:4px 0}
+.proof-guide p{margin:4px 0}
+#proof-guide-close{margin-top:6px;float:right;font-weight:800;padding:5px 16px;border:2px solid var(--ink,#24394c);border-radius:10px;background:var(--mint,#14A383);color:#fff;cursor:pointer}
+.proof-fingers span{display:inline-block;margin:2px 3px;padding:0 7px;border-radius:7px;font-weight:800;color:#fff}
+.proof-fingers .pf1{background:#C0583A}.proof-fingers .pf2{background:#C79A1E}.proof-fingers .pf3{background:#2E8B6A}.proof-fingers .pf4{background:#3E6FA8}.proof-fingers .pf5{background:#7A5BA8}
+
+/* 小白盲测 O1/O8/O2 */
+html body.native-app #max-score-tempo{display:none}
+html body.native-app .desktop-finger-reading{display:none}
+.tempo-quick{display:inline-flex;gap:6px;margin:4px 0 0}
+.tempo-quick button{font-weight:800;font-size:12px;padding:4px 10px;border:2px solid var(--ink,#24394c);border-radius:9px;background:#fff;cursor:pointer}
+.songs-heading{margin:10px 0 4px;font-size:15px}
+html body.native-app #connection[data-friendly]{font-size:0}
+html body.native-app #connection[data-friendly]::after{content:attr(data-friendly);font-size:12px}
+
+/* 小白校对：听一听 + 高亮 + 第 k/N 处 */
+.proof-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0 4px;font-size:13px}
+.proof-bar .proof-listen{font-weight:900;font-size:14px;padding:5px 14px;border:2px solid var(--ink,#24394c);border-radius:10px;background:#2e8b6e;color:#fff;cursor:pointer;box-shadow:2px 2px 0 var(--ink,#24394c)}
+.proof-bar .proof-listen.playing{background:#c84b3c}
+.proof-bar .proof-opt{display:inline-flex;align-items:center;gap:3px;font-weight:700;cursor:pointer}
+.proof-issues{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#fff3cf;border:1.5px solid #d6a22a;font-weight:800}
+.proof-issues button,.proof-bar .proof-help{font-weight:800;font-size:12px;padding:3px 10px;border:2px solid var(--ink,#24394c);border-radius:9px;background:#fff;cursor:pointer}
+.proof-status{color:#2b5d4c;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 160px}
+#review-row-hits .proof-measure{position:absolute;top:0;bottom:0;background:rgba(255,214,64,.22);border:2px solid rgba(214,162,42,.85);border-radius:8px;pointer-events:none;z-index:0}
+#review-row-hits .proof-measure span{position:absolute;right:4px;bottom:2px;font:800 11px/1.2 "Microsoft YaHei UI",sans-serif;color:#7a5600;background:#fff6d6;border-radius:4px;padding:0 4px}
+#review-row-panel .proof-now{outline:3px solid #ff3d7f!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(255,61,127,.25)!important;z-index:3}
+#review-overlay .proof-now{outline:3px solid #ff3d7f!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(255,61,127,.25)!important;z-index:3}
+html body.native-app.review-view #review-row-hits .review-row-hit.proof-now[data-note-id]{outline:3px solid #ff3d7f!important;outline-offset:2px!important;box-shadow:0 0 0 6px rgba(255,61,127,.25)!important;z-index:3!important}
+.proof-listen-measure{font-weight:800;background:#e9f7f1;border:2px solid #2e8b6e;border-radius:9px;padding:4px 10px;cursor:pointer;margin-right:6px}
+.proof-coach-card{position:fixed;z-index:60;left:50%;top:84px;transform:translateX(-50%);width:min(620px,calc(100vw - 32px));background:#fffdf6;border:3px solid var(--ink,#24394c);border-radius:16px;box-shadow:5px 5px 0 var(--ink,#24394c);padding:16px 20px;font-size:14px;line-height:1.6}
+.proof-coach-card h3{margin:0 0 8px;font-size:18px}
+.proof-coach-card ol{margin:0 0 8px;padding-left:4px;list-style:none}
+.proof-coach-card li{margin:6px 0}
+.proof-coach-card p{margin:6px 0;color:#52687c}
+.proof-coach-actions{display:flex;gap:10px;justify-content:flex-end}
+.proof-coach-actions button{font-weight:900;padding:7px 16px;border:2px solid var(--ink,#24394c);border-radius:10px;background:#fff;cursor:pointer}
+#proof-coach-try{background:#2e8b6e;color:#fff}
+
+/* O3 暂停按钮显眼一点 */
+html body.native-app #player-pause{background:#2e8b6e;color:#fff;font-weight:900;border:2px solid var(--ink,#24394c);border-radius:10px;padding:6px 14px;box-shadow:2px 2px 0 var(--ink,#24394c);cursor:pointer}
+html body.native-app #player-pause.paused{background:#e8590c}
+html body.native-app #player-pause:disabled{background:#c9d2da;color:#52687c;box-shadow:none}
+
+/* Y4 Y5 Y6 排版 */
+html body.native-app #library .pack-hint{display:none}
+html body.native-app .desktop-port{white-space:nowrap;display:flex;align-items:center;gap:6px}
+html body.native-app .desktop-port select{min-width:0;flex:1 1 auto;max-width:100%}
+html body.native-app footer #activity{white-space:nowrap}
+html body.native-app footer{overflow:hidden}
+html body.native-app footer #message{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+html body.native-app .review-toolbar .review-choose{flex:0 0 auto!important;width:auto!important;max-width:220px}
+
+.proof-bar .proof-listen{min-width:118px;text-align:center}
+.proof-bar .proof-first{font-weight:800;font-size:12px;padding:4px 10px;border:2px solid var(--ink,#24394c);border-radius:9px;background:#fff;cursor:pointer}
+.proof-status{white-space:normal!important;font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+html body.native-app #native-ready-search{min-width:0;width:170px;padding:7px 10px;border:2px solid var(--ink,#24394c);border-radius:10px;font:inherit;font-size:13px}
+
+html body.native-app #comic-fix-guide.guide-cooldown .guide-card{pointer-events:none;opacity:.55;transition:opacity .2s}
+
+/* 校对提示：确认 / 跳到下一处 / 这一行没问题，一眼能看到（11-03 用户反馈“没有提示”） */
+.comic-review-toast{position:fixed;left:50%;top:84px;z-index:200;transform:translate(-50%,-8px);max-width:min(640px,calc(100vw - 32px));padding:10px 18px;background:#E8F7EC;color:#1D4B2B;border:2.5px solid #2E7D46;border-radius:14px;box-shadow:0 6px 20px #1d4b2b33;font-size:15px;font-weight:800;line-height:1.45;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+.comic-review-toast.show{opacity:1;transform:translate(-50%,0)}
+.comic-review-toast[hidden]{display:none}
+/* 没选中音（这一行没有要查的、或刚看完）时，下面的编辑框整个收起 */
+html body.review-view #review-workspace #review-inspector.review-quick-editor.editor-idle{display:none!important}
+/* 「听着顺 就这样弹」：估的位置一键看完，比别的卡片大一圈 */
+html body.native-app .guide-card.guide-card-wide{min-width:150px;background:#e6f7ee;border-color:#2f9e5b}
+html body.native-app .guide-card.guide-card-wide .guide-big{color:#2f9e5b}
+html body.native-app .guide-card.guide-card-wide .guide-card-label{font-size:14px}
+
+/* 校对：说清楚查哪个、为什么 */
+html body.native-app .comic-fix-guide .guide-why{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin:0 0 6px}
+html body.native-app .comic-fix-guide .guide-why-where{font-size:12.5px;font-weight:800;color:var(--ink-2)}
+html body.native-app .comic-fix-guide .guide-why-reason{font-size:13px;font-weight:900;color:#8a4a00;background:#fff3d6;border:1.5px solid #E07A00;border-radius:8px;padding:2px 8px}
+html body.native-app.review-view #review-row-hits .review-row-hit.current.attention{overflow:visible}
+html body.native-app.review-view #review-row-hits .review-row-hit.current.attention::after{content:'查这个';position:absolute;left:50%;bottom:calc(100% + 2px);transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:900;line-height:1;color:#fff;background:#E07A00;border-radius:6px;padding:3px 5px;pointer-events:none;z-index:7}
+/* 整行放不下时不往上盖住工具栏：从上往下排，多出来的上下滚动 */
+html body.native-app.review-view #review-workspace.row-review #review-score-region{align-items:safe center;overflow-x:hidden;overflow-y:auto}
+
+/* 11-04 校对框一屏放下（用户：要确认的东西被收起来、按钮跑出屏幕）
+   上面整行谱子至少留 220px；下面的框只在自己里面滚，「下一处」等按钮一直在框里看得到 */
+html body.native-app.review-view #review-workspace.row-review #review-score-region{flex:1 1 220px;min-height:220px}
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open{display:flex!important;flex-direction:column;flex:0 1 auto;min-height:0;overflow:hidden;padding-top:6px}
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open>#review-inspector-content{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open>#review-editor-actions{flex:0 0 auto;padding:6px 12px 8px;border-top:1px solid #E4E0EA}
+html body.native-app.review-view #review-inspector .review-compact-heading{display:none}
+/* 引导卡片更紧凑：标题和说明一行，图小一点 */
+html body.native-app.review-view .comic-fix-guide{grid-template-columns:minmax(200px,260px) minmax(0,1fr);gap:14px;padding:6px 12px}
+html body.native-app.review-view .comic-fix-guide .guide-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px}
+html body.native-app.review-view .comic-fix-guide .guide-head b{display:inline;font-size:18px}
+html body.native-app.review-view .comic-fix-guide .guide-head span{display:inline;margin:0;font-size:13px}
+html body.native-app.review-view .comic-fix-guide .guide-why{margin:0 0 4px}
+html body.native-app.review-view .comic-fix-guide .guide-timeline{max-width:460px;margin-top:4px}
+html body.native-app.review-view .guide-row{margin-top:6px;align-items:stretch}
+html body.native-app.review-view .guide-card{padding:5px 10px}
+html body.native-app.review-view .guide-big{font-size:22px;line-height:30px}
+html body.native-app.review-view button.guide-more{margin-top:4px}
+/* 点了「更多」：要确认的那一栏排第一个、整栏放出来，不再被切掉 */
+html body.native-app.review-view #review-inspector:not(.guide-compact) .review-dock-fields{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));align-items:start}
+html body.native-app.review-view #review-inspector:not(.guide-compact) .review-dock-fields>.review-needs-action{order:-1}
+html body.native-app.review-view .comic-fix-guide .guide-timeline{max-width:400px}
+/* 卡片里已经有「听这一小节」，右下角那个就不重复了 */
+html body.native-app #review-inspector:has(.guide-card-listen) #proof-listen-measure{display:none}
+html body.native-app .guide-card.guide-card-listen{background:#eef6ff;border-color:#2f6fb0}
+html body.native-app .guide-card.guide-card-listen .guide-big{color:#2f6fb0}
+
+/* 宽屏：「不要这个音 / 下一处」放在框右边一竖列，省出高度给上面的整行谱子 */
+@media(min-width:1000px){
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open{flex-direction:row;align-items:stretch}
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open>#review-inspector-content{flex:1 1 auto;min-width:0}
+html body.native-app.review-view #review-workspace.row-review #review-inspector.quick-open>#review-editor-actions{display:flex;flex-direction:column;justify-content:flex-end;border-top:0;border-left:1px solid #E4E0EA;padding:8px 12px}
+html body.native-app.review-view #review-inspector.quick-open #review-editor-actions .review-action-buttons{flex-direction:column-reverse;align-items:stretch;gap:10px}
+}
+html body.native-app.review-view .comic-fix-guide .guide-timeline{max-width:380px}
+/* 点了「更多」：大卡片和手动几栏是同一件事，先收起卡片，只留「查哪个、为什么」一行，几栏整栏放出来 */
+html body.native-app.review-view #review-inspector:not(.guide-compact) .comic-fix-guide{display:block;padding:2px 12px 4px}
+html body.native-app.review-view #review-inspector:not(.guide-compact) :is(#comic-guide-lens,.guide-timeline,.guide-row,.guide-note-text,.guide-modes){display:none}
+html body.native-app.review-view #review-inspector:not(.guide-compact) #comic-guide-body{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px}
+html body.native-app.review-view #review-inspector:not(.guide-compact) .comic-fix-guide .guide-why{margin:0}
+html body.native-app.review-view #review-inspector:not(.guide-compact) button.guide-more{margin:0}
+/* 说明并成一行：「第几小节·为什么」「按多久？」「普通/带小圆点」排在同一行，卡片一排放在下面 */
+html body.native-app.review-view #review-inspector.guide-compact #comic-guide-body{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px}
+html body.native-app.review-view #review-inspector.guide-compact #comic-guide-body>*{flex:0 0 auto;margin-top:0;margin-bottom:0}
+html body.native-app.review-view #review-inspector.guide-compact #comic-guide-body>:is(.guide-row,div:not([class]),.guide-note-text){flex:1 0 100%}
+html body.native-app.review-view #review-inspector.guide-compact .guide-row>button.guide-more{align-self:flex-end;margin:0 0 2px 4px}
+/* 矮屏（笔记本）：上面谱子保底矮一点，左边小图和卡片也小一点，保证卡片和按钮都在框里 */
+@media(max-height:760px){
+html body.native-app.review-view #review-workspace.row-review #review-score-region{flex-basis:150px;min-height:150px}
+html body.native-app.review-view .comic-fix-guide{grid-template-columns:minmax(150px,190px) minmax(0,1fr);gap:10px;padding:4px 8px}
+html body.native-app.review-view .guide-card{min-width:64px;padding:3px 6px}
+html body.native-app.review-view .guide-card svg.guide-note{height:30px}
+html body.native-app.review-view .guide-big{font-size:18px;line-height:24px}
+html body.native-app.review-view .comic-fix-guide .guide-timeline{max-width:300px}
+html body.native-app.review-view .guide-row{gap:6px;margin-top:2px}
+}
+/* 矮屏：时间条省掉（上面谱子和左边小图已标出位置，主要靠「听」） */
+@media(max-height:760px){html body.native-app.review-view #review-inspector.guide-compact #comic-guide-body>div:has(>.guide-timeline){display:none}}
+/* 11-04 用户：展开后要能退回去；展开时不再重复大标题 */
+html body.native-app.review-view #review-inspector:not(.guide-compact) .comic-fix-guide .guide-head{display:none}
+html body.native-app.review-view #review-inspector:not(.guide-compact) button.guide-more.guide-back{font-size:15px;font-weight:900;padding:5px 16px;border:2px solid var(--ink);border-radius:10px;background:#fff;color:var(--ink);text-decoration:none;box-shadow:var(--shadow-sm)}
+/* 11-04 用户：「查这个」字盖住音符 → 换成音符下面一个会跳的箭头；放大镜放到上面整行里，跟着要查的音走 */
+html body.native-app.review-view #review-row-hits .review-row-hit.current.attention::after{content:none}
+html body.native-app.review-view #review-workspace.row-review #review-score-region{position:relative}
+#comic-row-magnifier{position:absolute;z-index:8;pointer-events:none}
+#comic-row-magnifier[hidden],#comic-row-arrow[hidden]{display:none}
+#comic-row-arrow{position:absolute;z-index:9;pointer-events:none;width:0;height:0;margin-left:-11px;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #E8590C;filter:drop-shadow(0 1px 0 #fff);animation:mag-bounce .9s ease-in-out infinite}
+#comic-row-arrow.mag-up{border-bottom:0;border-top:20px solid #E8590C;animation-name:mag-bounce-up}
+@keyframes mag-bounce{0%,100%{transform:translateY(8px)}50%{transform:translateY(-2px)}}
+@keyframes mag-bounce-up{0%,100%{transform:translateY(-8px)}50%{transform:translateY(2px)}}
+#comic-row-magnifier #comic-guide-lens .review-row-lens{position:static;width:100%;height:100%;aspect-ratio:auto;border:3px solid #E8590C;border-radius:14px;box-shadow:0 6px 18px #0004;background:#fff}
+/* 11-04 用户要箭头一直会动：这台电脑关了系统动画也照样动 */
+html body.native-app #comic-row-arrow{animation:mag-bounce .8s ease-in-out infinite!important}
+html body.native-app #comic-row-arrow.mag-up{animation-name:mag-bounce-up!important}
+/* 下面的框不再放左边小图，卡片更宽 */
+html body.native-app.review-view .comic-fix-guide{grid-template-columns:minmax(0,1fr)!important}
+/* 11-04 用户：谱上音符外面加的黄框/蓝框太难看 → 平时不画，鼠标移上去才亮，照样能点；要查的音靠下面跳的箭头指 */
+html body.native-app.review-view #review-row-hits .review-row-hit,
+html body.native-app.review-view #review-row-hits .review-row-hit:is(.attention,.current,.unfingered,.timing-warning,.uncertain,.confirmed,.excluded,.outside-scope){background:transparent!important;border-color:transparent!important;box-shadow:none!important;outline:none!important}
+html body.native-app.review-view #review-row-hits .review-row-hit:hover{background:#3D7BFF2E!important;border-color:#3D7BFF!important;outline:none!important;cursor:pointer}
+/* 11-04 用户：顶上只留黄色那句原因 */
+html body.native-app.review-view #review-inspector .comic-fix-guide .guide-why-where,html body.native-app.review-view #review-inspector.guide-compact .comic-fix-guide .guide-head{display:none}
+html body.native-app.review-view #review-row-hits .review-symbol-hit,html body.native-app.review-view #review-row-hits .review-symbol-hit.current{background:transparent!important;border-color:transparent!important;box-shadow:none!important;outline:none!important}
+html body.native-app.review-view #review-row-hits .review-symbol-hit:hover{background:#3D7BFF2E!important;border-color:#3D7BFF!important;cursor:pointer}
+/* 11-04 用户：放大镜里不加框，只看原谱 */
+#comic-guide-lens .review-row-lens svg rect{display:none}
+/* 11-04 用户：调手套是客户第一次要做的 */
+html body.native-app #comic-debug.comic-fit-hand{font-weight:900}
+html body.native-app .comic-first-badge{margin-left:6px;padding:1px 6px;border-radius:8px;background:#E8590C;color:#fff;font-size:11px;font-weight:900}
+/* ===== 11-04 用户：校对页统一版型 —— 顶上一行工具、曲谱固定在上面、放大镜固定在下面框左边 ===== */
+html body.native-app.review-view .review-title>h2,
+html body.native-app.review-view #review-simple-status,
+html body.native-app.review-view #native-review-save,
+html body.native-app.review-view .review-issue-nav,
+html body.native-app.review-view #proof-bar .proof-opt:has(#proof-continue),
+html body.native-app.review-view #proof-status{display:none!important}
+/* 行切换和听谱并成一行 */
+html body.native-app.review-view #review-workspace.row-review .review-source{display:grid!important;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;column-gap:14px;row-gap:8px;align-items:center}
+html body.native-app.review-view #review-workspace.row-review .review-source>#review-inspector{grid-column:1/-1;grid-row:3}
+html body.native-app.review-view #review-workspace.row-review .review-source>.review-row-toolbar{grid-column:1;grid-row:1;margin:0}
+html body.native-app.review-view #review-workspace.row-review .review-source>#proof-bar{grid-column:2;grid-row:1;margin:0}
+html body.native-app.review-view #review-workspace.row-review .review-source>#review-score-region{grid-column:1/-1;grid-row:2;align-self:stretch}
+/* 曲谱贴着上面放，不上下乱跑 */
+html body.native-app.review-view #review-workspace.row-review #review-score-region{align-items:flex-start!important;justify-content:center}
+/* 下面的框：固定高度；没选中音时也占着位置，版面不跳 */
+html body.native-app.review-view #review-inspector.review-quick-editor{height:clamp(170px,27vh,240px)!important;min-height:0!important;max-height:none!important}
+html body.review-view #review-workspace #review-inspector.review-quick-editor.editor-idle{display:flex!important;visibility:hidden}
+/* 放大镜：下面框最左边一块，大小固定，只显示原谱 */
+html body.native-app.review-view .comic-fix-guide{grid-template-columns:clamp(160px,18vw,240px) minmax(0,1fr)!important;column-gap:14px;align-items:center!important}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens{grid-column:1;grid-row:1/span 3;width:100%;aspect-ratio:48/30;align-self:center}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens{position:static!important;inset:auto!important;width:100%!important;height:100%!important;transform:none!important;border:3px solid #E8590C;border-radius:12px;background:#fff;overflow:hidden;box-shadow:none}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens svg{width:100%;height:100%;display:block}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-body{grid-column:2}
+html body.native-app.review-view .comic-fix-guide .guide-why-todo{margin-left:8px;font-weight:900;color:var(--ink)}
+/* 11-04 用户：标注进度条 */
+html body.native-app .proof-issues{gap:8px}
+html body.native-app .proof-progress{width:clamp(120px,16vw,240px);height:12px;appearance:none;-webkit-appearance:none;border:1.5px solid var(--ink);border-radius:7px;overflow:hidden;background:#fff}
+html body.native-app .proof-progress::-webkit-progress-bar{background:#fff}
+html body.native-app .proof-progress::-webkit-progress-value{background:#2f9e5b;border-radius:5px}
+/* 11-04 用户：放大镜要圆的 */
+html body.native-app.review-view .comic-fix-guide{grid-template-columns:clamp(130px,13vw,180px) minmax(0,1fr)!important}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens{aspect-ratio:1/1!important}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens{border-radius:50%!important;border-width:4px}
+/* 11-04 用户：每个按钮都要有必须留下的理由，否则不要。以下是重复或小白用不到的 */
+/* 主页：顶栏已有连接状态；三种练习顶栏已有；入门提示/手机连接在设置里 */
+html body.native-app .comic-hero-status,
+html body.native-app .comic-steps>.comic-step:nth-child(2),
+html body.native-app .comic-step-number,
+html body.native-app #comic-show-coach,
+html body.native-app #comic-phone-help{display:none!important}
+html body.native-app .comic-steps{grid-template-columns:minmax(0,1fr)!important}
+/* USB/驱动帮助只在没连上时出现 */
+html body.native-app:has(#connection.comic-conn-ready) #comic-usb-help{display:none!important}
+/* 底部：顶栏已有状态，不再重复“待机/通信 ms” */
+html body.native-app footer :is(#activity,#sync){display:none!important}
+/* 手指训练右栏：说明小字、声音对齐、拇指姿态反馈（调试用）不要 */
+html body.native-app .desktop-parameters :is(.comic-hint,label.sound-offset,details.desktop-position-details){display:none!important}
+/* 曲库：列表会自动刷新；内置原谱/导出/下载小白用不到；空位自动选；“选文件没反应”是手机的事 */
+html body.native-app :is(#refresh,#native-builtin-entry,#native-ready-export,.song-download,.score-file-help-area){display:none!important}
+html body.native-app #library .upload>label:has(#slot){display:none!important}
+/* 校对页：导出范围和“跳过待处理音导出”合并进「导出曲谱」 */
+html body.native-app :is(#review-export-preset,#review-export-skip-pending){display:none!important}
+/* 设置：顶栏已有「调手套」 */
+html body.native-app .desktop-settings-link[href*="web_piano_glove"]{display:none!important}
+/* 更多工具里只留：返回曲谱、完整 PDF、补录音符（自动保存，不用导出/导入复核文件；读谱帮助=「怎么校对」；内置原谱在曲库里） */
+html body.native-app #review-tools-panel>:is(#review-file-tools,.review-statusbar,#review-more,#review-performance-mode-field,#native-score-catalog){display:none!important}
+
+/* ===== 11-04 精简后重新排版 ===== */
+/* 主页：上面一条打招呼，下面三块大卡片并排（调手套 / 继续校对 / 不会看谱），不再一条条往下堆 */
+html body.native-app #comic-home{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;align-content:start}
+html body.native-app #comic-home>.comic-hero{grid-column:1/-1}
+html body.native-app #comic-home>:is(#comic-continue,.comic-steps,.comic-tips){margin:0!important;min-height:240px}
+html body.native-app #comic-home>.comic-steps{display:block!important}
+html body.native-app #comic-home>.comic-steps>.comic-step{height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:28px}
+html body.native-app #comic-home>.comic-steps>.comic-step h3{font-size:22px;margin:0}
+html body.native-app #comic-home>.comic-steps>.comic-step p{margin:0;line-height:1.6}
+html body.native-app #comic-home>.comic-steps .comic-step-actions{margin-top:8px;flex-wrap:wrap;gap:10px}
+html body.native-app #comic-home>#comic-continue{display:flex!important;flex-direction:column;justify-content:center;align-items:flex-start;gap:14px;padding:28px;box-sizing:border-box}
+html body.native-app #comic-home>#comic-continue>svg{width:34px;height:34px}
+html body.native-app #comic-home>#comic-continue>#comic-continue-name{font-size:20px;font-weight:900;line-height:1.45;flex:0 0 auto;white-space:normal}
+html body.native-app #comic-home>#comic-continue>#comic-continue-open{margin:8px 0 0 0!important;font-size:16px;padding:10px 26px}
+html body.native-app #comic-home>#comic-continue:not(.available){display:none!important}
+html body.native-app #comic-home>.comic-tips{display:flex!important;flex-direction:column;justify-content:center;align-items:flex-start;gap:12px;padding:28px;box-sizing:border-box;flex-wrap:nowrap}
+html body.native-app #comic-home>.comic-tips>strong{font-size:22px}
+html body.native-app #comic-home>.comic-tips>span{line-height:1.6;white-space:normal}
+html body.native-app #comic-home>.comic-tips>button{min-width:150px;justify-content:center}
+/* 手指训练：手指卡下面不留空；连续练习收成一张卡，一行排开；右栏只占内容高度 */
+html body.native-app main>aside.desktop-parameters{align-self:start;height:auto!important}
+html body.native-app #feedback-home{height:auto!important}
+html body.native-app #feedback-panel{height:auto!important;padding-bottom:22px!important}
+html body.native-app #train{margin-top:18px;padding:18px 22px;background:#fff;border:2.5px solid var(--ink);border-radius:18px;box-shadow:var(--shadow);display:grid!important;grid-template-columns:auto 1fr;align-items:center;gap:6px 18px}
+html body.native-app #train>h2{margin:0;font-size:19px}
+html body.native-app #train>.comic-subtitle{display:none!important}
+html body.native-app #train>.actions{grid-column:1/-1;margin:0!important;gap:12px;align-items:stretch}
+html body.native-app #train>.actions>button{flex:1 1 0;min-height:64px}
+html body.native-app #train>.actions>label{flex:0 0 auto;margin-left:6px}
+html body.native-app #train>#training-status{grid-column:2;grid-row:1;justify-self:end;margin:0;font-size:13px}
+/* 曲库：自带曲子一行（标题｜搜索｜选曲｜播放）；上传一行，按钮正常大小 */
+html body.native-app #native-ready-library{grid-template-columns:auto minmax(140px,200px) minmax(0,1fr) auto!important;align-items:center;gap:14px!important}
+html body.native-app #native-ready-library>div>span{display:none!important}
+html body.native-app #native-ready-library>div>strong{font-size:18px;white-space:nowrap}
+html body.native-app #library .upload{display:flex!important;align-items:center;gap:14px;flex-wrap:wrap}
+html body.native-app #library .upload::before{content:'上传新曲谱到手套';font-weight:900;font-size:15px;margin-right:4px}
+html body.native-app #library .upload>#upload{width:auto!important;flex:0 0 auto;margin-left:auto;padding:10px 28px}
+/* ===== 11-04 用户：精简后重新排版，好看一些 ===== */
+/* 右边「练习参数」只占自己内容的高度，不再拉满一整列 */
+html body.native-app aside.desktop-parameters{align-self:start!important;height:auto!important}
+/* 手指训练：「连续练习」也做成一张卡片，和上面手指卡片对齐 */
+html body.native-app #train{background:#fff;border:1.33px solid var(--ink);border-radius:12px;box-shadow:3px 3px 0 0 var(--ink);padding:18px 26px 16px!important;margin-top:4px}
+html body.native-app #train>h2{margin:0 0 4px}
+html body.native-app #train .actions{align-items:stretch;gap:12px}
+html body.native-app #train .actions>label{margin-left:auto;align-self:center}
+html body.native-app #train #training-status{margin:8px 0 0}
+/* 曲库：自带曲子那一条，说明小字挤成三行 → 只留标题 */
+html body.native-app #native-ready-library>div:first-child>span{display:none}
+html body.native-app #native-ready-library{align-items:center}
+/* 开始页：居中两列 —— 上面打招呼、继续校对；下面 调手套 | 不会看谱 两张一样高的卡片 */
+html body.native-app #comic-home{max-width:1080px;margin:0 auto;display:grid!important;grid-template-columns:1fr 1fr;gap:18px;align-content:start}
+html body.native-app #comic-home>.comic-hero,html body.native-app #comic-home>#comic-continue{grid-column:1/-1;margin:0}
+html body.native-app #comic-home>.comic-steps{grid-column:1;margin:0;display:block}
+html body.native-app #comic-home>.comic-steps>.comic-step{height:100%;box-sizing:border-box;padding:22px 24px}
+html body.native-app #comic-home>.comic-tips{grid-column:2;margin:0;border:1.33px solid var(--ink);border-radius:12px;background:#fff;box-shadow:3px 3px 0 0 var(--ink);padding:22px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+html body.native-app #comic-home>.comic-tips>strong{font-size:18px}
+html body.native-app #comic-home>.comic-tips>span{font-size:14px;color:var(--ink-soft,#5b6474)}
+html body.native-app #comic-home>.comic-tips>button{min-width:150px;justify-content:flex-start}
+html body.native-app #comic-home .comic-step h3{font-size:18px;margin:0 0 6px}
+html body.native-app #comic-home .comic-step-actions{margin-top:14px}
+html body.native-app #comic-home .comic-step-actions>button{min-height:44px}
+html body.native-app #comic-home .comic-step-number{display:none}
+/* 校对页：上面整块就是一张白卡片，谱子贴着顶；「怎么校对」靠右放在「更多工具」旁边 */
+html body.native-app.review-view #review-workspace.row-review #review-score-region{background:#fff;border:1.33px solid var(--ink);border-radius:12px;box-shadow:3px 3px 0 0 var(--ink)}
+html body.native-app.review-view #review-workspace.row-review #review-row-panel{border:0!important;box-shadow:none!important;background:transparent!important}
+html body.native-app.review-view .review-toolbar>#proof-guide{margin-left:auto}
+html body.native-app #train[hidden]{display:none!important}
+html body.native-app #comic-home{height:auto!important;grid-template-rows:auto;grid-auto-rows:auto;align-content:start!important;align-items:stretch}
+html body.native-app #comic-home>.comic-steps>.comic-step:not(:first-child){display:none!important}
+html body.native-app #comic-home>.comic-steps>.comic-step{height:100%;min-height:0!important}
+html body.native-app.review-view .review-title>.review-toolbar{flex:1 1 auto;width:100%}
+html body.native-app.review-view .review-toolbar>#review-tools{margin-left:0}
+/* 手指卡片撑满上面那张卡片，不管有没有反馈条 */
+html body.native-app #feedback-home>#feedback-panel{height:100%;box-sizing:border-box;display:flex;flex-direction:column;min-height:0}
+html body.native-app #feedback-home #fingers{flex:1 1 auto;align-items:stretch}
+html body.native-app #feedback-home #fingers>.finger-card{height:auto!important;min-height:max(220px,calc(100vh - 368px))}
+/* 开始页「上次的曲谱」一行排：图标 · 名字 · 回到校对 */
+html body.native-app #comic-home>#comic-continue.available{display:flex!important;flex-direction:row!important;align-items:center!important;gap:12px;padding:14px 22px!important;min-height:0!important;height:auto!important}
+html body.native-app #comic-home>#comic-continue.available>span{flex:1 1 auto;font-size:16px!important;margin:0!important}
+html body.native-app #comic-home>#comic-continue.available>button{margin:0!important}
+html body.native-app #comic-home>#comic-continue.available{justify-content:flex-start!important;text-align:left!important}
+html body.native-app #feedback-home #fingers{display:grid!important;grid-auto-rows:minmax(0,1fr);align-content:stretch!important;height:auto}
+/* 11-04 用户：开始页下面空荡荡 → 整页撑满：两张卡片占满剩下的高度，内容竖着居中、按钮放大、上面一个大图标 */
+html body.native-app #comic-home{min-height:calc(100vh - 150px)!important;grid-template-rows:auto auto minmax(260px,1fr)!important;align-content:stretch!important}
+html body.native-app #comic-home:not(:has(#comic-continue.available)){grid-template-rows:auto minmax(260px,1fr)!important}
+html body.native-app #comic-home>.comic-steps>.comic-step,html body.native-app #comic-home>.comic-tips{display:flex!important;flex-direction:column;justify-content:center;align-items:center!important;text-align:center;gap:12px;padding:28px!important}
+html body.native-app #comic-home>.comic-steps>.comic-step:not(:first-child){display:none!important}
+html body.native-app #comic-home>.comic-steps{height:100%}
+html body.native-app #comic-home .comic-step h3,html body.native-app #comic-home>.comic-tips>strong{font-size:24px!important;margin:0!important}
+html body.native-app #comic-home .comic-step p,html body.native-app #comic-home>.comic-tips>span{font-size:15px!important;max-width:30em;margin:0!important}
+html body.native-app #comic-home .comic-step-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:8px!important}
+html body.native-app #comic-home .comic-step-actions>button,html body.native-app #comic-home>.comic-tips>button{min-height:56px!important;min-width:180px!important;font-size:18px!important;justify-content:center!important}
+html body.native-app #comic-home .comic-step::before,html body.native-app #comic-home>.comic-tips::before{content:"";display:block;width:84px;height:84px;border-radius:50%;background:#FBE3B0 center/48px no-repeat;border:2px solid var(--ink)}
+html body.native-app #comic-home .comic-step::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2323212b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E")}
+html body.native-app #comic-home>.comic-tips::before{background-color:#DCEBE7;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2323212b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18V5l12-2v13'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Ccircle cx='18' cy='16' r='3'/%3E%3C/svg%3E")}
+
+/* ===== 11-04 曲谱列表（像网盘传输列表：拖进来的都在、逐个转换有进度、多选送到手套） ===== */
+#score-list-view{display:none}
+html body.native-app.score-list-on #convert>:not(#score-list-view){display:none!important}
+html body.native-app.score-list-on #score-list-view{display:flex;flex-direction:column;gap:12px;flex:1 1 auto;min-height:0}
+#score-list-view .sl-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+#score-list-view .sl-head h2{margin:0;font-size:24px;font-weight:900}
+#score-list-view #sl-summary{margin:4px 0 0;font-size:14px;color:var(--ink-2)}
+#score-list-view #sl-summary b{color:var(--ink);font-size:16px}
+#score-list-view .sl-rate-help{margin:2px 0 0;font-size:12px;color:var(--ink-2)}
+#score-list-view .sl-busy-text{color:#C2410C;font-weight:800}
+#score-list-view .sl-head-actions{display:flex;gap:10px;align-items:center}
+#score-list-view #sl-search{width:220px;padding:9px 12px;border:2px solid var(--ink);border-radius:12px;font:inherit;font-size:14px}
+#score-list-view button{font:inherit;font-weight:800;cursor:pointer}
+#score-list-view .sl-primary{background:var(--sun)!important;color:var(--ink)!important;border:2.5px solid var(--ink)!important;border-radius:12px!important;padding:9px 18px!important;box-shadow:var(--shadow-sm)}
+#score-list-view .sl-drop{border:2.5px dashed #B7AFC6;border-radius:14px;padding:10px 14px;text-align:center;color:var(--ink-2);font-size:13.5px;background:#fffdf6}
+body.native-app.score-list-on.drag-over #score-list-view .sl-drop,body.native-app.score-list-on .sl-drop:hover{border-color:var(--sun);background:var(--sun-2)}
+#score-list-view #sl-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#score-list-view #sl-filters button{padding:6px 14px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-size:13px;box-shadow:none}
+#score-list-view #sl-filters button.on{background:var(--ink);color:#fff}
+#score-list-view #sl-sort{margin-left:auto;padding:6px 10px;border:2px solid var(--ink);border-radius:10px;font:inherit;font-size:13px}
+#score-list-view #sl-bulk{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#EAF2FF;border:2px solid #2F6FB0;border-radius:12px}
+#score-list-view #sl-bulk[hidden]{display:none}
+#score-list-view #sl-bulk span{font-weight:900;margin-right:6px}
+#score-list-view #sl-bulk button:not(.sl-primary){padding:7px 14px;border:2px solid var(--ink);border-radius:10px;background:#fff}
+#score-list-view .sl-table-wrap{flex:1 1 auto;min-height:0;overflow:auto;background:#fff;border:2.5px solid var(--ink);border-radius:16px;box-shadow:var(--shadow)}
+#score-list-view .sl-table{width:100%;border-collapse:collapse;font-size:14px}
+#score-list-view .sl-table thead th{position:sticky;top:0;z-index:1;background:#F4F1FA;text-align:left;font-size:12.5px;color:var(--ink-2);font-weight:800;padding:9px 10px;border-bottom:2px solid var(--ink)}
+#score-list-view .sl-table td{padding:8px 10px;border-bottom:1px solid #ECE8F2;vertical-align:middle}
+#score-list-view .sl-table tbody tr:hover{background:#FFFBEA}
+#score-list-view .sl-table tr.sl-selected{background:#EAF2FF}
+#score-list-view .sl-check{width:34px;text-align:center}
+#score-list-view .sl-check input{width:17px;height:17px;cursor:pointer}
+#score-list-view .sl-name{max-width:0;width:38%}
+#score-list-view .sl-name strong{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#score-list-view .sl-name small{font-size:11.5px;color:var(--muted)}
+#score-list-view .sl-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;width:72px}
+#score-list-view .sl-left{white-space:nowrap;width:110px}
+#score-list-view .sl-ok{color:#1F7A45;font-weight:800}
+#score-list-view .sl-todo{color:#B4500A;font-weight:800}
+#score-list-view .sl-muted{color:var(--muted)}
+#score-list-view .sl-state{width:170px}
+#score-list-view .sl-state small{display:block;font-size:11.5px;color:var(--ink-2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+#score-list-view .sl-tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:800;background:#F1EEF6;color:var(--ink-2)}
+#score-list-view .sl-tag.sl-good{background:#E3F6EA;color:#1F7A45}
+#score-list-view .sl-tag.sl-bad{background:#FDE7E3;color:#B42318;cursor:help}
+#score-list-view .sl-tag.sl-wait{background:#FFF3D6;color:#8A5A00}
+#score-list-view .sl-tag.sl-busy{background:#EAF2FF;color:#2F6FB0}
+#score-list-view .sl-progress{height:10px;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;background:#fff}
+#score-list-view .sl-progress i{display:block;height:100%;background:#2E9E62;transition:width .2s}
+#score-list-view .sl-progress i.sl-indeterminate{animation:sl-slide 1.1s ease-in-out infinite!important}
+@keyframes sl-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+#score-list-view .sl-actions{white-space:nowrap;text-align:right;width:180px}
+#score-list-view .sl-actions button{padding:6px 12px;margin-left:6px;border:2px solid var(--ink);border-radius:10px;background:#fff;font-size:13px;box-shadow:none}
+#score-list-view .sl-actions button.sl-send{background:#2E9E62;color:#fff;border-color:#1F6E44}
+#score-list-view .sl-actions button:disabled{opacity:.45;cursor:default}
+#score-list-view .sl-empty{text-align:center;color:var(--muted);padding:30px}
+/* 校对页左上角回列表 */
+html body.native-app #sl-back{padding:8px 14px;border:2px solid var(--ink);border-radius:12px;background:#fff;font-weight:900;margin-right:8px;white-space:nowrap}
+/* 曲库多选 */
+html body.native-app #lib-manage{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
+html body.native-app #lib-manage label{display:flex;align-items:center;gap:6px;font-weight:800;cursor:pointer}
+html body.native-app #lib-manage #lib-count{font-weight:800;color:#2F6FB0;min-width:64px}
+html body.native-app #lib-manage button{padding:7px 14px;border:2px solid var(--ink);border-radius:10px;background:#fff;font-weight:800;font-size:13px}
+html body.native-app #lib-manage button:disabled{opacity:.45}
+html body.native-app #lib-manage .lib-danger{color:#B42318}
+html body.native-app #lib-manage #lib-to-list{margin-left:auto}
+html body.native-app #songs .song{position:relative}
+html body.native-app #songs .song>.lib-pick{width:18px;height:18px;margin:0 12px 0 0;flex:0 0 auto;cursor:pointer;align-self:center}
+html body.native-app #score-list-view>header.sl-head,html body.native-app #score-list-view>nav#sl-filters{padding:0 4px!important;margin:0!important;background:none!important;border:0!important;box-shadow:none!important;position:static!important;height:auto!important;min-height:0!important}
+html body.native-app #score-list-view>header.sl-head{padding-top:4px!important}
+html body.native-app.score-list-on #score-list-view>:not(.sl-table-wrap){flex:0 0 auto!important}
+html body.native-app.score-list-on #score-list-view>.sl-table-wrap{flex:1 1 0!important;min-height:200px}
+/* 11-04 用户：“这个咋一直在这”——曲谱的提示只在校对页里显示，别的页面和 PDF 转换列表不显示 */
+html body.native-app:not(.review-view) #review-global-warning,html body.native-app.score-list-on #review-global-warning{display:none!important}
+/* ===== 11-04 曲库：「手套里的」/「软件自带」两个标签；软件自带 100 首分类、播放、送到手套、校对 ===== */
+html body.native-app #native-ready-library{display:none!important} /* 原来的下拉框由「软件自带」标签代替 */
+html body.native-app #lib-tabs{display:flex;gap:8px;margin:2px 0 10px}
+html body.native-app #lib-tabs button{padding:9px 20px;border:2.5px solid var(--ink);border-radius:12px;background:#fff;font-weight:900;font-size:15px;box-shadow:none}
+html body.native-app #lib-tabs button.on{background:var(--ink);color:#fff}
+html body.native-app #lib-tabs small{font-weight:800;opacity:.75;margin-left:4px}
+html body.native-app #library #bl-panel{display:none}
+html body.native-app #library.lib-show-builtin #bl-panel{display:flex;flex-direction:column;gap:10px;flex:1 1 auto;min-height:0}
+html body.native-app #library.lib-show-builtin>:is(#capacity,#lib-manage,#songs,.upload,.pack-hint){display:none!important}
+html body.native-app #bl-panel .bl-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+html body.native-app #bl-panel #bl-filters{display:flex;gap:8px;flex-wrap:wrap}
+html body.native-app #bl-panel #bl-filters button{padding:6px 14px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-weight:800;font-size:13px;box-shadow:none}
+html body.native-app #bl-panel #bl-filters button.on{background:var(--sun);}
+html body.native-app #bl-panel #bl-filters small{opacity:.7;margin-left:2px}
+html body.native-app #bl-panel #bl-search{margin-left:auto;width:200px;padding:8px 12px;border:2px solid var(--ink);border-radius:12px;font:inherit;font-size:14px}
+html body.native-app #bl-panel #bl-bulk{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#EAF2FF;border:2px solid #2F6FB0;border-radius:12px}
+html body.native-app #bl-panel #bl-bulk[hidden]{display:none}
+html body.native-app #bl-panel #bl-bulk span{font-weight:900}
+html body.native-app #bl-panel #bl-bulk button:not(.sl-primary){padding:7px 14px;border:2px solid var(--ink);border-radius:10px;background:#fff;font-weight:800}
+html body.native-app #bl-panel .sl-table-wrap{flex:1 1 0;min-height:240px;overflow:auto;background:#fff;border:2.5px solid var(--ink);border-radius:16px}
+html body.native-app #bl-panel .sl-table{width:100%;border-collapse:collapse;font-size:14px}
+html body.native-app #bl-panel .sl-table thead th{position:sticky;top:0;z-index:1;background:#F4F1FA;text-align:left;font-size:12.5px;color:var(--ink-2);font-weight:800;padding:9px 10px;border-bottom:2px solid var(--ink)}
+html body.native-app #bl-panel .sl-table td{padding:8px 10px;border-bottom:1px solid #ECE8F2;vertical-align:middle}
+html body.native-app #bl-panel .sl-table tbody tr:hover{background:#FFFBEA}
+html body.native-app #bl-panel tr.sl-selected{background:#EAF2FF}
+html body.native-app #bl-panel .sl-check{width:34px;text-align:center}
+html body.native-app #bl-panel .sl-check input{width:17px;height:17px}
+html body.native-app #bl-panel .sl-name{max-width:0;width:55%}
+html body.native-app #bl-panel .sl-name strong{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.native-app #bl-panel .sl-name small{font-size:11.5px;color:var(--muted)}
+html body.native-app #bl-panel .sl-left{white-space:nowrap}
+html body.native-app #bl-panel .sl-ok{color:#1F7A45;font-weight:800}
+html body.native-app #bl-panel .sl-todo{color:#B4500A;font-weight:800}
+html body.native-app #bl-panel .sl-tag{display:inline-block;margin-top:3px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:800;background:#F1EEF6}
+html body.native-app #bl-panel .sl-tag.sl-good{background:#E3F6EA;color:#1F7A45}
+html body.native-app #bl-panel .sl-tag.sl-busy{background:#EAF2FF;color:#2F6FB0}
+html body.native-app #bl-panel .sl-tag.sl-bad{background:#FDE7E3;color:#B42318}
+html body.native-app #bl-panel .sl-actions{white-space:nowrap;text-align:right}
+html body.native-app #bl-panel .sl-actions button{padding:6px 12px;margin-left:6px;border:2px solid var(--ink);border-radius:10px;background:#fff;font-weight:800;font-size:13px;box-shadow:none}
+html body.native-app #bl-panel .sl-actions .bl-play{background:#2F6FB0;color:#fff;border-color:#1E4E80}
+html body.native-app #bl-panel .sl-actions .sl-send{background:#2E9E62;color:#fff;border-color:#1F6E44}
+html body.native-app #bl-panel .sl-actions button:disabled{opacity:.45}
+html body.native-app #bl-panel .sl-empty{text-align:center;color:var(--muted);padding:30px}
+html body.native-app #bl-panel .sl-primary{background:var(--sun)!important;color:var(--ink)!important;border:2.5px solid var(--ink)!important;border-radius:12px!important;padding:8px 18px!important;font-weight:900}
+/* 11-05 用户：「连续练习」不像按钮：去掉框和阴影，做成普通标题 */
+html body.native-app #train>h2{border:0!important;box-shadow:none!important;background:none!important;padding:0!important;border-left:6px solid var(--sun)!important;padding-left:10px!important;border-radius:0!important}
+/* 11-05 用户：提示在屏幕中间弹出，和软件一个风格（不在最上面一条） */
+.comic-review-toast{top:50%!important;transform:translate(-50%,-40%) scale(.96)!important;padding:18px 34px!important;font-size:20px!important;border-width:3px!important;border-radius:18px!important;box-shadow:0 10px 0 #1d4b2b33,0 18px 40px #0003!important;text-align:center}
+.comic-review-toast.show{transform:translate(-50%,-50%) scale(1)!important}
+/* 11-05 用户：箭头放到音符左边指着、半透明；放大镜竖长条、能拖 */
+html body.native-app #comic-row-arrow.mag-left{margin-left:0!important;border:0!important;border-top:11px solid transparent!important;border-bottom:11px solid transparent!important;border-left:20px solid #E8590C!important;opacity:.7;animation:mag-nudge .8s ease-in-out infinite!important}
+@keyframes mag-nudge{0%,100%{transform:translateX(-4px)}50%{transform:translateX(1px)}}
+html body.native-app #comic-guide-lens .review-row-lens{aspect-ratio:auto!important;border-radius:14px!important;overflow:hidden;touch-action:none}
+html body.native-app #comic-guide-lens .review-row-lens svg{display:block;width:100%;height:auto;max-height:46vh}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens{aspect-ratio:auto!important;height:auto!important;display:flex;justify-content:center}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens{width:auto!important;height:auto!important;border-radius:14px!important;clip-path:none!important}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens svg{width:auto;height:min(300px,38vh);max-width:100%}
+/* 11-05 用户：「USB / 驱动帮助」和下面几个一个样子 */
+html body.native-app button#usbDriverHelpEntry.desktop-settings-link{display:flex!important;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:12px 14px!important;margin:0 0 10px!important;font:inherit!important;font-weight:800!important;font-size:inherit!important;color:var(--ink)!important;text-align:left;background:#fff!important;border:2px solid var(--ink)!important;border-radius:14px!important;box-shadow:var(--shadow-sm)!important;min-height:0!important;transform:none!important}
+html body.native-app button#usbDriverHelpEntry.desktop-settings-link:hover{background:var(--sun-3)!important}
+/* 11-05 用户：校对页白卡右边/下边像被裁掉——阴影贴着外框被剪，留出几像素 */
+html body.native-app.review-view #review-workspace .review-source{padding:0 6px 6px 0;box-sizing:border-box}
+/* 时值开关：小圆点 / 标着 3 */
+html body.native-app .guide-toggles{margin-top:8px}
+html body.native-app .guide-toggles button{font-size:14px;padding:6px 14px;font-weight:800}
+html body.native-app .guide-toggles button.selected{background:var(--sun)!important;color:var(--ink)!important}
+/* 11-05：没有黄色原因的卡片（比如特殊记号）照常显示标题和一句说明，不然只剩按钮看不懂 */
+html body.native-app.review-view #review-inspector.guide-compact #comic-guide-body:not(:has(.guide-why)) .guide-head{display:flex!important}
+
+/* ===== 11-05 用户：校对版型定下来，以后不变 =====
+   上：工具栏一行；中：整行原谱（大小固定）；下：校对框固定 260px 高——
+   左 放大镜 | 中 一句原因 + 答案（都直接摆出来，没有「更多」）| 右 下一处 / 听这一小节 / 不要这个音。
+   没有要查的音时，下面这块照样占着位置，写“这一行没问题”，曲谱不会忽大忽小。 */
+html body.native-app.review-view #review-workspace.row-review .review-source{grid-template-rows:auto minmax(0,1fr) 260px!important}
+html body.native-app.review-view #review-workspace.row-review .review-source>#review-score-region{min-height:0!important;height:auto!important}
+html body.native-app.review-view #review-inspector.review-quick-editor{height:260px!important;min-height:260px!important;max-height:260px!important}
+html body.native-app.review-view #review-inspector.review-quick-editor>#review-inspector-content{overflow:hidden!important}
+html body.native-app.review-view .comic-fix-guide{display:grid!important;grid-template-columns:230px minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important;gap:0 16px!important;height:100%;padding:6px 10px!important;box-sizing:border-box}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens{grid-column:1;grid-row:1;height:100%!important;min-height:0;display:flex;align-items:center;justify-content:center;aspect-ratio:auto!important}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens svg{height:224px!important;width:auto!important;max-width:226px}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-body{grid-column:2;grid-row:1;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;justify-content:flex-start;gap:8px!important;min-height:0;overflow:hidden}
+html body.native-app.review-view #comic-guide-body>*{flex:0 0 auto!important;margin:0!important}
+html body.native-app.review-view #comic-guide-body .guide-why{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+html body.native-app.review-view #comic-guide-body .guide-head{display:none!important}
+html body.native-app.review-view #comic-guide-body .guide-row{display:flex;flex-wrap:nowrap;gap:10px;align-items:stretch;overflow-x:auto}
+html body.native-app.review-view button.guide-more{display:none!important}
+html body.native-app.review-view #proof-idle{grid-column:1/-1;grid-row:3;display:none;align-items:center;justify-content:center;gap:18px;border:3px solid var(--ink);border-radius:18px;background:#fff;font-size:20px;font-weight:900;color:#2f7a4a}
+html body.native-app.review-view #proof-idle button{font:inherit;font-size:17px;padding:10px 22px;border:2.5px solid var(--ink);border-radius:12px;background:#F4B63D;color:var(--ink);cursor:pointer;box-shadow:var(--shadow-sm)}
+html body.native-app.review-view .review-source:has(#review-inspector.editor-idle) #proof-idle,html body.native-app.review-view .review-source:not(:has(#review-inspector:not([hidden]))) #proof-idle{display:flex}
+/* 开始位置对照工具 */
+html body.native-app .guide-compare-wrap{width:100%;max-width:900px}
+html body.native-app svg.guide-compare{display:block;width:100%;height:auto;max-height:150px;touch-action:none;cursor:ew-resize;user-select:none}
+html body.native-app svg.guide-compare .paper{fill:#fff;stroke:#d9d3e2}
+html body.native-app svg.guide-compare .ring{fill:none;stroke:#E8590C;stroke-width:3}
+html body.native-app svg.guide-compare .ruler{stroke:#1d2733;stroke-width:3}
+html body.native-app svg.guide-compare .tick{stroke:#1d2733;stroke-width:2}
+html body.native-app svg.guide-compare .tick-minor{stroke:#8a93a0;stroke-width:1.5}
+html body.native-app svg.guide-compare .tick-num{font:800 22px "Microsoft YaHei UI",sans-serif;fill:#52687c;text-anchor:middle}
+html body.native-app svg.guide-compare .link{fill:none;stroke:#7d6cf0;stroke-width:1.6;opacity:.55}
+html body.native-app svg.guide-compare .blk{fill:#7d6cf0;opacity:.6}
+html body.native-app svg.guide-compare .link-now{fill:none;stroke:#E8590C;stroke-width:3.5}
+html body.native-app svg.guide-compare .blk-now{fill:#E8590C;stroke:#1d2733;stroke-width:2;cursor:grab}
+html body.native-app svg.guide-compare.dragging .blk-now{cursor:grabbing}
+html body.native-app svg.guide-compare .drag-label{font:900 22px "Microsoft YaHei UI",sans-serif;fill:#E8590C}
+html body.native-app .guide-row.guide-row-small .guide-card{min-width:96px;padding:6px 12px}
+/* 送到手套放到上面一行，导出放进「更多工具」；下面那一排不要了 */
+html body.native-app.review-view .review-bottom #review-export{display:none!important}
+html body.native-app #review-play-glove.moved-top{font-size:15px;padding:8px 16px;border:2.5px solid var(--ink);border-radius:12px;background:#2f9e5b;color:#fff;font-weight:900;cursor:pointer;box-shadow:var(--shadow-sm);white-space:nowrap}
+html body.native-app #export.moved-tools{margin:8px 0}
+/* ===== 11-05 用户：谱子一长条吸在上面，指法框在下面上下滑；放大镜方形真放大 ===== */
+html body.native-app.review-view #review-workspace.row-review #review-score-region{overflow-y:auto!important;overflow-x:hidden!important;align-items:flex-start!important;justify-content:flex-start!important;display:block!important}
+html body.native-app.review-view #review-row-panel{margin:0 auto}
+html body.native-app.review-view #review-row-canvas{position:sticky!important;top:0;z-index:4;background:#fff;box-shadow:0 6px 8px -6px #1d273333}
+html body.native-app.review-view .comic-fix-guide>#comic-guide-lens .review-row-lens svg{width:224px!important;height:224px!important;max-width:224px;cursor:grab}
+/* ===== 11-05 用户：「更多工具」点开不再把整页塌掉——改成按钮下面弹出的小菜单 ===== */
+html body.native-app.review-view #convert:has(#review-tools[open])>#review-workspace{display:block!important}
+html body.native-app.review-view #convert:has(#review-tools[open]) .review-title{display:flex!important;flex:0 0 auto!important;min-height:32px!important;max-height:32px!important;flex-direction:row!important;align-items:center!important}
+html body.native-app.review-view #convert:has(#review-tools[open]) .review-title .review-toolbar{display:flex!important;flex:1 1 0%!important;min-height:32px!important;align-items:center!important;grid-template-columns:none!important;grid-template-rows:none!important}
+html body.native-app.review-view #review-tools[open]{display:block!important;position:relative!important}
+html body.native-app.review-view #review-tools[open]>summary{background:var(--sun)!important}
+html body.native-app.review-view #review-tools[open]>#review-tools-panel{position:absolute!important;right:0!important;left:auto!important;top:calc(100% + 10px)!important;z-index:80!important;width:300px!important;height:auto!important;max-height:none!important;padding:10px!important;margin:0!important;display:flex!important;flex-direction:column!important;gap:8px!important;background:#FFFBF2!important;border:2.5px solid var(--ink)!important;border-radius:16px!important;box-shadow:0 8px 0 #1d273322,0 16px 36px #0003!important;overflow:visible!important}
+html body.native-app.review-view #review-tools-panel>*:not(#review-file-tools):not(#review-row-mode):not(#add-note){display:none!important}
+html body.native-app.review-view #review-tools-panel #review-file-tools{display:contents!important}
+html body.native-app.review-view #review-tools-panel #review-file-tools>*:not(#export){display:none!important}
+html body.native-app.review-view #review-tools-panel :is(#export,#review-row-mode,#add-note){display:block!important;width:100%!important;margin:0!important;padding:11px 14px!important;text-align:left!important;font:inherit!important;font-size:16px!important;font-weight:900!important;color:var(--ink)!important;background:#fff!important;border:2px solid var(--ink)!important;border-radius:12px!important;box-shadow:none!important;cursor:pointer}
+html body.native-app.review-view #review-tools-panel :is(#export,#review-row-mode,#add-note):hover{background:var(--sun-3)!important}
+html body.native-app.review-view #review-tools-panel :is(#export,#review-row-mode,#add-note)::after{display:block;margin-top:2px;font-size:12.5px;font-weight:600;color:#5c6b7a}
+html body.native-app.review-view #review-tools-panel #export{order:1}html body.native-app.review-view #review-tools-panel #export::after{content:'存成文件，发给别人或以后再用'}
+html body.native-app.review-view #review-tools-panel #review-row-mode{order:2}html body.native-app.review-view #review-tools-panel #review-row-mode::after{content:'看整页原谱，再点一次回来'}
+html body.native-app.review-view #review-tools-panel #add-note{order:3}html body.native-app.review-view #review-tools-panel #add-note::after{content:'软件漏认的音，自己补上'}
+/* ===== 11-05 晚 用户定的校对版型（第三版，以此为准，以后不再改结构）=====
+   上：谱子一长条铺满 + 下面固定 5 行高的指法框（不滚动，箭头亮粉色）。
+   下：校对框 190px 贴底，没有底部小字。框内：左 放大镜 174×174 | 中 上排「指法 / 节拍 / 时值」+ 黄色闪烁原因，下排对应选项 | 右 三个按钮等高撑满。
+   放大镜、中间、右列上下边齐平。 */
+html body.native-app.review-view main>footer,html body.native-app.review-view #convert>.review-bottom{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;grid-template-rows:auto minmax(0,1fr) 190px!important;row-gap:8px!important;height:100%!important;padding-bottom:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-score-region{grid-column:1/-1!important;grid-row:2!important;overflow:hidden!important;min-height:0!important;height:auto!important;display:block!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-row-canvas{position:relative!important;top:auto!important;box-shadow:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-inspector{grid-column:1/-1!important;grid-row:3!important;height:190px!important;min-height:190px!important;max-height:190px!important;margin:0!important;padding:8px!important;box-sizing:border-box!important;display:grid!important;grid-template-columns:minmax(0,1fr) 168px!important;grid-template-rows:174px!important;column-gap:12px!important;position:static!important;overflow:hidden!important;inset:auto!important;transform:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-inspector.editor-idle{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-inspector>#review-editor-empty{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-inspector>#review-inspector-content{grid-column:1!important;grid-row:1!important;height:174px!important;min-height:0!important;overflow:hidden!important;display:block!important;margin:0!important;padding:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#review-inspector>#review-editor-actions{grid-column:2!important;grid-row:1!important;height:174px!important;display:flex!important;flex-direction:column!important;padding:0!important;margin:0!important;border:0!important;position:static!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-editor-actions .review-action-buttons{display:flex!important;flex-direction:column!important;gap:8px!important;height:174px!important;width:100%!important;position:static!important;margin:0!important;padding:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-editor-actions .review-action-buttons>button{flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:0 8px!important;font-size:16px!important;font-weight:900!important;border:2.5px solid var(--ink)!important;border-radius:12px!important;box-shadow:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-editor-actions .review-action-buttons>button[hidden]{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-next-problem{order:1}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #proof-listen-measure{order:2}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #review-exclude-note{order:3}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-fix-guide{display:grid!important;grid-template-columns:174px minmax(0,1fr)!important;grid-template-rows:174px!important;gap:0 14px!important;height:174px!important;padding:0!important;margin:0!important;border:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-fix-guide[hidden]{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-guide-lens{grid-column:1!important;grid-row:1!important;width:174px!important;height:174px!important;display:block!important;aspect-ratio:auto!important;align-self:start!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-guide-lens .review-row-lens{width:174px!important;height:174px!important;position:static!important;border:3px solid #E8590C!important;border-radius:12px!important;box-sizing:border-box!important;overflow:hidden!important;aspect-ratio:auto!important;clip-path:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-guide-lens .review-row-lens svg{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;display:block!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-guide-body{grid-column:2!important;grid-row:1!important;height:174px!important;min-height:0!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:8px!important;overflow:hidden!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source #comic-guide-body>*{margin:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tabs{display:flex!important;align-items:center;gap:8px;flex:0 0 42px!important;min-width:0}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tab{font:inherit;font-size:16px;font-weight:900;height:40px;padding:0 20px;border:2.5px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);cursor:pointer;position:relative;flex:0 0 auto}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tab:hover{background:#fff3d6}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tab.on{background:var(--ink);color:#fff}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tab.need::after{content:'';position:absolute;top:-6px;right:-6px;width:13px;height:13px;border-radius:50%;background:#FF1493;border:2px solid #fff}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tabs .guide-why{margin:0 0 0 8px!important;display:flex!important;align-items:center;min-width:0;flex:1 1 auto}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tabs .guide-why-where,html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tabs .guide-why-todo{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-tabs .guide-why-reason{display:block!important;font-size:16px!important;font-weight:900!important;color:#7a4b00!important;padding:5px 12px!important;border-radius:10px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:why-blink 1.1s ease-in-out infinite!important}
+@keyframes why-blink{0%,100%{background:#fff3d6;box-shadow:0 0 0 0 #ffb300}50%{background:#ffd54f;box-shadow:0 0 0 4px #ffb30066}}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane{flex:1 1 0!important;min-height:0!important;display:flex!important;flex-direction:row!important;align-items:stretch!important;gap:10px!important;overflow:hidden!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane>.guide-row{display:flex!important;flex-wrap:nowrap!important;gap:10px!important;margin:0!important;overflow:hidden!important;align-items:stretch!important;height:100%!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-head,html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-note-text{display:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-card{height:100%!important;min-width:88px!important;max-width:120px;padding:4px 8px!important;margin:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;box-sizing:border-box!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-card svg.guide-note{height:44px!important;width:auto}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-card svg{max-height:62px}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-card .guide-card-label{font-size:13px!important;line-height:1.25!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-digit{font-size:34px!important;line-height:1!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-toggles{display:flex!important;flex-direction:column!important;gap:6px!important;justify-content:center;margin:0!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-toggles button{font:inherit;font-size:13px;font-weight:800;padding:6px 10px;border:2px solid var(--ink);border-radius:10px;background:#fff;cursor:pointer;white-space:nowrap}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-toggles button.selected{background:#F4B63D}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-compare-wrap{flex:1 1 auto!important;min-width:0!important;height:100%!important;max-width:none!important;display:flex;align-items:center}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane svg.guide-compare{width:100%!important;height:100%!important;max-height:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-row-small{display:grid!important;grid-template-columns:repeat(2,96px)!important;grid-auto-rows:1fr!important;gap:6px!important;height:100%!important;flex:0 0 auto!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-row-small .guide-card{min-width:0!important;max-width:none!important;height:auto!important;flex-direction:row!important;gap:6px!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source .guide-pane .guide-row-small .guide-big{font-size:18px!important;line-height:1!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source>#proof-idle{grid-column:1/-1!important;grid-row:3!important;height:190px;box-sizing:border-box;display:none;align-items:center;justify-content:center;gap:18px;border:3px solid var(--ink);border-radius:18px;background:#fff;font-size:20px;font-weight:900;color:#2f7a4a}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source:has(>#review-inspector.editor-idle)>#proof-idle{display:flex!important}
+
+/* 校对页的发送提示原先留在隐藏容器里；只在有状态时显示，不占用工具栏宽度。 */
+html body.native-app.review-view #review-play-status:not(:empty){position:fixed;z-index:90;top:108px;right:20px;max-width:min(360px,calc(100vw - 40px));padding:10px 14px;border:2px solid var(--ink);border-radius:10px;background:#fff;color:var(--ink);font-size:14px;font-weight:800;box-shadow:var(--shadow-sm);pointer-events:none}
+html body.native-app.review-view #review-play-status.problem:not(:empty){background:#fff1db;color:#713b00}
+html body.native-app #convert #review-play-glove.moved-top:hover:not(:disabled){background:#176d4b!important;color:#fff!important}
+html body.native-app.review-view #proof-idle button:disabled{opacity:.5;cursor:default;box-shadow:none}
+html body.native-app.review-view #proof-idle.has-pending{color:#8a5300!important}
+html body.native-app.review-view #comic-guide-body .guide-close{flex:0 0 auto;margin-left:auto;padding:5px 9px;border:2px solid var(--ink);border-radius:9px;background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:800}
+html body.native-app .manual-note-dialog{width:min(650px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:22px;border:3px solid var(--ink);border-radius:18px;background:#fffbf2;color:var(--ink);box-shadow:0 8px 0 #1d273333}
+html body.native-app .manual-note-dialog::backdrop{background:#1d273388}
+html body.native-app .manual-note-dialog h2{margin:0 0 8px;font-size:22px}
+html body.native-app .manual-note-dialog p{margin:8px 0;color:var(--ink-2);font-size:14px;line-height:1.5}
+html body.native-app .manual-note-dialog label{display:flex;flex-direction:column;align-items:stretch;gap:5px;color:var(--ink);font-size:14px;font-weight:800}
+html body.native-app .manual-note-dialog input,html body.native-app .manual-note-dialog select{width:100%;min-width:0;padding:9px 10px;border:2px solid var(--ink);border-radius:9px;background:#fff;color:var(--ink);font:inherit}
+html body.native-app .manual-note-dialog .manual-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+html body.native-app .manual-note-dialog .manual-context{padding:8px 10px;border-radius:9px;background:#eaf5ed;color:#244f31;font-weight:800}
+html body.native-app .manual-note-dialog #manual-error:not(:empty){color:#a22c1d;font-weight:800}
+html body.native-app .manual-note-dialog .manual-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+html body.native-app .manual-note-dialog #manual-save{background:#2f9e5b;color:#fff;font-weight:900}
+html body.native-app .manual-note-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;white-space:pre-line;background:#f5f0e4;border:2px dashed #9b8b73;border-radius:12px;color:#665a4c;font-weight:800}
+/* 完整 PDF 不应让隐藏的校对框和行状态占据可读区域；有选中音时仍保留编辑框。 */
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#review-inspector.editor-idle{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#proof-idle{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) #review-score-region{flex:1 1 auto!important;min-height:0!important;overflow:auto!important}
+/* 完整 PDF 点选音符时沿用同一套贴底校对框，不挤掉原谱。 */
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#review-inspector:not(.editor-idle){height:190px!important;min-height:190px!important;max-height:190px!important;margin:0!important;padding:8px!important;box-sizing:border-box!important;display:grid!important;grid-template-columns:minmax(0,1fr) 168px!important;grid-template-rows:174px!important;column-gap:12px!important;position:static!important;overflow:hidden!important;inset:auto!important;transform:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#review-inspector>#review-editor-empty{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#review-inspector>#review-inspector-content{grid-column:1!important;grid-row:1!important;height:174px!important;min-height:0!important;overflow:hidden!important;display:block!important;margin:0!important;padding:0!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source>#review-inspector>#review-editor-actions{grid-column:2!important;grid-row:1!important;height:174px!important;display:flex!important;flex-direction:column!important;padding:0!important;margin:0!important;border:0!important;position:static!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #review-editor-actions .review-action-buttons{display:flex!important;flex-direction:column!important;gap:8px!important;height:174px!important;width:100%!important;position:static!important;margin:0!important;padding:0!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #review-editor-actions .review-action-buttons>button{flex:1 1 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:0 8px!important;font-size:16px!important;font-weight:900!important;border:2.5px solid var(--ink)!important;border-radius:12px!important;box-shadow:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #review-editor-actions .review-action-buttons>button[hidden]{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #review-next-problem{order:1}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #proof-listen-measure{order:2}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #review-exclude-note{order:3}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-fix-guide{display:grid!important;grid-template-columns:174px minmax(0,1fr)!important;grid-template-rows:174px!important;gap:0 14px!important;height:174px!important;padding:0!important;margin:0!important;border:0!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-guide-lens{grid-column:1!important;grid-row:1!important;width:174px!important;height:174px!important;display:block!important;aspect-ratio:auto!important;align-self:start!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-guide-lens .review-row-lens{width:174px!important;height:174px!important;position:static!important;border:3px solid #E8590C!important;border-radius:12px!important;box-sizing:border-box!important;overflow:hidden!important;aspect-ratio:auto!important;clip-path:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-guide-lens .review-row-lens svg{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;display:block!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-guide-body{grid-column:2!important;grid-row:1!important;height:174px!important;min-height:0!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:8px!important;overflow:hidden!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source #comic-guide-body>*{margin:0!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tabs{display:flex!important;align-items:center;gap:8px;flex:0 0 42px!important;min-width:0}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tab{font:inherit;font-size:16px;font-weight:900;height:40px;padding:0 20px;border:2.5px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);cursor:pointer;position:relative;flex:0 0 auto}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tab.on{background:var(--ink);color:#fff}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tab.need::after{content:'';position:absolute;top:-6px;right:-6px;width:13px;height:13px;border-radius:50%;background:#FF1493;border:2px solid #fff}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tabs .guide-why{margin:0 0 0 8px!important;display:flex!important;align-items:center;min-width:0;flex:1 1 auto}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tabs .guide-why-where,html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tabs .guide-why-todo{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-tabs .guide-why-reason{display:block!important;font-size:16px!important;font-weight:900!important;color:#7a4b00!important;padding:5px 12px!important;border-radius:10px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:why-blink 1.1s ease-in-out infinite!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane{flex:1 1 0!important;min-height:0!important;display:flex!important;flex-direction:row!important;align-items:stretch!important;gap:10px!important;overflow:hidden!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane>.guide-row{display:flex!important;flex-wrap:nowrap!important;gap:10px!important;margin:0!important;overflow:hidden!important;align-items:stretch!important;height:100%!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-head,html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-note-text{display:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-card{height:100%!important;min-width:88px!important;max-width:120px;padding:4px 8px!important;margin:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:2px!important;box-sizing:border-box!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-card svg.guide-note{height:44px!important;width:auto}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-card svg{max-height:62px}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-card .guide-card-label{font-size:13px!important;line-height:1.25!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-digit{font-size:34px!important;line-height:1!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-toggles{display:flex!important;flex-direction:column!important;gap:6px!important;justify-content:center;margin:0!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-toggles button{font:inherit;font-size:13px;font-weight:800;padding:6px 10px;border:2px solid var(--ink);border-radius:10px;background:#fff;cursor:pointer;white-space:nowrap}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-toggles button.selected{background:#F4B63D}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-compare-wrap{flex:1 1 auto!important;min-width:0!important;height:100%!important;max-width:none!important;display:flex;align-items:center}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane svg.guide-compare{width:100%!important;height:100%!important;max-height:none!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-row-small{display:grid!important;grid-template-columns:repeat(2,96px)!important;grid-auto-rows:1fr!important;gap:6px!important;height:100%!important;flex:0 0 auto!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-row-small .guide-card{min-width:0!important;max-width:none!important;height:auto!important;flex-direction:row!important;gap:6px!important}
+html body.native-app.review-view #convert #review-workspace:not(.row-review) .review-source .guide-pane .guide-row-small .guide-big{font-size:18px!important;line-height:1!important}
+/* 箭头：亮粉色、一闪一闪 */
+html body.native-app #comic-row-arrow.mag-left{border-left-color:#FF1493!important;opacity:1!important;filter:drop-shadow(0 0 2px #fff) drop-shadow(0 0 5px #FF1493)!important;animation:arrow-pulse .9s ease-in-out infinite!important}
+@keyframes arrow-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* 2026-11-06：标题和导航给按钮本身及阴影留足空间。 */
+html body.native-app.review-view #convert .review-title{min-height:48px!important;max-height:none!important;flex:0 0 auto!important}
+html body.native-app.review-view #convert .review-title .review-toolbar{min-height:48px!important;align-items:center!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-source{padding:3px 6px 6px 5px!important;box-sizing:border-box!important}
+html body.native-app.review-view #convert #review-workspace.row-review .review-row-toolbar{min-height:36px!important;max-height:none!important}
+html body.native-app.review-view #convert #review-workspace.row-review #review-score-region.annotations-overflow{overflow-y:auto!important}
+html body.native-app.review-view #review-row-annotations .review-row-label{height:var(--finger-height,27px)!important;min-height:0!important;padding:0 1px!important;box-sizing:border-box!important}
+html body.native-app.review-view #review-row-annotations .review-finger-primary{line-height:1!important}
+html body.native-app.review-view #review-row-annotations .review-finger-primary b{font-size:var(--finger-font,17px)!important;line-height:1!important}
+/* 持续轻微移动，且试听时随当前音符移动；允许用户关闭系统动画时仍能定位。 */
+html body.native-app[data-page] #comic-row-arrow.mag-left{animation:proof-arrow-move .9s ease-in-out infinite!important}
+@keyframes proof-arrow-move{0%,100%{transform:translateX(-5px);opacity:.75}50%{transform:translateX(0);opacity:1}}
+html body.native-app .proof-progress{width:clamp(50px,7vw,100px)}
+html body.native-app #proof-status:empty{display:none}
+@media(max-width:1100px){
+ html body.native-app.review-view #proof-bar{gap:4px}
+ html body.native-app.review-view #proof-bar .proof-listen{font-size:12px;padding:5px 8px}
+ html body.native-app.review-view #proof-bar .proof-first{font-size:11px;padding:4px 6px}
+ html body.native-app.review-view #proof-issues{gap:4px;padding:3px 6px}
+ html body.native-app.review-view #proof-progress{width:45px}
+ html body.native-app.review-view #proof-issues-label{font-size:11px;white-space:nowrap}
+}

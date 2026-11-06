@@ -16,7 +16,7 @@ starts = source[source.index('static bool startPlay('):source.index('static bool
 scheduler = source[source.index('static bool peekScoreEvent('):source.index('static void response(')]
 service = source[source.index('static void serviceMotion(){'):source.index('const char *ssid()')]
 phase_ready = source[source.index('static bool patternPreparationReady(){'):source.index('static String state(){')]
-tempo_change = source[source.index('static bool changeTempo('):source.index('// Firmware targets')]
+tempo_change = source[source.index('static bool changeTempo('):source.index('// Software targets')]
 cpp = root / 'library_score_clock_generated.cpp'
 exe = root / 'library_score_clock_generated.exe'
 cpp.write_text(r'''
@@ -42,9 +42,9 @@ namespace scs{
 enum class Family{STS,SCS};struct Profile{Family family=Family::STS;uint16_t range=4095;}pf;const Profile&profile(){return pf;}
 struct SyncItem{uint8_t id;uint16_t pos,speed;uint8_t acc;};
 struct Feedback{bool ok=true;uint8_t voltage=50,temp=25;int16_t current=0;};
-int busError=0,readCount=6;bool healthOk=true;uint8_t healthVoltage=50,healthTemp=25;uint16_t samples[6]={};
+int busError=0,readCount=6;bool healthOk=true;uint8_t healthVoltage=50,healthTemp=25;uint16_t samples[6]={};int16_t sampleSpeed[6]={};uint8_t sampleMoving[6]={};
 int lastError(){return busError;}int positionReadBudget(int){return 20;}
-int syncReadPos(const uint8_t*,int,uint16_t*out,int){for(int s=0;s<6;++s)out[s]=samples[s];return readCount;}
+int syncReadPos(const uint8_t*,int,uint16_t*out,int,int16_t*velocity=nullptr,uint8_t*moving=nullptr){for(int s=0;s<6;++s){out[s]=samples[s];if(velocity)velocity[s]=sampleSpeed[s];if(moving)moving[s]=sampleMoving[s];}return readCount;}
 bool readFeedback(int,Feedback&fb){fb.ok=healthOk;fb.voltage=healthVoltage;fb.temp=healthTemp;return healthOk;}
 void syncMove(const SyncItem*items,int n,bool){Write w{};w.at=now;for(int i=0;i<n;++i){int s=items[i].id-1;w.ids|=1<<s;w.targets[s]=items[i].pos;w.speed[s]=items[i].speed;w.acc[s]=items[i].acc;}writes.push_back(w);}
 }
@@ -53,6 +53,8 @@ bool running=true,training=false,initializing=false,nextReady=false,patternRunni
 uint8_t positionValidMask=63,hold=50,requestedHold=50,enabledMask=63,healthValidMask=0,movingMask=0,feedbackSlot=0,patternChangedMask=0;
 uint8_t amp=100,mask=0,positionsReady=0;
 uint16_t tempo=100,poseTargets[6]={},speeds[6]={},hardwareMinimum[6]={},hardwareMaximum[6]={};int16_t poseFrom[6]={},actual[6]={},currentRaw[6]={};
+int16_t actualSpeed[6]={};uint8_t actualMoving[6]={255,255,255,255,255,255};
+uint16_t phaseDeadband[6]={6,6,6,6,6,6};
 uint8_t volts[6]={},temps[6]={};uint32_t positionSampleMs[6]={},healthSampleMs[6]={},axisPoseAt[6]={};
 uint32_t endTimes[5]={},index=0,count=0,duration=0,previousEvent=0,playedEventCount=0,candidateEventCount=0;
 uint32_t started=0,keepAt=0,positionsAt=0,feedbackAt=0,poseAt=0,lastPoseMs=0;
@@ -65,6 +67,8 @@ struct Reader{std::vector<pgl::Event>events;size_t at=0;void reset(){at=0;}bool 
 struct File{bool seek(int){return true;}void close(){}}playing;
 std::string stopped,failure,owner,controller;int currentSlot=1;bool outputOk=true;uint32_t fileDuration=0;std::vector<uint16_t>armingSpeeds;int preparedMask=-1;
 struct SerialMock{std::vector<std::string>lines;void printf(const char*format,...){char line[512];va_list args;va_start(args,format);vsnprintf(line,sizeof(line),format,args);va_end(args);lines.push_back(line);}}Serial;
+std::string String(const char*value){return value;}std::string String(int value){return std::to_string(value);}std::string String(unsigned value){return std::to_string(value);}
+void emitUsbDiagnostic(const std::string&line){Serial.lines.push_back(line+"\n");}
 void stop(const char*reason){running=false;initializing=false;glove::safe();stopped=reason;}
 int target(int s,bool pressed,uint8_t amplitude){const auto&slot=glove::slot(s);return librarytargets::softwareTarget(s,scs::pf.family==scs::Family::SCS,slot.lo,slot.hi,hardwareMinimum[s],hardwareMaximum[s],pressed,amplitude);}
 bool applyOutput(int){if(!outputOk){stop("hold_limit_write_readback_failed");return false;}return true;}
@@ -72,7 +76,7 @@ bool motionOwnerMatches(const char*){return true;}std::string requestController(
 bool validSlot(int s){return s>=1&&s<=100;}
 bool openScore(int,File&,uint8_t*h){memset(h,0,128);pgl::put32(h+8,playReader.events.size());pgl::put32(h+12,fileDuration);return true;}
 bool prepare(int selected=0,int amplitude=100){
- preparedMask=selected;glove::isArmed=true;for(int s=0;s<6;++s){hardwareMinimum[s]=0;hardwareMaximum[s]=scs::pf.range;actual[s]=scs::samples[s];poseTargets[s]=target(s,s>0&&(selected&(1<<(s-1))),s==0?100:amplitude);speeds[s]=scs::pf.family==scs::Family::SCS?1000:8000;armingSpeeds.push_back(1200);}
+ preparedMask=selected;glove::isArmed=true;for(int s=0;s<6;++s){hardwareMinimum[s]=0;hardwareMaximum[s]=scs::pf.range;actual[s]=scs::samples[s];poseTargets[s]=target(s,s>0&&(selected&(1<<(s-1))),s==0?100:amplitude);speeds[s]=scs::pf.family==scs::Family::SCS?1000:0;phaseDeadband[s]=scs::pf.family==scs::Family::SCS?35:6;armingSpeeds.push_back(scs::pf.family==scs::Family::STS?0:1200);}
  return true;
 }
 static void tickScoreTimeline();
@@ -82,12 +86,13 @@ void reset(const std::vector<pgl::Event>&events,int rate,uint32_t end){
  index=previousEvent=playedEventCount=candidateEventCount=0;count=events.size();duration=fileDuration=end;tempo=rate;
  boundaryPending=boundaryReleaseStarted=false;repeatLiftMask=candidateLiftMask=0;lastScoreBoundary=0;memset(endTimes,0,sizeof(endTimes));
  scs::busError=0;scs::readCount=6;scs::healthOk=true;scs::healthVoltage=50;scs::healthTemp=25;
- for(int s=0;s<6;++s){glove::slots[s].lo=500;glove::slots[s].hi=900;hardwareMinimum[s]=0;hardwareMaximum[s]=scs::pf.range;poseFrom[s]=actual[s]=scs::samples[s]=1000;poseTargets[s]=target(s,false,100);speeds[s]=scs::pf.family==scs::Family::SCS?1000:8000;positionSampleMs[s]=healthSampleMs[s]=axisPoseAt[s]=0;}
+ for(int s=0;s<6;++s){glove::slots[s].lo=500;glove::slots[s].hi=900;hardwareMinimum[s]=0;hardwareMaximum[s]=scs::pf.range;poseFrom[s]=actual[s]=scs::samples[s]=1000;poseTargets[s]=target(s,false,100);speeds[s]=scs::pf.family==scs::Family::SCS?1000:0;phaseDeadband[s]=scs::pf.family==scs::Family::SCS?35:6;positionSampleMs[s]=healthSampleMs[s]=axisPoseAt[s]=0;actualSpeed[s]=0;actualMoving[s]=255;scs::sampleSpeed[s]=2400;scs::sampleMoving[s]=1;}
  playReader.events=events;playReader.at=0;stopped.clear();writes.clear();Serial.lines.clear();armingSpeeds.clear();preparedMask=-1;scoreClock.start(0);
  feedbackAt=positionsAt=poseAt=keepAt=started=0;feedbackSlot=movingMask=patternChangedMask=0;
 }
 void tick(uint32_t at){now=at;keepAt=now;serviceMotion();}
 bool hasWrite(uint32_t at,int slot,int goal){for(const auto&w:writes)if(w.at==at&&(w.ids&(1<<slot))&&w.targets[slot]==goal)return true;return false;}
+void nativeStopped(int residual){for(int s=0;s<6;++s){scs::samples[s]=poseTargets[s]-residual;scs::sampleSpeed[s]=0;scs::sampleMoving[s]=0;}}
 int main(int argc,char**argv){
  libraryclock::WallClock c;c.start(100);assert(c.desired(110,100)==10);assert(c.desired(1710,1000)==16010);assert(!c.paused());
  c.start(0xfffffffeu);assert(c.desired(3,100)==5);c.start(0);assert(c.desired(1,50)==0);assert(c.desired(2,50)==1);assert(c.desired(2,50)==1);
@@ -99,24 +104,24 @@ int main(int argc,char**argv){
  // Stalled positions beyond calibration + 15%, and even physically opposite
  // travel, cannot pause song time. A final release does not await arrival.
  reset({{0,4000,60,1,96,100}},100,4000);for(uint32_t t=0;t<=4000;t+=20)tick(t);
- assert(stopped=="completed"&&now==4000&&actual[1]==1000&&poseTargets[1]==880);
+ assert(stopped=="completed"&&now==4000&&actual[1]==1000&&poseTargets[1]==900);
  reset(simple,100,400);tick(0);scs::samples[1]=1300;tick(220);assert(running&&playedEventCount==2);tick(400);assert(stopped=="completed");
  std::vector<pgl::Event>repeat={{0,200,60,1,96,100},{200,200,62,1,96,100},{200,200,65,3,96,100}};
- reset(repeat,100,400);tick(0);tick(159);assert(mask==1);tick(160);assert(boundaryReleaseStarted&&mask==0&&playedEventCount==1);tick(199);assert(mask==0);tick(200);assert(mask==5&&playedEventCount==3);assert(hasWrite(160,1,900)&&hasWrite(200,1,520));tick(400);assert(stopped=="completed");
- reset(repeat,1000,400);tick(0);tick(9);assert(mask==1);tick(10);assert(mask==0);tick(20);assert(mask==5);assert(hasWrite(10,1,900)&&hasWrite(20,1,520));tick(40);assert(stopped=="completed");
+ reset(repeat,100,400);tick(0);tick(159);assert(mask==1);tick(160);assert(boundaryReleaseStarted&&mask==0&&playedEventCount==1);tick(199);assert(mask==0);tick(200);assert(mask==5&&playedEventCount==3);assert(hasWrite(160,1,900)&&hasWrite(200,1,500));tick(400);assert(stopped=="completed");
+ reset(repeat,1000,400);tick(0);tick(9);assert(mask==1);tick(10);assert(mask==0);tick(20);assert(mask==5);assert(hasWrite(10,1,900)&&hasWrite(20,1,500));tick(40);assert(stopped=="completed");
  // Same-finger taps with explicit gaps lift to the recorded endpoint;
  // different-finger releases remain inset, and downstroke timing is unchanged.
  reset({{0,400,60,2,96,40},{1000,650,60,2,96,40}},100,2000);tick(0);tick(400);
  assert(mask==0&&repeatLiftMask==2&&hasWrite(400,2,900));tick(999);assert(mask==0);
- tick(1000);assert(mask==2&&repeatLiftMask==0&&hasWrite(1000,2,520));tick(1650);
- assert(hasWrite(1650,2,880));tick(2000);assert(stopped=="completed");
+ tick(1000);assert(mask==2&&repeatLiftMask==0&&hasWrite(1000,2,500));tick(1650);
+ assert(hasWrite(1650,2,900));tick(2000);assert(stopped=="completed");
  reset({{0,650,60,2,96,40},{1000,650,64,3,96,40}},100,2000);tick(0);tick(650);
- assert(repeatLiftMask==0&&hasWrite(650,2,880)&&!hasWrite(650,2,900));
+ assert(repeatLiftMask==0&&hasWrite(650,2,900));
  reset({{0,650,60,2,96,40},{1000,650,60,2,96,40}},100,2000);hardwareMaximum[2]=890;scs::samples[2]=actual[2]=700;tick(0);tick(650);
  assert(hasWrite(650,2,890));stop("stopped");assert(train(2,50,100,"usb"));assert(repeatLiftMask==0&&candidateLiftMask==0);
- reset({{0,200,60,1,96,100},{0,400,64,2,96,100},{200,200,62,1,96,100}},100,400);tick(0);tick(160);assert(mask==2&&poseTargets[2]==520);tick(200);assert(mask==3);tick(400);assert(stopped=="completed");
+ reset({{0,200,60,1,96,100},{0,400,64,2,96,100},{200,200,62,1,96,100}},100,400);tick(0);tick(160);assert(mask==2&&poseTargets[2]==500);tick(200);assert(mask==3);tick(400);assert(stopped=="completed");
  // Missed pre-release has no fabricated same-tick UP/DOWN or tempo delay.
- reset(repeat,1000,400);tick(0);tick(25);assert(mask==5&&playedEventCount==3);assert(!hasWrite(25,1,880));tick(40);assert(stopped=="completed");
+ reset(repeat,1000,400);tick(0);tick(25);assert(mask==5&&playedEventCount==3);assert(!hasWrite(25,1,900));tick(40);assert(stopped=="completed");
  // A global rest stays a real rest; subsequent onsets and tempo changes use
  // canonical source time rather than the timestamp of a late feedback frame.
  reset({{100,100,60,1,96,100},{500,100,64,2,96,100}},100,600);tick(0);assert(playedEventCount==0);tick(100);assert(mask==1);tick(200);assert(mask==0);now=300;assert(changeTempo(200,"usb"));tick(399);assert(playedEventCount==1);tick(400);assert(playedEventCount==2);tick(450);assert(stopped=="completed");
@@ -130,17 +135,24 @@ int main(int argc,char**argv){
  for(auto family:{scs::Family::STS,scs::Family::SCS}){
   scs::pf.family=family;scs::pf.range=family==scs::Family::STS?4095:1023;reset(simple,100,400);running=false;
   assert(startPlay(1,100,100,"usb"));assert(preparedMask==0);assert(writes.size()==1&&writes[0].ids==63&&armingSpeeds.size()==6);
-  for(int s=0;s<6;++s){assert(writes[0].speed[s]==(family==scs::Family::STS?8000:1000));assert(writes[0].acc[s]==0);}assert(playedEventCount==1);
+  for(int s=0;s<6;++s){assert(writes[0].speed[s]==(family==scs::Family::STS?0:1000));assert(writes[0].acc[s]==0);assert(armingSpeeds[s]==(family==scs::Family::STS?0:1200));}assert(playedEventCount==1);
   reset(simple,100,400);running=false;assert(train(1,100,100,"usb"));assert(preparedMask==1);assert(writes.size()==1&&writes[0].ids==63);tick(20);assert(running); // calibration advisory in training
-  reset(simple,100,400);running=false;assert(startPattern(2,1,100,100,100,"usb"));assert(writes.size()==1&&writes[0].ids==63&&initializing);
+  reset(simple,100,400);running=false;assert(startPattern(2,1,100,100,100,"usb"));assert(writes.size()==1&&writes[0].ids==63&&!initializing&&mask==21);
  }
  scs::pf.family=scs::Family::STS;scs::pf.range=4095;
  // Genuine stop conditions remain live in the actual serviceMotion path.
- reset(simple,100,400);tick(0);scs::samples[2]=4096;tick(20);assert(stopped=="feedback_hardware_limit");
- reset(simple,100,400);tick(0);scs::readCount=5;tick(20);assert(stopped=="position_feedback_lost");
- reset(simple,100,400);tick(0);scs::busError=1;tick(20);assert(stopped=="position_feedback_lost");
- reset(simple,100,400);tick(0);scs::healthOk=false;tick(100);assert(stopped=="health_feedback_lost");
- for(int voltage:{39,66}){reset(simple,100,400);tick(0);scs::healthVoltage=voltage;tick(100);assert(stopped=="temperature_or_voltage");}
+ // One bad sample keeps playing; only a sustained fault stops.
+ // Each sample needs its own 20 ms (position) or 100 ms (health) window; an idle pass clears the miss counters.
+ // The score is long enough that it cannot complete before the longest fault window (25 x 20 ms).
+ auto fresh=[&]{reset(simple,100,4000);running=false;serviceMotion();running=true;tick(0);};
+ auto sustained=[&](int samples,uint32_t period,const char*reason){for(int i=1;i<samples;++i){tick(i*period);assert(running);}tick(samples*period);assert(stopped==reason);};
+ fresh();scs::readCount=5;tick(20);assert(running);scs::readCount=6;tick(40);assert(running);
+ fresh();scs::samples[2]=4096;sustained(5,20,"feedback_hardware_limit");
+ fresh();scs::readCount=5;sustained(25,20,"position_feedback_lost");
+ // A dead bus also fails the next pose write, which may stop it before the read window runs out.
+ fresh();scs::busError=1;for(int i=1;i<=25&&running;++i)tick(i*20);assert(stopped=="position_feedback_lost"||stopped=="sync_write_failed");
+ fresh();scs::healthOk=false;sustained(6,100,"health_feedback_lost");
+ for(int voltage:{39,66}){fresh();scs::healthVoltage=voltage;sustained(6,100,"temperature_or_voltage");}
  reset(simple,100,400);tick(0);scs::healthTemp=65;tick(100);assert(stopped=="temperature_or_voltage");
  reset(simple,100,400);owner="usb";tick(0);now=2001;serviceMotion();assert(stopped=="controller_disconnected");
  // A brief phone Wi-Fi request stall does not stop an on-board score. The
@@ -156,9 +168,18 @@ int main(int argc,char**argv){
  reset(simple,100,400);tick(0);stop("stopped");auto written=writes.size();tick(1000);assert(stopped=="stopped"&&writes.size()==written);
  reset(simple,100,400);scs::busError=1;tick(0);assert(stopped=="sync_write_failed");
  reset(simple,100,400);outputOk=false;tick(0);assert(stopped=="hold_limit_write_readback_failed");
- // Pattern pacing intentionally remains feedback-based, with its existing
- // timeout. No calibration-based veto is added to its initialization.
- reset(simple,100,400);running=false;assert(startPattern(2,1,100,100,100,"usb"));tick(20);assert(running&&initializing);tick(1801);assert(stopped=="pattern_full_target_not_reached");
+ // Fixed-rate training follows deadlines despite stalled feedback.
+ reset(simple,100,400);running=false;assert(startPattern(2,1,100,100,100,"usb"));tick(20);assert(running&&!initializing&&patternSequence.step==0);tick(350);assert(patternSequence.step==1&&mask==0);tick(530);assert(patternSequence.step==2&&mask==10);tick(880);assert(patternSequence.step==3&&mask==0);tick(1060);assert(stopped=="completed");
+ // Only fastest mode follows feedback. It has no fixed dwell or1800ms stop.
+ reset(simple,100,400);running=false;assert(startPattern(2,1,0,100,100,"usb"));tick(20);assert(running&&initializing);tick(1801);assert(running&&initializing);
+ nativeStopped(27);tick(1821);assert(running&&!initializing&&mask==21&&patternSequence.step==0);tick(1821);assert(patternSequence.step==0);
+ for(int s=0;s<6;++s){scs::sampleMoving[s]=0;scs::sampleSpeed[s]=2400;}tick(5000);assert(running&&patternSequence.step==0);
+ for(int s=0;s<6;++s){scs::sampleMoving[s]=1;scs::sampleSpeed[s]=0;}tick(5020);assert(running&&patternSequence.step==0);
+ nativeStopped(50);tick(5040);assert(patternSequence.step==1&&mask==0);tick(5040);assert(patternSequence.step==1);
+ nativeStopped(27);tick(5060);assert(patternSequence.step==2&&mask==10);
+ nativeStopped(50);tick(5080);assert(patternSequence.step==3&&mask==0);
+ nativeStopped(27);tick(5100);assert(stopped=="completed");
+ reset(simple,100,400);running=false;assert(startPattern(2,1,0,100,100,"usb"));tick(20);stop("stopped");const auto stoppedPatternWrites=writes.size();nativeStopped(50);tick(40);assert(!running&&writes.size()==stoppedPatternWrites&&stopped=="stopped");
  int cases=0;
  for(int arg=1;arg<argc;++arg){std::ifstream file(argv[arg],std::ios::binary);assert(file);std::vector<uint8_t>blob((std::istreambuf_iterator<char>(file)),{});pgl::Validator validator;assert(validator.header(blob.data(),blob.size()));
   std::vector<pgl::Event>events;for(uint32_t i=0;i<validator.count;++i){const uint8_t*b=blob.data()+128+16*i;assert(validator.add(b));events.push_back(pgl::event(b));}assert(validator.finish());
@@ -171,7 +192,7 @@ int main(int argc,char**argv){
  printf("PASS actual start/sendPose/service/scheduler: %d original/synthetic PGL cases, stalled/lagging positions, 50/100/200/1000 percent, exact deadline within 5ms tick; advisory calibration, no arrival waits, capped pre-release, late catchup, live tempo, first six-axis max-speed broadcast, bounded targets, genuine hardware/health/bus/lease/stop retained\n",cases);
 }
 ''',encoding='utf-8')
-environment=os.environ.copy();vcvars=Path('D:/AI_Workspace/ai-models/vs-build-tools/VC/Auxiliary/Build/vcvars64.bat')
+environment=os.environ.copy();vcvars=Path(os.environ.get('VCVARS64', 'C:/Program Files/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/vcvars64.bat'))
 for line in subprocess.check_output(['cmd','/d','/c',f'call {vcvars} >nul && set'],encoding='utf-8',errors='replace').splitlines():
     if '=' in line and not line.startswith('='):
         key,value=line.split('=',1);environment[key.upper()]=value

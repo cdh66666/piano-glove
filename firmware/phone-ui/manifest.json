@@ -1,0 +1,45 @@
+{
+  "origin_image_sha256": "feb397365bc50b489bf19ad5b82c782860a953a175fd6f521b028121c28c4814",
+  "layout_and_control_structure_changed": false,
+  "allowed_changes": [
+    "HTML hold default50 to100",
+    "HTML hold label50% to100%",
+    "CSS comic theme appended; controls and logic unchanged",
+    "r29.6 JS: Wi-Fi tolerance (score/library reads pause the lost-connection timer; 4 s retry grace during playback; transient poll/keep failures retried; 120/300 ms polling)",
+    "r29.7: nav labels match desktop (曲库/PDF 识谱/调手套); tempo quick buttons (−10%/50/75/100/150/最快/＋10%) and larger slider thumb"
+  ],
+  "assets": [
+    {
+      "name": "software.html",
+      "original_bytes": 6670,
+      "bytes": 7078,
+      "original_sha256": "3b61bfc110b074526c7a17ccd95f9ea8eef3eb8edf250d424b67ce541dc5e99a",
+      "sha256": "5538f70e299b96b6842ebeff0ad882f5b013c33c82bfdd4ae0132cb465c40d97",
+      "changed": true
+    },
+    {
+      "name": "software.js",
+      "original_bytes": 47566,
+      "bytes": 49516,
+      "original_sha256": "c13e0d9dc50b86663327b351ca8db0893010f68eb026fa87cddcced9b99047ff",
+      "sha256": "4448419a5f3fb7da4c9242e471bb0e3afef5cf47bd69bc65f614f32e1b8d0bc0",
+      "changed": true
+    },
+    {
+      "name": "software.css",
+      "original_bytes": 13508,
+      "bytes": 18607,
+      "original_sha256": "ad87e2a16c267c9ce1ba6acbf8cdb197aa4e0c0a020808c28e13df856d82fee0",
+      "sha256": "98ee9a4376095170cd70c6c78d44864e135984f557792f7381fa976e1db10998",
+      "changed": true
+    },
+    {
+      "name": "software-audio.js",
+      "original_bytes": 6866,
+      "bytes": 6866,
+      "original_sha256": "913949da609f6b84ff642dcd7dce6f388bc354467618fc18a3aa247d2c368177",
+      "sha256": "913949da609f6b84ff642dcd7dce6f388bc354467618fc18a3aa247d2c368177",
+      "changed": false
+    }
+  ]
+}

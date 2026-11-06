@@ -147,6 +147,7 @@ int posTol();
 bool    moveTo(uint8_t id, uint16_t pos, uint16_t speed, uint8_t acc);
 // BENCH speed is normalized encoder counts/s; ordinary moveTo remains raw SDK units.
 bool    checkedBenchSpeed(uint8_t id,uint16_t countsPerSecond,uint16_t &raw,uint16_t *actual=nullptr);
+bool    checkedNativePositionSpeed(uint8_t id,uint16_t &raw,uint16_t *deadband=nullptr);
 bool    setTorque(uint8_t id, bool on);
 bool    setId(uint8_t oldId, uint8_t newId);
 int     scan(uint8_t maxId, uint8_t *found, int cap);
@@ -163,7 +164,8 @@ void    syncMove(const SyncItem *items, int n, bool benchRaw=false);   // 一帧
 // 1 Mbps 下总共不到 1 ms。
 uint16_t positionReadBudget(int count);
 int     syncReadPos(const uint8_t *ids, int n, uint16_t *pos,
-                    uint16_t timeoutMs = RESP_TIMEOUT_MS);
+                    uint16_t timeoutMs = RESP_TIMEOUT_MS,
+                    int16_t *velocity=nullptr,uint8_t *moving=nullptr);
 
 void    drain(uint16_t ms);                       // 丢弃总线上的残包
 

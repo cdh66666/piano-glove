@@ -1,0 +1,94 @@
+/* 漫画风：调试与校准页、使用说明页（EXE 窗口内）。只改外观，不改调试逻辑。 */
+body.native-app[data-page]{
+ --c-paper:#FFF6E3;--c-dot:#F3DDB1;--c-ink:#1E1A2E;--c-ink2:#3B3552;--c-muted:#6C6584;--c-sun:#FFC83D;--c-sun2:#FFEBB0;--c-sun3:#FFF6D6;
+ --c-sky:#3D7BFF;--c-sky2:#DEE8FF;--c-mint:#14A585;--c-mint2:#CFF4EA;--c-coral:#FF5A5A;--c-coral2:#FFE2DE;
+ --c-shadow:4px 4px 0 #1E1A2E;--c-shadow-sm:2px 2px 0 #1E1A2E;
+}
+
+/* ===== 调试与校准 ===== */
+html body.native-app[data-page=debug]{
+ --bg:var(--c-paper);--panel:#fff;--line:var(--c-ink);--ink:var(--c-ink);--sub:var(--c-ink2);--blue:var(--c-sky);--blue-bg:var(--c-sky2);--green:var(--c-mint);--red:var(--c-coral);
+ font-family:'Microsoft YaHei UI','Microsoft YaHei',sans-serif;color:var(--c-ink);
+ background-color:var(--c-paper)!important;background-image:radial-gradient(var(--c-dot) 1.15px,transparent 1.35px)!important;background-size:15px 15px!important;
+}
+html body.native-app[data-page=debug] #demoTop{background:var(--c-sun);border-bottom:3px solid var(--c-ink);margin:0 -28px;padding:0 28px;background-image:radial-gradient(#F5B21E 1.3px,transparent 1.5px);background-size:9px 9px}
+html body.native-app[data-page=debug] #demoTop h1{font-size:21px;font-weight:900;letter-spacing:1px;color:var(--c-ink);text-shadow:2px 2px 0 #fff}
+html body.native-app[data-page=debug] #demoTop h1::before{content:'';display:inline-block;width:12px;height:12px;margin-right:9px;background:var(--c-coral);border:2.5px solid var(--c-ink);border-radius:3px;transform:rotate(45deg);vertical-align:1px}
+html body.native-app[data-page=debug] :is(#demoTop #native-back,#native-back){background:#fff!important;color:var(--c-ink)!important;border:2.5px solid var(--c-ink)!important;border-radius:12px!important;box-shadow:var(--c-shadow-sm);font-weight:800;font-size:13px}
+html body.native-app[data-page=debug] #demoConnection{font-weight:700;color:var(--c-ink);background:#fff;border:2px solid var(--c-ink);border-radius:99px;padding:6px 12px}
+html body.native-app[data-page=debug] #demoConnection.connected{background:var(--c-mint2);color:var(--c-ink)}
+html body.native-app[data-page=debug] #demoStop{color:#fff!important;background:var(--c-coral)!important;border:2.5px solid var(--c-ink)!important;border-radius:13px!important;box-shadow:3px 3px 0 var(--c-ink)!important;font-size:15px!important;font-weight:900!important;letter-spacing:1px}
+html body.native-app[data-page=debug] #demoTabs{background:transparent;padding:0;gap:8px;display:flex}
+html body.native-app[data-page=debug] #demoTabs button{height:36px;padding:0 16px;font-weight:800;color:var(--c-ink);background:#fff;border:2.5px solid var(--c-ink);border-radius:12px;box-shadow:var(--c-shadow-sm)}
+html body.native-app[data-page=debug] #demoTabs button:disabled{opacity:1;color:#6B6780;background:#ECEAF2;border-style:dashed;box-shadow:none;cursor:not-allowed}
+html body.native-app[data-page=debug] #demoTabs button.active{background:var(--c-ink);color:#fff;box-shadow:3px 3px 0 var(--c-sun),4px 4px 0 var(--c-ink);transform:rotate(-1.2deg)}
+html body.native-app[data-page=debug] #demoRoot :is(.demoBlock,.demoSongList,.demoSongStage){background:#fff!important;color:var(--c-ink)!important;border:2.5px solid var(--c-ink)!important;border-radius:20px!important;box-shadow:6px 6px 0 var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot .demoBlock h2{font-weight:900;color:var(--c-ink);display:inline-block;background:linear-gradient(transparent 58%,var(--c-sun) 58% 92%,transparent 92%);padding:0 4px}
+html body.native-app[data-page=debug] #demoRoot .demoBlock :is(p,small){color:var(--c-ink2)}
+html body.native-app[data-page=debug] #demoRoot :is(.demoBlock button,.demoBlock select,button.secondary){background:#fff!important;color:var(--c-ink)!important;border:2px solid var(--c-ink)!important;border-radius:11px!important;box-shadow:var(--c-shadow-sm)!important;font-weight:700}
+html body.native-app[data-page=debug] #demoRoot :is(.demoBlock button,button.secondary):hover:not(:disabled){background:var(--c-sun3)!important;transform:translate(-1px,-1px)}
+html body.native-app[data-page=debug] #demoRoot :is(button.primary,#demoCalStart,#demoSongStart,#demoShowAll){background:var(--c-sky)!important;color:#fff!important;border:2.5px solid var(--c-ink)!important;box-shadow:3px 3px 0 var(--c-ink)!important;font-weight:900}
+html body.native-app[data-page=debug] #demoRoot button:disabled{opacity:.5!important;box-shadow:none!important;background:#F1EFF5!important;color:var(--c-muted)!important}
+html body.native-app[data-page=debug] #demoRoot :is(.demoCalSlot,.demoSlot,.demoServo,.demoServoCard,.demoEnrollSlot,[class*=Slot]):not(button){border-color:var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot #demoCalibrationSlots .demoCalSlot{background:#fff!important;border:2px solid var(--c-ink)!important;border-radius:14px!important}
+html body.native-app[data-page=debug] #demoRoot #demoCalibrationSlots .demoCalSlot.current{background:var(--c-sun2)!important;box-shadow:var(--c-shadow-sm)}
+html body.native-app[data-page=debug] #demoRoot #demoCalibrationSlots .demoCalSlot.done{background:var(--c-mint2)!important}
+html body.native-app[data-page=debug] #demoRoot :is(input[type=number],input[type=text],select){border:2px solid var(--c-ink)!important;border-radius:10px!important;background:#fff!important;color:var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot details>summary{font-weight:800;cursor:pointer}
+html body.native-app[data-page=debug] #demoFoot,html body.native-app[data-page=debug] #demoStatus{color:var(--c-ink2);font-weight:600}
+html body.native-app[data-page=debug] :is(button,select,a,summary,input):focus-visible{outline:3px solid var(--c-sky)!important;outline-offset:3px}
+
+/* ===== 使用说明 ===== */
+html body.native-app[data-page=guide],html body.native-app[data-page=licenses]{
+ background-color:var(--c-paper);background-image:radial-gradient(var(--c-dot) 1.15px,transparent 1.35px);background-size:15px 15px;color:var(--c-ink);
+ font-family:'Microsoft YaHei UI','Microsoft YaHei',sans-serif;
+}
+html body.native-app[data-page] main{max-width:940px}
+html body.native-app[data-page] .intro{position:relative;background:var(--c-sun);border:3px solid var(--c-ink);border-radius:24px;box-shadow:6px 6px 0 var(--c-ink);padding:22px 26px 20px 140px;margin-bottom:26px;min-height:120px;background-image:radial-gradient(#F5B21E 1.3px,transparent 1.5px);background-size:9px 9px}
+html body.native-app[data-page] .intro h1{font-size:28px;font-weight:900;color:var(--c-ink);text-shadow:2px 2px 0 #fff}
+html body.native-app[data-page] .intro p,html body.native-app[data-page] .intro small{color:var(--c-ink);font-weight:600}
+html body.native-app[data-page] .intro .comic-mascot{position:absolute;left:18px;top:50%;width:108px;height:108px;transform:translateY(-50%) rotate(-6deg)}
+html body.native-app[data-page] h2{display:inline-block;font-size:21px;font-weight:900;margin:32px 0 12px;padding:0 6px;background:linear-gradient(transparent 58%,var(--c-sun) 58% 92%,transparent 92%)}
+html body.native-app[data-page] :is(p,li){color:var(--c-ink2)}
+html body.native-app[data-page] strong{color:var(--c-ink)}
+html body.native-app[data-page] a{color:#1F4FC2;font-weight:700}
+html body.native-app[data-page] code{background:var(--c-sun2);border:1.5px solid var(--c-ink);border-radius:6px;color:var(--c-ink)}
+html body.native-app[data-page] table{background:#fff;border:2.5px solid var(--c-ink);border-radius:16px;border-collapse:separate;border-spacing:0;overflow:hidden;box-shadow:4px 4px 0 var(--c-ink)}
+html body.native-app[data-page] :is(td,th){border:0;border-bottom:1.5px dashed #1E1A2E40;color:var(--c-ink2)}
+html body.native-app[data-page] tr:last-child td{border-bottom:0}
+html body.native-app[data-page] th{background:var(--c-sky2);color:var(--c-ink);font-weight:900}
+html body.native-app[data-page] td:first-child{font-weight:800;color:var(--c-ink);white-space:nowrap}
+html body.native-app[data-page] ol>li::marker{font-weight:900;color:var(--c-ink)}
+html body.native-app[data-page] #native-back,html body.native-app[data-page] .native-back{background:#fff!important;color:var(--c-ink)!important;border:2.5px solid var(--c-ink)!important;border-radius:12px!important;box-shadow:2px 2px 0 var(--c-ink)!important;font-weight:800!important}
+html body.native-app[data-page] .comic-guide-new{background:#fff;border:2.5px solid var(--c-ink);border-radius:18px;box-shadow:4px 4px 0 var(--c-ink);padding:14px 20px}
+html body.native-app[data-page] .comic-guide-new h2{margin-top:6px}
+@media (prefers-reduced-motion:reduce){html body.native-app[data-page] *{animation:none!important;transition:none!important}}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel:not(#demoCalibration){background:#fff!important;border:2.5px solid var(--c-ink)!important;border-radius:20px!important;box-shadow:6px 6px 0 var(--c-ink)!important;color:var(--c-ink)}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel :is(h2,h3){color:var(--c-ink)!important;font-weight:900}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel :is(p,small,.hint){color:var(--c-ink2)!important}
+html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot{background:#fff!important;border:2.5px solid var(--c-ink)!important;border-radius:16px!important;box-shadow:var(--c-shadow-sm);color:var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot :is(b,strong,span,small){color:var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot.connected,html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot.done{background:var(--c-mint2)!important}
+html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot.active,html body.native-app[data-page=debug] #demoRoot .demoEnrollSlot.current{background:var(--c-sun2)!important}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel button{background:#fff;color:var(--c-ink);border:2px solid var(--c-ink);border-radius:11px;box-shadow:var(--c-shadow-sm);font-weight:700}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel button.primary{background:var(--c-sky);color:#fff;border-width:2.5px;font-weight:900}
+html body.native-app[data-page=debug] #demoRoot>.demo-panel button.danger,html body.native-app[data-page=debug] #demoRoot>.demo-panel button[id*=Stop]{background:var(--c-coral2);color:#9B1C1C}
+html body.native-app[data-page=debug] #demoRoot .card,html body.native-app[data-page=debug] #demoRoot .demoSong{border:2px solid var(--c-ink)!important;border-radius:14px!important;background:#fff!important;color:var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot .demoSong.selected{background:var(--c-sun2)!important}
+
+/* 成熟版配色（与电脑版一致） */
+body.native-app[data-page]{--c-paper:#F5F1E8;--c-dot:#F5F1E8;--c-ink:#23212B;--c-ink2:#45424F;--c-muted:#6F6B78;--c-sun:#E2A93B;--c-sun2:#F3E3BC;--c-sun3:#FAF3E0;--c-sky:#2F5FB3;--c-sky2:#E9EDF3;--c-mint:#2F8F75;--c-mint2:#DCEBE5;--c-coral:#C8453F;--c-coral2:#F4E1DE;--c-shadow:2px 2px 0 #23212B;--c-shadow-sm:1px 1px 0 #23212B}
+html body.native-app[data-page]{background-image:none!important}
+html body.native-app[data-page=debug] #demoTop{background:var(--c-ink);background-image:none;border-bottom:0}
+html body.native-app[data-page=debug] #demoTop h1{font-size:18px;color:#F5F1E8;text-shadow:none}
+html body.native-app[data-page=debug] #demoTabs button{border-width:1.5px;border-radius:8px}
+html body.native-app[data-page=debug] #demoTabs button.active{transform:none;box-shadow:none;background:var(--c-sun);color:var(--c-ink)}
+html body.native-app[data-page=debug] #demoRoot :is(.demoBlock,.demoSongList,.demoSongStage){border-width:1.5px!important;border-radius:12px!important;box-shadow:3px 3px 0 var(--c-ink)!important}
+html body.native-app[data-page=debug] #demoRoot .demoBlock h2{background:none;padding:0}/* 11-05 用户截图：舵机编号那块的「重新编号/停止编号」还是旧样式，和「再调一遍」不统一 */
+html body.native-app[data-page=debug] #demoRoot :is(#demoEnrollment,.demo-panel) button{background:#fff!important;color:var(--c-ink)!important;border:2px solid var(--c-ink)!important;border-radius:11px!important;box-shadow:var(--c-shadow-sm)!important;font-weight:800;min-height:38px;padding:9px 15px}
+html body.native-app[data-page=debug] #demoRoot :is(#demoEnrollment,.demo-panel) button:hover:not(:disabled){background:var(--c-sun3)!important;transform:translate(-1px,-1px)}
+html body.native-app[data-page=debug] #demoRoot :is(#demoEnrollment,.demo-panel) button.primary{background:var(--c-sky)!important;color:#fff!important;border:2.5px solid var(--c-ink)!important;box-shadow:3px 3px 0 var(--c-ink)!important;font-weight:900}
+html body.native-app[data-page=debug] #demoRoot #demoEnrollStop{color:#B42318!important}
+html body.native-app[data-page=debug] #demoRoot :is(#demoEnrollment,.demo-panel) button:disabled{opacity:.5!important;box-shadow:none!important;background:#F1EFF5!important;color:var(--c-muted)!important}
+html body.native-app[data-page=debug] #demoRoot #demoEnrollment #demoEnrollStop:not(:disabled){background:#fff!important;color:#B42318!important;border:2px solid var(--c-ink)!important;box-shadow:var(--c-shadow-sm)!important}
+html body.native-app[data-page=debug] #demoRoot #demoEnrollment #demoEnrollStop:hover:not(:disabled){background:#FDE7E3!important}

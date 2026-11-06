@@ -19,6 +19,18 @@ class ConverterTests(unittest.TestCase):
     def test_unconfirmed_not_executable(self):
         p=self.project();p['notes'][0]['confirmed']=False
         with self.assertRaises(ValueError):export_reviewed(p)
+    def test_fractional_millisecond_notes_share_exact_boundary(self):
+        p = self.project()
+        p['selection'].update(bpm=80, end_beat=2)
+        p['notes'] = [dict(id=i+1, page=1, hand='right', pitch='C4', finger=1,
+                           beat=i/4, duration_beats=.25, confirmed=True) for i in range(8)]
+        score = export_reviewed(p)
+        played = decode(encode(score))['notes']
+        for previous, current in zip(played, played[1:]):
+            self.assertEqual(previous['t_ms'] + previous['duration_ms'], current['t_ms'])
+        self.assertEqual(played[-1]['t_ms'] + played[-1]['duration_ms'], 1500)
+        for note, mapping in zip(played, score['source_notes']):
+            self.assertEqual(mapping['source_spans'][0]['duration_ms'], note['duration_ms'])
     def test_unknown_hand_not_silent(self):
         p=self.project();p['notes'].append(dict(id=3,page=1,hand=None))
         with self.assertRaises(ValueError):export_reviewed(p)

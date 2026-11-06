@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import platform
+import shutil
 import sys
 import subprocess
 import tempfile
@@ -65,7 +66,23 @@ def _native_architecture():
             os.environ.get('PROCESSOR_ARCHITECTURE') or platform.machine()).upper()
 
 
+def _bundled_package():
+    # The desktop release carries the signed package so a first-time user can
+    # install while connected to the glove's offline hotspot.
+    bundled = Path(getattr(sys, '_MEIPASS', Path(__file__).parent)) / 'web' / 'assets' / 'drivers' / 'CP210x_Windows_Update.cab'
+    if not bundled.is_file():
+        bundled = Path(__file__).parent / 'assets' / 'drivers' / 'CP210x_Windows_Update.cab'
+    return bundled if bundled.is_file() else None
+
+
 def _download_package(directory):
+    bundled = _bundled_package()
+    if bundled is not None and _native_architecture() in ('AMD64', 'X86_64'):
+        if hashlib.sha256(bundled.read_bytes()).hexdigest() != MICROSOFT_DRIVER_SHA256:
+            raise ValueError('bundled_driver_hash_mismatch')
+        archive = directory / bundled.name
+        shutil.copy2(bundled, archive)
+        return archive
     try:
         return _download_from(DRIVER_DOWNLOAD_URL, directory / 'CP210x_Universal_Windows_Driver.zip')
     except Exception:
@@ -286,7 +303,7 @@ class USBDriverInstaller:
             base.mkdir(parents=True, exist_ok=True)
             directory = Path(tempfile.mkdtemp(prefix='cp210x-', dir=base))
             stage = 'download'
-            self._update(phase=stage, progress=15, message='正在从 Silicon Labs 下载官方驱动…')
+            self._update(phase=stage, progress=15, message='正在准备官方 USB 驱动…')
             archive = _download_package(directory)
             stage = 'verify'
             self._update(phase=stage, progress=40, message='正在验证驱动包和数字签名…')

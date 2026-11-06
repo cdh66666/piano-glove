@@ -1,0 +1,63 @@
+body.native-app .native-catalog-select{max-width:250px;min-width:170px;padding:7px 10px;font-size:12px;background:#fff;border:1px solid #dce5ed;border-radius:7px;color:#314b62}
+body.native-app .native-catalog-select:disabled{opacity:.6}
+body.native-app #native-ready-library{display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,2fr) auto auto;gap:14px;align-items:center;padding:16px 18px;background:#e8f0f5;border:1px solid #ccdce7;border-radius:12px;margin:8px 0 16px}
+body.native-app #native-ready-library[hidden]{display:none!important}
+body.native-app #native-ready-library strong{display:block;font-size:16px;color:#24394c}
+body.native-app #native-ready-library span{display:block;font-size:11px;color:#52687c;margin-top:5px}
+body.native-app #native-ready-select{width:100%;min-width:0;padding:10px 12px;border:1px solid #bbcedd;border-radius:8px;background:#f5f8fb;color:#24394c;font:14px 'Microsoft YaHei UI',sans-serif}
+body.native-app #native-ready-play{background:#226884;color:white;padding:10px 24px;border:0;border-radius:8px;font:14px 'Microsoft YaHei UI',sans-serif;white-space:nowrap;min-width:76px;cursor:pointer}
+body.native-app #native-ready-play:disabled{opacity:.55;cursor:wait}
+body.native-app #native-ready-export{padding:9px 15px;border:1px solid #bbcedd;border-radius:8px;background:#f5f8fb;color:#24516c;font:14px 'Microsoft YaHei UI',sans-serif;white-space:nowrap;cursor:pointer}
+body.native-app #native-ready-export:disabled{opacity:.55;cursor:wait}
+body.native-app #native-ready-status{grid-column:1/-1;color:#52687c;font-size:12px}
+body.native-app #native-ready-status:empty{display:none}
+body.native-app .native-review-save{font-size:11px;color:#708699;white-space:nowrap}
+body.native-app .native-review-save.error{color:#af4b5c}
+body.native-app #native-drop-blank{flex:1;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed #cfdae5;border-radius:14px;background:#fff;margin:12px 0 16px;color:#59738b}
+body.native-app #native-drop-blank strong{font-size:21px;font-weight:500;color:#334d65}
+body.native-app #native-drop-blank p{font-size:13px;margin:9px 0;color:#8996a4}
+body.native-app #native-drop-overlay{position:fixed;inset:14px;z-index:5000;display:flex;align-items:center;justify-content:center;background:#f4f8fcee;border:2px dashed #6e91ac;border-radius:14px;pointer-events:none;color:#365c78;font:500 25px 'Microsoft YaHei UI',sans-serif}
+body.native-app #native-drop-overlay[hidden],body.native-app #native-drop-blank[hidden]{display:none!important}
+body.native-app .review-title{flex-wrap:wrap;gap:9px}
+body.native-app .review-title .review-toolbar{gap:7px;flex-wrap:wrap}
+body.native-app #convert .review-title #add-note{font-size:12px;padding:6px 9px;color:#466d8b}
+body.native-app #convert .review-title #review-help{margin-left:auto}
+body.native-app #convert .review-fields>label:first-child{grid-column:auto}
+.native-phone-dialog{width:min(440px,90vw);padding:26px;border:1px solid #dce5ed;border-radius:14px;background:#fff;color:#263b4d;font:14px/1.8 'Microsoft YaHei UI',sans-serif}
+.native-phone-dialog::backdrop{background:#26384945}
+.native-phone-dialog h3{margin:0 0 9px;font-size:20px;font-weight:600}
+.native-phone-dialog p{margin:7px 0;color:#6d7e8c}
+.native-phone-dialog img{display:block;width:220px;height:220px;margin:15px auto;background:white}
+.native-phone-dialog strong{display:block;text-align:center;font-size:13px;color:#3a5871}
+.native-phone-dialog .phone-actions{display:flex;align-items:center;justify-content:space-between;margin-top:13px;gap:12px}
+.native-phone-dialog button{padding:7px 14px;border:1px solid #dce5ed;background:#f0f5f9;border-radius:7px;color:#466d8b;cursor:pointer;font:inherit}
+@media(max-width:1100px){body.native-app .native-catalog-select{max-width:190px;min-width:145px}body.native-app .native-review-save{font-size:10px}}
+body.native-app #native-conversion-panel{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px;margin:8px 0;padding:14px 16px;border:1px solid #b9cddb;border-radius:12px;background:#fff;color:#29465d}
+body.native-app #native-conversion-panel[hidden],body.native-app #native-conversion-history[hidden]{display:none!important}
+body.native-app #native-conversion-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;padding:0;min-height:30px;border:0;background:transparent;flex:none}
+body.native-app #native-conversion-title{font-size:19px}
+body.native-app #native-conversion-stop{padding:6px 12px;min-height:30px;border:1px solid #bfccd5;border-radius:6px;background:#f3f7fa;color:#385d78;font:12px 'Microsoft YaHei UI',sans-serif;white-space:nowrap}
+body.native-app #native-conversion-overall-label{font-size:13px;line-height:19px}
+body.native-app #native-conversion-panel progress{display:block;flex:none;width:100%;height:14px;appearance:none;-webkit-appearance:none;border:0;border-radius:7px;overflow:hidden;background:#e3edf3;accent-color:#365f7d;margin:2px 0 7px}
+body.native-app #native-conversion-panel progress::-webkit-progress-bar{background:#e3edf3;border-radius:7px}
+body.native-app #native-conversion-panel progress::-webkit-progress-value{background:#365f7d;border-radius:7px;transition:width .15s linear}
+body.native-app #native-conversion-panel progress::-moz-progress-bar{background:#365f7d;border-radius:7px}
+body.native-app #native-conversion-panel progress:not([value])::-webkit-progress-bar{background:linear-gradient(100deg,#e3edf3 10%,#8eafc5 50%,#e3edf3 90%);background-size:200% 100%;animation:native-conversion-wait 1.2s linear infinite}
+@keyframes native-conversion-wait{from{background-position:100% 0}to{background-position:-100% 0}}
+body.native-app .native-conversion-current{min-width:0;display:flex;align-items:center;gap:12px;margin:2px 0 3px}
+body.native-app #native-conversion-position{flex:none;font-size:12px;color:#647b8c}
+body.native-app #native-conversion-current{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:24px}
+body.native-app #native-conversion-stage{margin:0;font-size:14px;line-height:20px}
+body.native-app #native-conversion-pages{margin:0 0 6px;font-size:12px;line-height:17px;color:#647b8c}
+body.native-app #native-conversion-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start;gap:4px;min-height:0;overflow:auto;flex:1}
+body.native-app .native-conversion-item{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:7px;min-height:25px;padding:4px 6px;border:1px solid #e1e8ed;border-radius:5px;background:#f6f9fb;box-sizing:border-box}
+body.native-app .native-conversion-item>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:15px}
+body.native-app .native-conversion-item>small{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#647b8c}
+body.native-app .native-conversion-item[data-status=processing],body.native-app .native-conversion-item[data-status=reading]{border-color:#779bb6;background:#e9f2f8}
+body.native-app .native-conversion-item[data-status=error]{border-color:#d6a1a1;background:#fff3f3}
+body.native-app .native-conversion-item[data-status=error]>small{color:#a43a3a}
+body.native-app #native-conversion-history{padding:8px 0;font-size:12px}
+body.native-app #native-conversion-history>div{display:grid;gap:4px;margin-top:7px}
+body.native-app.conversion-busy #review-current-file,body.native-app.conversion-busy #review-simple-status,body.native-app.conversion-busy #review-tools,body.native-app.conversion-busy #native-review-save{display:none!important}
+body.native-app.conversion-busy #review-workspace,body.native-app.conversion-busy #review-export,body.native-app.conversion-busy #review-summary,body.native-app.conversion-busy #convert .review-bottom{display:none!important}
+@media(max-width:700px){body.native-app #native-conversion-list{grid-template-columns:repeat(2,minmax(0,1fr))}body.native-app #native-conversion-panel{padding:12px}body.native-app #native-conversion-current{font-size:14px}}

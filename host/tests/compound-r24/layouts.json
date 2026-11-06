@@ -1,0 +1,1166 @@
+{
+  "scope": "Independent actual compiler states in real headless DOM, not native EXE or physical-device acceptance",
+  "layouts": [
+    {
+      "label": "automatic",
+      "viewport": {
+        "width": 960,
+        "height": 680
+      },
+      "scroll": 680,
+      "client": 680,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 133,
+          "bottom": 318.8125,
+          "scroll": 186,
+          "client": 186
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 324.8125,
+          "bottom": 610,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 472,
+          "right": 617,
+          "top": 396.8125,
+          "bottom": 421.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 412.5,
+          "right": 478,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 482,
+          "right": 547.5,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-lower-aux": {
+          "visible": true,
+          "left": 551.5,
+          "right": 617,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-borrow": {
+          "visible": true,
+          "left": 343,
+          "right": 408.5,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 343,
+          "right": 431.65625,
+          "top": 503.8125,
+          "bottom": 530.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 728,
+          "right": 814,
+          "top": 572.40625,
+          "bottom": 601.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 822,
+          "right": 934,
+          "top": 571.8125,
+          "bottom": 602,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 876,
+          "right": 944,
+          "top": 622,
+          "bottom": 652,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "borrow_ratio",
+        "kind",
+        "lower_aux_finger",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音接下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "kind": "trill_with_lower_mordent",
+        "combination_id": "a:trill_with_lower_mordent",
+        "component_group_ids": [
+          "tr",
+          "low"
+        ],
+        "rate_hz": 8,
+        "borrow_ratio": 0.3333333333333333,
+        "aux_finger": null,
+        "lower_aux_finger": null,
+        "upper_performance_finger": 4,
+        "lower_performance_finger": 2,
+        "upper_finger_origin": "estimated",
+        "lower_finger_origin": "estimated",
+        "sequence": [
+          "trill",
+          "mordent_lower"
+        ],
+        "candidates": [
+          "trill",
+          "mordent_lower",
+          "trill_with_lower_mordent"
+        ],
+        "phase": "termination",
+        "performance_finger": 3,
+        "finger_origin": "source"
+      }
+    },
+    {
+      "label": "trill-only",
+      "viewport": {
+        "width": 960,
+        "height": 680
+      },
+      "scroll": 680,
+      "client": 680,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 133,
+          "bottom": 318.8125,
+          "scroll": 186,
+          "client": 186
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 324.8125,
+          "bottom": 610,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 472,
+          "right": 617,
+          "top": 396.8125,
+          "bottom": 421.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 343,
+          "right": 478,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 482,
+          "right": 617,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 343,
+          "right": 431.65625,
+          "top": 503.8125,
+          "bottom": 530.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 728,
+          "right": 814,
+          "top": 572.40625,
+          "bottom": 601.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 822,
+          "right": 934,
+          "top": 571.8125,
+          "bottom": 602,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 876,
+          "right": 944,
+          "top": 622,
+          "bottom": 652,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "kind",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "rate_hz": 8,
+        "aux_finger": null,
+        "performance_finger": 3,
+        "finger_origin": "source",
+        "candidates": [
+          "mordent_lower",
+          "trill",
+          "trill_with_lower_mordent"
+        ],
+        "kind": "trill"
+      }
+    },
+    {
+      "label": "lower-only",
+      "viewport": {
+        "width": 960,
+        "height": 680
+      },
+      "scroll": 680,
+      "client": 680,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 133,
+          "bottom": 318.8125,
+          "scroll": 186,
+          "client": 186
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 324.8125,
+          "bottom": 610,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 472,
+          "right": 617,
+          "top": 396.8125,
+          "bottom": 421.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 343,
+          "right": 478,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 482,
+          "right": 617,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 343,
+          "right": 431.65625,
+          "top": 503.8125,
+          "bottom": 530.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 728,
+          "right": 814,
+          "top": 572.40625,
+          "bottom": 601.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 822,
+          "right": 934,
+          "top": 571.8125,
+          "bottom": 602,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 876,
+          "right": 944,
+          "top": 622,
+          "bottom": 652,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "kind",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：下波音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "rate_hz": 8,
+        "aux_finger": null,
+        "performance_finger": 3,
+        "finger_origin": "source",
+        "candidates": [
+          "mordent_lower",
+          "trill",
+          "trill_with_lower_mordent"
+        ],
+        "kind": "mordent_lower"
+      }
+    },
+    {
+      "label": "explicit-combination",
+      "viewport": {
+        "width": 960,
+        "height": 680
+      },
+      "scroll": 680,
+      "client": 680,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 133,
+          "bottom": 318.8125,
+          "scroll": 186,
+          "client": 186
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 324.8125,
+          "bottom": 610,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 472,
+          "right": 617,
+          "top": 396.8125,
+          "bottom": 421.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 412.5,
+          "right": 478,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 482,
+          "right": 547.5,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-lower-aux": {
+          "visible": true,
+          "left": 551.5,
+          "right": 617,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-borrow": {
+          "visible": true,
+          "left": 343,
+          "right": 408.5,
+          "top": 472.8125,
+          "bottom": 499.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 343,
+          "right": 431.65625,
+          "top": 503.8125,
+          "bottom": 530.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 728,
+          "right": 814,
+          "top": 572.40625,
+          "bottom": 601.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 822,
+          "right": 934,
+          "top": 571.8125,
+          "bottom": 602,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 876,
+          "right": 944,
+          "top": 622,
+          "bottom": 652,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "borrow_ratio",
+        "kind",
+        "lower_aux_finger",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音接下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "kind": "trill_with_lower_mordent",
+        "combination_id": "a:trill_with_lower_mordent",
+        "component_group_ids": [
+          "tr",
+          "low"
+        ],
+        "rate_hz": 8,
+        "borrow_ratio": 0.3333333333333333,
+        "aux_finger": null,
+        "lower_aux_finger": null,
+        "upper_performance_finger": 4,
+        "lower_performance_finger": 2,
+        "upper_finger_origin": "estimated",
+        "lower_finger_origin": "estimated",
+        "sequence": [
+          "trill",
+          "mordent_lower"
+        ],
+        "candidates": [
+          "trill",
+          "mordent_lower",
+          "trill_with_lower_mordent"
+        ],
+        "phase": "termination",
+        "performance_finger": 3,
+        "finger_origin": "source"
+      }
+    },
+    {
+      "label": "automatic",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "scroll": 800,
+      "client": 800,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 133,
+          "bottom": 438.8125,
+          "scroll": 306,
+          "client": 306
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 444.8125,
+          "bottom": 730,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 685.328125,
+          "right": 830.328125,
+          "top": 516.8125,
+          "bottom": 541.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 545.8125,
+          "right": 637.984375,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 641.984375,
+          "right": 734.15625,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-lower-aux": {
+          "visible": true,
+          "left": 738.15625,
+          "right": 830.328125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-borrow": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 541.8125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 573.875,
+          "top": 623.8125,
+          "bottom": 650.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 1048,
+          "right": 1134,
+          "top": 692.40625,
+          "bottom": 721.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 1142,
+          "right": 1254,
+          "top": 691.8125,
+          "bottom": 722,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 1196,
+          "right": 1264,
+          "top": 742,
+          "bottom": 772,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "borrow_ratio",
+        "kind",
+        "lower_aux_finger",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音接下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "kind": "trill_with_lower_mordent",
+        "combination_id": "a:trill_with_lower_mordent",
+        "component_group_ids": [
+          "tr",
+          "low"
+        ],
+        "rate_hz": 8,
+        "borrow_ratio": 0.3333333333333333,
+        "aux_finger": null,
+        "lower_aux_finger": null,
+        "upper_performance_finger": 4,
+        "lower_performance_finger": 2,
+        "upper_finger_origin": "estimated",
+        "lower_finger_origin": "estimated",
+        "sequence": [
+          "trill",
+          "mordent_lower"
+        ],
+        "candidates": [
+          "trill",
+          "mordent_lower",
+          "trill_with_lower_mordent"
+        ],
+        "phase": "termination",
+        "performance_finger": 3,
+        "finger_origin": "source"
+      }
+    },
+    {
+      "label": "trill-only",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "scroll": 800,
+      "client": 800,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 133,
+          "bottom": 452.8125,
+          "scroll": 320,
+          "client": 320
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 458.8125,
+          "bottom": 730,
+          "scroll": 269,
+          "client": 269
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 685.328125,
+          "right": 830.328125,
+          "top": 530.8125,
+          "bottom": 555.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 637.984375,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 641.984375,
+          "right": 830.328125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 573.875,
+          "top": 623.8125,
+          "bottom": 650.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 1048,
+          "right": 1134,
+          "top": 692.40625,
+          "bottom": 721.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 1142,
+          "right": 1254,
+          "top": 691.8125,
+          "bottom": 722,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 1196,
+          "right": 1264,
+          "top": 742,
+          "bottom": 772,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "kind",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "rate_hz": 8,
+        "aux_finger": null,
+        "performance_finger": 3,
+        "finger_origin": "source",
+        "candidates": [
+          "mordent_lower",
+          "trill",
+          "trill_with_lower_mordent"
+        ],
+        "kind": "trill"
+      }
+    },
+    {
+      "label": "lower-only",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "scroll": 800,
+      "client": 800,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 133,
+          "bottom": 452.8125,
+          "scroll": 320,
+          "client": 320
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 458.8125,
+          "bottom": 730,
+          "scroll": 269,
+          "client": 269
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 685.328125,
+          "right": 830.328125,
+          "top": 530.8125,
+          "bottom": 555.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 637.984375,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 641.984375,
+          "right": 830.328125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 573.875,
+          "top": 623.8125,
+          "bottom": 650.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 1048,
+          "right": 1134,
+          "top": 692.40625,
+          "bottom": 721.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 1142,
+          "right": 1254,
+          "top": 691.8125,
+          "bottom": 722,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 1196,
+          "right": 1264,
+          "top": 742,
+          "bottom": 772,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "kind",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：下波音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "rate_hz": 8,
+        "aux_finger": null,
+        "performance_finger": 3,
+        "finger_origin": "source",
+        "candidates": [
+          "mordent_lower",
+          "trill",
+          "trill_with_lower_mordent"
+        ],
+        "kind": "mordent_lower"
+      }
+    },
+    {
+      "label": "explicit-combination",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "scroll": 800,
+      "client": 800,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 133,
+          "bottom": 438.8125,
+          "scroll": 306,
+          "client": 306
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 444.8125,
+          "bottom": 730,
+          "scroll": 283,
+          "client": 283
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 685.328125,
+          "right": 830.328125,
+          "top": 516.8125,
+          "bottom": 541.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-rate": {
+          "visible": true,
+          "left": 545.8125,
+          "right": 637.984375,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-aux": {
+          "visible": true,
+          "left": 641.984375,
+          "right": 734.15625,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-lower-aux": {
+          "visible": true,
+          "left": 738.15625,
+          "right": 830.328125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-borrow": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 541.8125,
+          "top": 592.8125,
+          "bottom": 619.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 573.875,
+          "top": 623.8125,
+          "bottom": 650.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 1048,
+          "right": 1134,
+          "top": 692.40625,
+          "bottom": 721.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 1142,
+          "right": 1254,
+          "top": 691.8125,
+          "bottom": 722,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 1196,
+          "right": 1264,
+          "top": 742,
+          "bottom": 772,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "keys": [
+        "aux_finger",
+        "borrow_ratio",
+        "kind",
+        "lower_aux_finger",
+        "rate_hz"
+      ],
+      "options": [
+        {
+          "value": "",
+          "label": "自动：颤音接下波音"
+        },
+        {
+          "value": "trill",
+          "label": "颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "label": "下波音"
+        },
+        {
+          "value": "trill_with_lower_mordent",
+          "label": "颤音接下波音"
+        }
+      ],
+      "params": {
+        "kind": "trill_with_lower_mordent",
+        "combination_id": "a:trill_with_lower_mordent",
+        "component_group_ids": [
+          "tr",
+          "low"
+        ],
+        "rate_hz": 8,
+        "borrow_ratio": 0.3333333333333333,
+        "aux_finger": null,
+        "lower_aux_finger": null,
+        "upper_performance_finger": 4,
+        "lower_performance_finger": 2,
+        "upper_finger_origin": "estimated",
+        "lower_finger_origin": "estimated",
+        "sequence": [
+          "trill",
+          "mordent_lower"
+        ],
+        "candidates": [
+          "trill",
+          "mordent_lower",
+          "trill_with_lower_mordent"
+        ],
+        "phase": "termination",
+        "performance_finger": 3,
+        "finger_origin": "source"
+      }
+    }
+  ],
+  "page_errors": []
+}

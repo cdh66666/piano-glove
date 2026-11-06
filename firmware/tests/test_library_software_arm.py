@@ -18,7 +18,7 @@ base = base.replace('const int lo=20,hi=1003;', 'const int lo=hardwareMin,hi=har
 base = base.replace('bool readFeedback(uint8_t id,Feedback &fb){', '''bool readFeedback(uint8_t id,Feedback &fb){
  if(feedbackMissing)return false;
  fb.voltage=healthVoltage;fb.temp=healthTemperature;
- if(movingSamples){fb.pos=(movingSample++%3)*200+200;fb.ok=true;return true;}
+ if(movingSamples){fb.pos=(movingSample++%3)*200+200;lastFeedback[id-1]=fb.pos;fb.ok=true;return true;}
 ''')
 prefix = '''bool relaxSoftwareMockGoal=false,feedbackMissing=false,movingSamples=false;
 int movingSample=0,healthVoltage=50,healthTemperature=25,hardwareMin=20,hardwareMax=1003;
@@ -26,27 +26,29 @@ int movingSample=0,healthVoltage=50,healthTemperature=25,hardwareMin=20,hardware
 harness = prefix + base + r'''
 void softwareReset(){
  reset();relaxSoftwareMockGoal=true;feedbackMissing=movingSamples=false;movingSample=0;healthVoltage=50;healthTemperature=25;hardwareMin=20;hardwareMax=1003;
+ scs::nativeConfigOk=true;scs::nativeReads=0;
  for(auto&slot:g_slot){slot.lo=400;slot.hi=500;slot.standby=450;}
  scs::edgePosition=700; // Clearly beyond the old 15%+35 calibration window.
 }
 void modeOff(){assert(!g_libraryArm&&!g_libraryOffhand&&!g_librarySoftware);}
-void goalsBounded(uint8_t selected,int amplitude){
+void goalsAtFreshPosition(uint8_t selected,int amplitude){
  for(int s=0;s<6;++s){const auto&slot=g_slot[s];
-  const int expected=librarytargets::softwareTarget(s,scs::pf.family==scs::Family::SCS,slot.lo,slot.hi,hardwareMin,hardwareMax,
-      s>0&&bool(selected&(1<<(s-1))),s==0?100:amplitude);
-  assert(scs::goals[s]==expected&&expected>=slot.lo&&expected<=slot.hi&&expected>=hardwareMin&&expected<=hardwareMax);
+  assert(scs::goals[s]==scs::sampleAtGoal[s]&&scs::goals[s]>=hardwareMin&&scs::goals[s]<=hardwareMax);
+  if(scs::pf.family==scs::Family::STS)assert(scs::goalSpeeds[s]==0&&scs::goalAcc[s]==0);
+  else assert(scs::goalSpeeds[s]==g_speed&&scs::goalAcc[s]==g_acc);
+  assert(g_speed==1200&&g_acc==30);
   assert(armLibraryHardwareMinimum(s)==hardwareMin&&armLibraryHardwareMaximum(s)==hardwareMax);
  }
 }
 int main(){
- softwareReset();assert(armLibrarySoftwarePose(1,100));assert(g_armed&&scs::writes==6);modeOff();goalsBounded(1,100);
- assert(scs::goals[0]==494&&scs::goals[1]==406);for(int s=0;s<6;++s)assert(armLibraryLastPosition(s)==700);
+ softwareReset();assert(armLibrarySoftwarePose(1,100));assert(g_armed&&scs::writes==6);modeOff();goalsAtFreshPosition(1,100);
+ for(int s=0;s<6;++s)assert(scs::goals[s]==700&&armLibraryLastPosition(s)==700);
  assert(fakeMs<100); // No 300ms arrival loop and no current-to-edge recovery pose.
- softwareReset();movingSamples=true;scs::edgePosition=-1;assert(armLibrarySoftwarePose(21,20));modeOff();goalsBounded(21,20);
- assert(fakeMs<100&&armLibraryLastPosition(0)==400); // Readable 200/400/600 motion is not "unstable".
+ softwareReset();movingSamples=true;scs::edgePosition=-1;assert(armLibrarySoftwarePose(21,20));modeOff();goalsAtFreshPosition(21,20);
+ assert(fakeMs<100); // Fresh readable moving samples are not an arrival wait.
  for(auto family:{scs::Family::SCS,scs::Family::STS})for(int amplitude:{1,20,60,100})for(int selected:{0,1,10,31}){
   softwareReset();scs::pf.family=family;scs::pf.range=family==scs::Family::SCS?1023:4095;
-  assert(armLibrarySoftwarePose(selected,amplitude));modeOff();goalsBounded(selected,amplitude);
+  assert(armLibrarySoftwarePose(selected,amplitude));modeOff();goalsAtFreshPosition(selected,amplitude);
  }
  softwareReset();scs::edgePosition=700;assert(!armAtCurrent(63));off();assert(scs::writes==0);modeOff();
  softwareReset();scs::edgePosition=700;assert(!armPrepareCurrent(63));off();assert(scs::writes==0);modeOff();
@@ -64,14 +66,16 @@ int main(){
  softwareReset();g_slot[0].id=2;assert(!armLibrarySoftwarePose(1,100));off();modeOff();assert(scs::writes==0);
  for(int amplitude:{0,101}){softwareReset();assert(!armLibrarySoftwarePose(1,amplitude));off();modeOff();assert(scs::writes==0);}
  softwareReset();assert(!armLibrarySoftwarePose(32,100));off();modeOff();assert(scs::writes==0);
- // Software targets retain at least 5% inset at both ends.
+ // Native enabling holds the measured pose; musical full endpoints follow later.
  softwareReset();for(auto&slot:g_slot){slot.lo=10;slot.hi=1010;slot.standby=450;}
- assert(armLibrarySoftwarePose(31,100));modeOff();goalsBounded(31,100);
- assert(scs::goals[0]==960&&scs::goals[1]==60);
+ assert(armLibrarySoftwarePose(31,100));modeOff();goalsAtFreshPosition(31,100);
+ assert(scs::goals[0]==700&&scs::goals[1]==700);
  // Fresh hardware limits may narrow the window without expanding calibration.
  softwareReset();hardwareMin=440;hardwareMax=460;scs::edgePosition=450;
- assert(armLibrarySoftwarePose(31,100));modeOff();goalsBounded(31,100);
- assert(scs::goals[0]==460&&scs::goals[1]==440);
+ assert(armLibrarySoftwarePose(31,100));modeOff();goalsAtFreshPosition(31,100);
+ assert(scs::goals[0]==450&&scs::goals[1]==450);
+ softwareReset();scs::pf.family=scs::Family::STS;scs::pf.range=4095;scs::nativeConfigOk=false;
+ assert(!armLibrarySoftwarePose(1,100));off();modeOff();assert(scs::writes==0&&strstr(armFailure(),"native_speed_configuration"));
  softwareReset();hardwareMin=800;hardwareMax=900;scs::edgePosition=850;
  assert(!armLibrarySoftwarePose(31,100));off();modeOff();assert(scs::writes==0&&strstr(armFailure(),"target_intersection_empty"));
  // Software mode is reset: the next normal ARM retains its strict behavior.
@@ -83,7 +87,7 @@ int main(){
 cpp = root / 'library_software_arm_generated.cpp'
 exe = root / 'library_software_arm_generated.exe'
 cpp.write_text(harness, encoding='utf-8')
-vcvars = Path('D:/AI_Workspace/ai-models/vs-build-tools/VC/Auxiliary/Build/vcvars64.bat')
+vcvars = Path(os.environ.get('VCVARS64', 'C:/Program Files/Microsoft Visual Studio/2022/BuildTools/VC/Auxiliary/Build/vcvars64.bat'))
 environment = os.environ.copy()
 for line in subprocess.check_output(['cmd', '/d', '/c', f'call {vcvars} >nul && set'], encoding='utf-8', errors='replace').splitlines():
     if '=' in line and not line.startswith('='):

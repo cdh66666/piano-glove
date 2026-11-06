@@ -51,7 +51,7 @@ enum HTTPAuthMethod { BASIC_AUTH, DIGEST_AUTH };
 #define HTTP_MAX_SEND_WAIT 500 // maximum send wait without progress, ms
 #endif
 #ifndef HTTP_MAX_RESPONSE_WAIT
-#define HTTP_MAX_RESPONSE_WAIT 2500 // whole response; feedback serviced during it
+#define HTTP_MAX_RESPONSE_WAIT 10000 // whole response (long phone scores); feedback serviced during it
 #endif
 #define HTTP_MAX_CLOSE_WAIT 150
 

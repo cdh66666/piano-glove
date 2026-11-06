@@ -17,6 +17,7 @@ struct Profile{Family family=Family::STS;uint16_t range=4095,model=0,minAng=0,ma
 const Profile &profile(){return pf;}
 struct Feedback{bool ok=false;int16_t pos=-1,speed=0,load=0,current=0;uint8_t voltage=0,temp=0,moving=0,mode=0;};
 struct SyncItem{uint8_t id;uint16_t pos,speed;uint8_t acc;};void syncMove(const SyncItem*,int,bool benchRaw=false);bool checkedBenchSpeed(uint8_t,uint16_t,uint16_t &,uint16_t *actual=nullptr);
+int syncReadPos(const uint8_t*,int,uint16_t*,uint16_t,int16_t*velocity=nullptr,uint8_t*moving=nullptr);
 const int RESP_TIMEOUT_MS=20,INST_SYNC_READ=0x82;
 const int PRES_BLOCK_LEN=15,REG_PRES_POS_L=56,RESP_BUF=96,INST_WRITE=3,INST_SYNC_WRITE=0x83,BROADCAST_ID=254,REG_MODEL_L=3,REG_MIN_ANGLE_L=9,REG_MAX_ANGLE_L=11;
 uint8_t last[80],lastN=0,lastReadSize=0;
@@ -27,10 +28,12 @@ struct Bus{int available(){return 0;}int read(){return 0;}void write(uint8_t*,ui
 uint8_t build(uint8_t,uint8_t,uint8_t*,uint8_t,uint8_t*){return 0;}
 void eatEcho(uint8_t){}std::vector<std::array<uint8_t,8>> packets;size_t packetIndex=0;bool readPacket(int,uint8_t*r,int&n,uint16_t){if(packetIndex>=packets.size())return false;auto &p=packets[packetIndex++];memcpy(r,p.data(),8);n=8;return true;}
 uint8_t modelBytes[2]={5,4},minBytes[2]={0,20},maxBytes[2]={3,235};
+uint8_t configEndian=0,configPhase=12,configResolution=1,configMode=0,deadA=2,deadB=5;
 bool sendRecv(uint8_t,uint8_t,const uint8_t*p,uint8_t n,uint8_t*,int&,bool){memcpy(last,p,n);lastN=n;return true;}
 bool readRegs(uint8_t id,uint8_t addr,uint8_t n,uint8_t*out,uint16_t timeout=20){
  ++readCount;clockNow+=timeout<5?timeout:5;if(id==failedId)return false;
  memset(out,0,n);lastReadSize=n;
+ if(addr==2){assert(n==32);out[0]=configEndian;out[16]=configPhase;out[24]=deadA;out[25]=deadB;out[28]=configResolution;out[31]=configMode;}
  if(addr==3)memcpy(out,modelBytes,2);
  if(addr==9)memcpy(out,minBytes,2);
  if(addr==11)memcpy(out,maxBytes,2);
@@ -51,6 +54,18 @@ int main(){
  SyncItem item{6,381,1200,30};syncMove(&item,1);const uint8_t syncS[]={42,6,6,1,125,0,0,0,200};assert(lastN==9&&!memcmp(last,syncS,9));
  SyncItem grouped[6]={{1,100,1000,0},{2,200,1000,0},{3,300,1000,0},{4,400,1000,0},{5,500,1000,0},{6,600,1000,0}};syncMove(grouped,6,true);assert(lastN==44&&last[0]==42&&last[1]==6);for(int i=0;i<6;i++){int k=2+7*i;assert(last[k]==i+1&&last[k+1]==(grouped[i].pos>>8)&&last[k+2]==(grouped[i].pos&255)&&last[k+3]==0&&last[k+4]==0&&last[k+5]==3&&last[k+6]==232);}lastN=0;grouped[5].id=5;syncMove(grouped,6,true);assert(lastN==0&&g_lastErr!=0);grouped[5].id=6;
  pf.family=Family::STS;pf.range=4095;lastN=0;syncMove(grouped,6,true);assert(lastN==50&&last[0]==41&&last[1]==7);
+ // Native highest-speed position mode is distinct from the normalized BENCH
+ // numeric path. Phase BIT3 must explicitly define zero as maximum, not stop.
+ uint16_t raw=99,dead=0;assert(checkedNativePositionSpeed(6,raw,&dead)&&raw==0&&dead==6);
+ configPhase=4;assert(!checkedNativePositionSpeed(6,raw,&dead));configPhase=8;assert(checkedNativePositionSpeed(6,raw,&dead)&&raw==0);
+ configEndian=1;assert(!checkedNativePositionSpeed(6,raw,&dead));configEndian=0;
+ configResolution=2;assert(!checkedNativePositionSpeed(6,raw,&dead));configResolution=1;
+ configMode=1;assert(!checkedNativePositionSpeed(6,raw,&dead));configMode=0;configPhase=12;
+ assert(normalizedStsSpeed(0,12,1,0,0,raw)&&raw==0);assert(!normalizedStsSpeed(0,4,1,0,0,raw));
+ assert(normalizedStsSpeed(0,12,1,0,8001,raw)&&raw==8001);assert(normalizedStsSpeed(0,12,1,0,32767,raw)&&raw==32767);assert(!normalizedStsSpeed(0,12,1,0,32768,raw));
+ assert(!normalizedStsSpeed(0,8,1,0,49,raw));assert(normalizedStsSpeed(0,8,1,0,50,raw)&&raw==1);
+ for(auto &v:grouped){v.speed=0;v.acc=0;}lastN=0;g_lastErr=0;syncMove(grouped,6,true);assert(lastN==50&&g_lastErr==0);for(int i=0;i<6;++i){int k=2+8*i;assert(last[k]==i+1&&last[k+1]==0&&last[k+6]==0&&last[k+7]==0);}
+ assert(moveTo(6,381,0,0));assert(lastN==8&&last[0]==41&&last[1]==0&&last[6]==0&&last[7]==0);
  pf.family=Family::STS;assert(moveTo(6,381,1200,30));const uint8_t wantT[]={41,30,125,1,0,0,176,4};assert(lastN==8&&!memcmp(last,wantT,8));
  syncMove(&item,1);const uint8_t syncT[]={41,7,6,30,125,1,0,0,176,4};assert(lastN==10&&!memcmp(last,syncT,10));
  assert(!readFeedback(6,fb,20));assert(fb.pos==32001&&lastReadSize==15);
@@ -61,7 +76,7 @@ int main(){
  clockNow=0;readCount=0;assert(syncReadPos(ids,6,pos,8)==2);assert(clockNow==8&&readCount==2);
  pf.family=Family::STS;pf.range=4095;assert(positionReadBudget(6)==8);
  packets={{{255,255,1,4,0,0,8,0}},{{255,255,2,4,1,0,8,0}},{{255,255,3,4,0,0,32,0}},{{255,255,4,4,0,1,8,0}}};packetIndex=0;assert(syncReadPos(ids,6,pos,8)==2&&pos[0]==2048&&pos[1]==65535&&pos[2]==65535&&pos[3]==2049);
- puts("actual profile/feedback/move/syncMove PASS: ID6 raw0504, custom20..1003, unique endian only, SC09 BE and unchanged STS LE");
+ puts("actual profile/feedback/move/syncMove PASS: native BIT3 raw0 through configuration/ordinary-write/six-axis bytes, normalized8001/32767 and protocol boundary, SC09 BE legacy and STS LE preserved");
 }
 '''
 (root/'profile_packets_generated.cpp').write_text(prefix+'\n'.join(parts)+tests,encoding='utf-8')

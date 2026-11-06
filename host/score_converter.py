@@ -41,12 +41,97 @@ def source_range(selection):
     return fields, tuple(lower), tuple(upper)
 
 
+def export_scope(project):
+    """Resolve one shared source/beat selection without requiring playable notes.
+
+    Source ranges start at the selected measure boundary, including its rests.
+    Unlocatable records remain in scope so they cannot disappear through a filter.
+    """
+    selection = dict(project.get('selection', {}))
+    bpm, start, end = selection.get('bpm', 120), selection.get('start_beat', 0), selection.get('end_beat')
+    if not finite(bpm) or not 10 <= bpm <= 240 or not finite(start) or start < 0:
+        raise ValueError('速度或区间无效')
+    if end is not None and (not finite(end) or end <= start):
+        raise ValueError('结束拍无效')
+    fields, lower, upper = source_range(selection)
+
+    def source_match(item):
+        coordinates = tuple(item.get(field) for field in fields)
+        # A known earlier coordinate can establish that an item is outside even
+        # when a later coordinate is unresolved (for example another page).
+        for bound, less in ((lower, True), (upper, False)):
+            for value, limit in zip(coordinates, bound):
+                if type(value) is not int or value < 1:
+                    break
+                if value != limit:
+                    if (value < limit) == less:
+                        return False
+                    break
+        return True
+
+    source_notes = [note for note in project.get('notes', []) if source_match(note)]
+    if fields:
+        events = [event for event in source_notes + [rest for rest in project.get('rests', []) if source_match(rest)]
+                  if event.get('hand')!='left']
+        lengths = {}
+        for staff in project.get('staves', []):
+            if staff.get('hand')=='left':continue
+            for measure in staff.get('measures', []):
+                length = measure.get('length_beats')
+                if measure.get('timing_resolved') and finite(length) and length > 0:
+                    lengths[(staff.get('id'), measure.get('measure'))] = length
+        right_measures={(m.get('page'),m.get('system'),m.get('measure')):m
+                        for m in project.get('right_hand_timing',{}).get('measures',[])}
+        starts, ends = [], []
+        for event in events:
+            beat = event.get('beat')
+            boundary = event.get('measure_start_beat')
+            if not finite(boundary) and finite(beat) and finite(event.get('measure_beat')):
+                boundary = beat - event['measure_beat']
+            if finite(boundary):
+                starts.append(boundary)
+                right_measure=right_measures.get((event.get('page'),event.get('system'),event.get('measure')))
+                length=(right_measure.get('length_beats') if right_measure is not None else
+                        lengths.get((event.get('staff'), event.get('measure'))))
+                if length is not None:
+                    ends.append(boundary + length)
+            elif finite(beat):
+                starts.append(beat)
+            duration = event.get('duration_beats', event.get('duration'))
+            if finite(beat) and finite(duration) and duration > 0:
+                ends.append(beat + duration)
+        if starts:
+            start = max(start, min(starts))
+        if ends:
+            source_end = max(ends)
+            end = source_end if end is None else min(end, source_end)
+        if end is not None and end <= start:
+            raise ValueError('所选原谱区间与起止拍没有交集')
+    def in_time(note):
+        beat = note.get('beat')
+        if not finite(beat):return True
+        if end is not None and beat >= end:return False
+        if beat >= start:return True
+        # A measured tremolo is a group of attacks throughout its notated span.
+        # Keep its source while selecting an interior segment; automatic export
+        # expands it before filtering the individual performed attacks.
+        span = note.get('tremolo_span_beats')
+        return bool(note.get('tremolo_group') and finite(span) and beat + span > start)
+    notes = [note for note in source_notes if in_time(note)]
+    selection.update(bpm=bpm, start_beat=start, end_beat=end)
+    return dict(selection=selection, notes=notes, start_beat=start, end_beat=end,
+                source_fields=fields, source_start=lower, source_end=upper)
+
+
 def recognize_pdf(path, bpm=120):
     from score_converter_engine import recognize
     if not finite(bpm) or not 10 <= bpm <= 240:
         raise ValueError('BPM须为10至240')
     project = recognize(path)
     project['name'] = Path(path).stem
+    # New PDF imports explicitly opt into an editable practice realization.
+    # Persisted older projects without this field keep their strict behavior.
+    project['performance_policy'] = dict(mode='practice',estimate_unresolved_fingering=True)
     project['selection'] = dict(hand='right', bpm=bpm, start_beat=0, end_beat=None,
                                 range_reviewed=False, repeat_mode='written')
     for note in project['notes']:
@@ -134,6 +219,10 @@ def _performance_segments(project, selection, start, end):
     sections=[]
     for repeat in project.get('repeat_sections',[]):
         lo,hi,count=repeat.get('start_beat'),repeat.get('end_beat'),repeat.get('count',2)
+        section_end=repeat.get('second_ending_end_beat')
+        if section_end is None:section_end=hi
+        if finite(lo) and finite(section_end) and (section_end<=start or lo>=end):
+            continue
         if not finite(lo) or not finite(hi) or lo<0 or hi<=lo or type(count) is not int or not 2<=count<=10:
             raise ValueError('反复区间或次数无效')
         first,second=repeat.get('first_ending_start_beat'),repeat.get('second_ending_end_beat')
@@ -169,18 +258,15 @@ def _performance_segments(project, selection, start, end):
 
 
 def export_reviewed(project):
-    selection = project.get('selection', {})
+    scope = export_scope(project)
+    selection = scope['selection']
     if selection.get('range_reviewed') is not True:
         raise ValueError('请对照原谱确认所选区间没有漏音，再导出')
     bpm, start, end = selection.get('bpm', 120), selection.get('start_beat', 0), selection.get('end_beat')
-    if not finite(bpm) or not 10 <= bpm <= 240 or not finite(start) or start < 0:
-        raise ValueError('速度或区间无效')
-    if end is not None and (not finite(end) or end <= start):
-        raise ValueError('结束拍无效')
     source_fields, source_start, source_end = source_range(selection)
     records = []
     errors = []
-    for note in project.get('notes', []):
+    for note in scope['notes']:
         if note.get('excluded') is True:
             continue
         if note.get('hand') == 'left':
@@ -236,16 +322,18 @@ def export_reviewed(project):
                 raise ValueError('跨越反复边界的持续音需要人工整理')
             occurrence+=1
             source=record['source']
-            note=dict(t_ms=round((played+record['beat']-lo)*60000/bpm),
-                      duration_ms=round(record['duration']*60000/bpm),pitch=record['pitch'],
+            onset = played + record['beat'] - lo
+            start_ms = round(onset * 60000 / bpm)
+            note=dict(t_ms=start_ms,
+                      duration_ms=round((onset+record['duration'])*60000/bpm)-start_ms,pitch=record['pitch'],
                       finger=source['finger'],velocity=96,amplitude_pct=100)
             sources=record.get('sources',[source])
             metadata={key:source[key] for key in ('id','page','system','measure','origin','bbox') if key in source}
             metadata.update(t_ms=note['t_ms'],duration_ms=note['duration_ms'],finger=note['finger'],pitch=note['pitch'],
                             source_note_ids=[s.get('id') for s in sources],occurrence=occurrence)
             metadata['source_spans']=[dict({key:s[key] for key in ('id','page','system','measure','origin','bbox') if key in s},
-                t_ms=note['t_ms']+round((s['beat']-source['beat'])*60000/bpm),
-                duration_ms=round(s['duration_beats']*60000/bpm)) for s in sources]
+                t_ms=round((played+s['beat']-lo)*60000/bpm),
+                duration_ms=round((played+s['beat']-lo+s['duration_beats'])*60000/bpm)-round((played+s['beat']-lo)*60000/bpm)) for s in sources]
             exported.append((note,metadata))
     exported.sort(key=lambda pair:(pair[0]['t_ms'],pair[0]['finger']))
     notes=[pair[0] for pair in exported]

@@ -14,7 +14,22 @@ from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 import webbrowser
 
-BUILD_DATE = '20261022'
+BUILD_DATE = '20261030'
+# Both pages share the USB connection. Compare their actual assets before reusing
+# an existing process, including PDF review changes outside software.js.
+WEB_ASSETS = (
+    'software.html', 'software.js', 'software.css', 'software-audio.js',
+    'software-pack.js', 'software-review.js', 'software-review.css',
+    'software-tempo.js', 'software-tempo.css', 'software-upload.js',
+    'software-upload.css', 'web_piano_glove.html', 'delivery-shell.js',
+    'delivery-shell.css', 'delivery-speed-chart.js', 'delivery-speed-chart.css',
+    'delivery-demo.js', 'delivery-mount.js', 'delivery-mount.css',
+    'delivery-validation.js', 'delivery-validation.css', 'usb-driver.js',
+    'usb-driver.css',
+    'guide.html', 'native-transport.js', 'desktop-ui.css', 'desktop-shell.js',
+    'desktop-debug.css', 'desktop-debug.js', 'native-catalog.js', 'desktop-catalog.css',
+    'comic-ui.css', 'comic-art.js', 'comic-shell.js', 'comic-guide.js', 'comic-pages.css', 'proof-coach.js', 'score-list.js', 'reading-lesson.js',
+)
 if sys.stdout is not None and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 if sys.stderr is not None and hasattr(sys.stderr, 'reconfigure'):
@@ -52,18 +67,28 @@ def open_existing(port, expected_serial, page, launch_browser):
     if expected_serial and state.get('fixed') != expected_serial:
         raise RuntimeError('现有调试台连接其他串口，请先关闭其窗口再启动本包。')
     # Do not silently open an old console with incompatible software files.
+    root = resources()
+    opener = build_opener(ProxyHandler({}))
     try:
-        with build_opener(ProxyHandler({})).open('http://127.0.0.1:%d/software.js' % port, timeout=2) as reply:
-            served = reply.read()
+        for name in WEB_ASSETS:
+            with opener.open('http://127.0.0.1:%d/%s' % (port, name), timeout=2) as reply:
+                served = reply.read()
+            expected = (root / name).read_bytes()
+            if served.replace(b'\r\n', b'\n') != expected.replace(b'\r\n', b'\n'):
+                raise RuntimeError('另一版本软件正在运行（%s 不同），请先退出旧版本，再启动本包。' % name)
     except (URLError, OSError) as error:
-        raise RuntimeError('旧版调试台正在运行，请先关闭其黑色窗口，再启动本包。') from error
-    expected = (resources() / 'software.js').read_bytes()
-    if served.replace(b'\r\n', b'\n') != expected.replace(b'\r\n', b'\n'):
-        raise RuntimeError('另一版本调试台正在运行，请先关闭它的黑色窗口，再启动本包。')
+        raise RuntimeError('无法核对已运行的软件版本，请先退出旧版本，再启动本包。') from error
     if launch_browser:
         webbrowser.open('http://127.0.0.1:%d/%s' % (port, page))
     print('已使用正在运行的同版调试台。')
     return True
+
+
+def catalog_source_counts(entries):
+    """Keep document formats and human-authored scores separate in reports."""
+    return dict(bundled_original_documents=len(entries),
+                bundled_original_pdfs=sum(Path(entry.get('file') or '').suffix.lower() == '.pdf' for entry in entries),
+                bundled_manual_scores=sum(entry.get('source_kind') == 'manual' for entry in entries))
 
 
 def self_test():
@@ -76,8 +101,7 @@ def self_test():
     from usb_driver import get_driver_status
     from score_codec import encode, decode
     asset_root = resources()
-    required = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'software-tempo.js', 'software-tempo.css', 'software-upload.js', 'software-upload.css', 'web_piano_glove.html',
-                'delivery-demo.js', 'delivery-shell.js', 'delivery-shell.css', 'usb-driver.js', 'usb-driver.css']
+    required = WEB_ASSETS
     for name in required:
         if not (asset_root / name).is_file():
             raise RuntimeError('运行文件缺失：' + name)
@@ -104,23 +128,34 @@ def self_test():
         if not data.startswith(b'\x89PNG\r\n\x1a\n'):
             raise RuntimeError('PDF 页面不是 PNG')
     driver = get_driver_status(list(serial.tools.list_ports.comports()), refresh=True)
+    from score_catalog import ScoreCatalog
+    catalog = ScoreCatalog(asset_root / 'assets' / 'score-library')
+    bundled = catalog.list()
+    for entry in bundled:
+        catalog.read(entry['id'])
+        if entry.get('source_kind') == 'manual':
+            catalog.project(entry['id'])
     output = dict(ok=True, build_date=BUILD_DATE, python=sys.version.split()[0],
                   serial_version=serial.__version__, pdfium_version=importlib.metadata.version('pypdfium2'),
                   pypdf_version=importlib.metadata.version('pypdf'),
                   assets=len(required), pgl_roundtrip=True, pdf_pipeline=True,
-                  pdf_preview_png=True, driver_helper=True, driver_diagnostics=driver['state'], serial_opened=False)
+                  pdf_preview_png=True, driver_helper=True, driver_diagnostics=driver['state'], serial_opened=False,
+                  **catalog_source_counts(bundled), manual_pdf_holdouts=len(catalog.manifest['holdout_ids']))
     print(json.dumps(output, ensure_ascii=False))
     return output
 
 
-def serve(args):
+def serve(args, on_ready=None):
     import bridge
     # The staged frozen bridge redirects recording writes here. The source
     # bridge keeps its usual recording path; no source bridge patch is needed.
     bridge.HOST_DIR = str(resources())
     bridge.RUNTIME_DATA_DIR = str(data_directory())
     page = 'web_piano_glove.html?simple=1' if args.debug else 'software.html'
+    url = 'http://127.0.0.1:%d/%s' % (args.port, page)
     if open_existing(args.port, args.url, page, not args.no_open):
+        if on_ready:
+            on_ready(None, None, url)
         return
     session = bridge.Bridge(url=args.url, baud=args.baud, auto=not args.no_auto)
     server = None
@@ -128,17 +163,22 @@ def serve(args):
         server = ThreadingHTTPServer(('127.0.0.1', args.port), bridge.make_handler(session))
         server.daemon_threads = True
         threading.Thread(target=session._autoloop, name='pg-auto', daemon=True).start()
-        url = 'http://127.0.0.1:%d/%s' % (args.port, page)
         print('钢琴手套 · 软件测试版 ' + BUILD_DATE)
         print('页面：' + url)
         print('记录：' + str(data_directory()))
-        print('请保留此窗口。退出前在网页点“停止”；Ctrl+C 关闭本程序。')
+        print('关闭启动窗口退出本程序；独立手机播放不受本程序退出影响。')
+        if on_ready:
+            on_ready(server, session, url)
         if not args.no_open:
             threading.Timer(.8, lambda: webbrowser.open(url)).start()
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        # Stop discovery before releasing USB, so the auto loop cannot reopen
+        # the port after cleanup. This does not stop a run owned by the phone.
+        session._stop = True
+        session.paused = True
         if session.connected:
             try:
                 # Closing an idle USB program must leave independent phone
@@ -152,8 +192,8 @@ def serve(args):
             server.server_close()
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description='钢琴手套 Windows 软件训练测试版')
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser(description='钢琴手套 Windows 电脑软件')
     parser.add_argument('--port', type=int, default=8123, help='本地网页端口，默认8123')
     parser.add_argument('--url', help='指定串口，例如COM3；省略时自动发现，也可在校准页选择')
     parser.add_argument('--baud', type=int, default=115200)
@@ -162,6 +202,7 @@ def main(argv=None):
     parser.add_argument('--debug', action='store_true', help='先打开调试和校准页')
     parser.add_argument('--self-test', action='store_true', help='只检查运行文件和PDF模块，不打开串口')
     parser.add_argument('--list-ports', action='store_true', help='只列出USB串口，不打开串口')
+    parser.add_argument('--report', help='将自检或串口清单写入指定的绝对JSON文件路径')
     args = parser.parse_args(argv)
     if not 1024 <= args.port <= 65535:
         parser.error('网页端口须为1024至65535')
@@ -169,14 +210,38 @@ def main(argv=None):
         parser.error('请指定COM串口，例如COM3')
     if args.url:
         args.url = args.url.upper()
-    if args.self_test:
-        return self_test()
-    if args.list_ports:
-        from serial.tools import list_ports
-        print(json.dumps([dict(port=p.device, description=p.description, vid=p.vid, pid=p.pid)
-                          for p in list_ports.comports()], ensure_ascii=False, indent=2))
-        return
-    return serve(args)
+    if args.report and (not (args.self_test or args.list_ports) or not Path(args.report).is_absolute()):
+        parser.error('--report 须与 --self-test 或 --list-ports 一起使用，并指定绝对路径')
+    return args
+
+
+def write_report(path, output):
+    if path:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(output, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+
+def run(args):
+    try:
+        if args.self_test:
+            output = self_test()
+        elif args.list_ports:
+            from serial.tools import list_ports
+            output = [dict(port=p.device, description=p.description, vid=p.vid, pid=p.pid)
+                      for p in list_ports.comports()]
+            print(json.dumps(output, ensure_ascii=False, indent=2))
+        else:
+            return serve(args)
+    except Exception as error:
+        write_report(args.report, dict(ok=False, build_date=BUILD_DATE, error=str(error)))
+        raise
+    write_report(args.report, output)
+    return output
+
+
+def main(argv=None):
+    return run(parse_arguments(argv))
 
 
 if __name__ == '__main__':

@@ -258,6 +258,14 @@ bool checkedBenchSpeed(uint8_t id,uint16_t speed,uint16_t &raw,uint16_t *actual)
  return true;
 }
 
+bool checkedNativePositionSpeed(uint8_t id,uint16_t &raw,uint16_t *deadband){
+ if(profile().family!=Family::STS)return false;
+ uint8_t config[32];if(!readRegs(id,2,sizeof(config),config)||lastError())return false;
+ if(!nativeStsPositionSpeed(config[0],config[16],config[28],config[31],raw))return false;
+ if(deadband)*deadband=(config[24]>config[25]?config[24]:config[25])+1;
+ return true;
+}
+
 bool setTorque(uint8_t id, bool on) {
   const uint8_t v = on ? 1 : 0;
   return writeRegs(id, REG_TORQUE_EN, &v, 1);
@@ -286,7 +294,7 @@ void syncMove(const SyncItem *items, int n, bool benchRaw) {
   if(n<=0)return;
   if(n>8)n=8;
   const bool scs=profile().family==Family::SCS;
-  if(benchRaw){uint8_t seen=0;if((!scs&&profile().family!=Family::STS)||n>6){g_lastErr=255;return;}for(int i=0;i<n;++i){const auto &v=items[i];if(v.id<1||v.id>6||v.pos>profile().range||v.speed<(scs?50:1)||v.speed>(scs?1000:8000)||(seen&(1u<<(v.id-1)))){g_lastErr=255;return;}seen|=1u<<(v.id-1);}}
+  if(benchRaw){uint8_t seen=0;if((!scs&&profile().family!=Family::STS)||n>6){g_lastErr=255;return;}for(int i=0;i<n;++i){const auto &v=items[i];if(v.id<1||v.id>6||v.pos>profile().range||(scs&&v.speed<50)||v.speed>(scs?1000:32767)||(seen&(1u<<(v.id-1)))){g_lastErr=255;return;}seen|=1u<<(v.id-1);}}
   uint8_t p[2+8*8];int k=0;p[k++]=scs?42:41;p[k++]=scs?6:7;
   for(int i=0;i<n;++i){
     uint8_t data[8];uint8_t size;
@@ -299,10 +307,13 @@ void syncMove(const SyncItem *items, int n, bool benchRaw) {
 
 uint16_t positionReadBudget(int n){return profile().family==Family::SCS?(uint16_t)(n*RESP_TIMEOUT_MS):8;}
 
-int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
+int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs,int16_t *velocity,uint8_t *moving) {
   if (n <= 0) return 0;
   if (n > 16) n = 16;
   for (int i = 0; i < n; ++i) pos[i] = 0xFFFF;
+  const uint8_t width=(velocity||moving)?11:2;
+  if(velocity)for(int i=0;i<n;++i)velocity[i]=0;
+  if(moving)for(int i=0;i<n;++i)moving[i]=255;
   if(profile().family==Family::SCS){
     // SCSCL SDK provides per-ID READ; do not assume STS broadcast SYNC_READ support.
     int got=0;const uint32_t start=millis();
@@ -310,10 +321,10 @@ int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
       const uint32_t used=millis()-start;if(used>=timeoutMs)break;
       uint16_t remaining=(uint16_t)(timeoutMs-used);
       const uint16_t budget=remaining<RESP_TIMEOUT_MS?remaining:RESP_TIMEOUT_MS;
-      uint8_t d[2];
-      if(readRegs(ids[i],REG_PRES_POS_L,2,d,budget)&&lastError()==0){
+      uint8_t d[11]={};
+      if(readRegs(ids[i],REG_PRES_POS_L,width,d,budget)&&lastError()==0){
         const uint16_t value=servoWord(d,true);
-        if(value<=profile().range){pos[i]=value;++got;}
+        if(value<=profile().range){pos[i]=value;if(velocity)velocity[i]=int16_t(servoWord(d+2,true));if(moving)moving[i]=d[10];++got;}
       }
     }
     return got;
@@ -322,7 +333,7 @@ int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
   uint8_t p[2 + 16];
   int     k = 0;
   p[k++] = REG_PRES_POS_L;          // 56
-  p[k++] = 2;                       // 每次读 2 字节（位置）
+  p[k++] = width;                   // Position alone, or position/speed/native moving in one frame.
   for (int i = 0; i < n; ++i) p[k++] = ids[i];
 
   uint8_t       pkt[40];
@@ -343,12 +354,14 @@ int syncReadPos(const uint8_t *ids, int n, uint16_t *pos, uint16_t timeoutMs) {
     if (spent >= timeoutMs) break;
     int rl = 0;
     if (!readPacket(0xFF, r, rl, (uint16_t)(timeoutMs - spent))) break;   // 0xFF = 收谁的都行
-    if (rl != 8 || r[4]!=0) continue;
+    if (rl != width+6 || r[4]!=0) continue;
     for (int i = 0; i < n; ++i) {
       if (ids[i] == r[2] && pos[i] == 0xFFFF) {
         const uint16_t value=(uint16_t)(r[5] | ((uint16_t)r[6] << 8));
         if(value>profile().range)continue;
         pos[i] = value;
+        if(velocity){const uint16_t v=servoWord(r+7,false);velocity[i]=(v&0x8000)?-int16_t(v&0x7fff):int16_t(v);}
+        if(moving)moving[i]=r[15];
         ++got;
         break;
       }

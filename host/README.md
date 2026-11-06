@@ -1,5 +1,7 @@
 # host · PC 侧上位机与调试工具
 
+当前单 EXE 通过 `desktop_runtime.py` / `native_window.py` 在窗口内使用进程内 API；无需开启本机 HTTP 网页端口。本文下面保留源码调试与历史协议说明；R7 及之后的统一入口见[软件接口](../docs/SOFTWARE-INTERFACES.md)和[构建/部署](../docs/DELIVERY-BUILD-AND-DEPLOY.md)，客户使用见[运行说明](../docs/客户软件测试包_启动说明.md)。
+
 通过 USB 串口（CP2102，**115200 8N1**）与主控板上的 `PIANO_GLOVE_1` 固件通信。
 
 > 协议细节见 [../docs/handoff-2026-09-17.md](../docs/handoff-2026-09-17.md#2-固件-piano_glove_1-命令协议核心)。

@@ -56,7 +56,7 @@ class VectorPage:
         if page.get_rotation() or abs(left)>1e-4 or abs(bottom)>1e-4:
             raise ValueError('此 PDF 的旋转或裁切坐标需要先恢复为普通竖向页面')
 
-    def chars(self):
+    def chars(self, music_only=True):
         result=[]
         with closing(self.page.get_textpage()) as text:
             for index in range(text.count_chars()):
@@ -66,7 +66,8 @@ class VectorPage:
                     continue
                 buffer=ctypes.create_string_buffer(length)
                 raw.FPDFText_GetFontInfo(text,index,buffer,length,flags)
-                if buffer.value.decode('utf-8',errors='replace').split('+')[-1] != 'Aloisen':
+                font=buffer.value.decode('utf-8',errors='replace').split('+')[-1]
+                if music_only and font != 'Aloisen':
                     continue
                 unicode_value=raw.FPDFText_GetUnicode(text,index)
                 if not unicode_value or raw.FPDFText_IsGenerated(text,index):
@@ -89,7 +90,7 @@ class VectorPage:
                 raw.FPDFText_GetFillColor(text,index,red,green,blue,alpha)
                 result.append(dict(char=chr(unicode_value),x=x.value,y=self.rect.height-y.value,
                                    bbox=[left,self.rect.height-top,right,self.rect.height-bottom],
-                                   size=size,color=(red.value<<16)|(green.value<<8)|blue.value))
+                                   size=size,font=font,color=(red.value<<16)|(green.value<<8)|blue.value))
         return result
 
     def geometry(self):

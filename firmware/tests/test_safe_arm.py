@@ -28,6 +28,8 @@ const int REG_TORQUE_EN=40;
 bool torque[6];int goals[6];int writes=0,enables=0,safeCount=0;
 int edgePosition=-1;
 bool hardwareOutside=false,prewriteHardwareOutside=false,configFailed=false;int configReads=0;
+bool nativeConfigOk=true;int nativeReads=0;uint16_t goalSpeeds[6]={};uint8_t goalAcc[6]={};int sampleAtGoal[6]={},lastFeedback[6]={};
+bool checkedNativePositionSpeed(uint8_t,uint16_t&raw,uint16_t*deadband=nullptr){++nativeReads;raw=0;if(deadband)*deadband=6;return nativeConfigOk;}
 bool slack=false,prewriteOutside=false,settleTransient=false,settlePersistent=false,settleOutside=false,engagementTransient=false,enableTransient=false,enablePersistent=false;int feedbackReads[6]={};
 bool autoEnable=false;int autoEnableId=-1;int implicitEnables=0;bool missingAck=false;bool badGoal=false,badOff=false,drift=false,outside=false;int failedEnable=-1;
 const Profile &profile(){return pf;}int posTol(){return pf.family==Family::SCS?6:24;}
@@ -38,8 +40,8 @@ bool readRegs(uint8_t id,uint8_t addr,uint8_t n,uint8_t *out){
  out[2]=pf.family==Family::SCS?v>>8:v&255;out[3]=pf.family==Family::SCS?v&255:v>>8;}
  return true;
 }
-bool readFeedback(uint8_t id,Feedback &fb){int i=id-1;int n=++feedbackReads[i];fb.pos=edgePosition>=0?edgePosition:hardwareOutside||(prewriteHardwareOutside&&n>1)?1005:outside||(prewriteOutside&&n>1)||(settleOutside&&n>=4)?1021:(drift&&torque[i]?481:((settleTransient&&n==4)||(engagementTransient&&n>=3&&n<=4)||(enableTransient&&n>=7&&n<=8)||(enablePersistent&&n>=7)||(settlePersistent&&n>=4)?390:(slack&&n>1?401:381)));return true;}
-bool moveTo(uint8_t id,uint16_t p,uint16_t,uint8_t){assert(!torque[id-1]);goals[id-1]=p;++writes;if(autoEnable&&(autoEnableId<0||id==autoEnableId)){torque[id-1]=true;++implicitEnables;}return !missingAck;}
+bool readFeedback(uint8_t id,Feedback &fb){int i=id-1;int n=++feedbackReads[i];fb.pos=edgePosition>=0?edgePosition:hardwareOutside||(prewriteHardwareOutside&&n>1)?1005:outside||(prewriteOutside&&n>1)||(settleOutside&&n>=4)?1021:(drift&&torque[i]?481:((settleTransient&&n==4)||(engagementTransient&&n>=3&&n<=4)||(enableTransient&&n>=7&&n<=8)||(enablePersistent&&n>=7)||(settlePersistent&&n>=4)?390:(slack&&n>1?401:381)));lastFeedback[i]=fb.pos;return true;}
+bool moveTo(uint8_t id,uint16_t p,uint16_t speed,uint8_t acc){assert(!torque[id-1]);goals[id-1]=p;goalSpeeds[id-1]=speed;goalAcc[id-1]=acc;sampleAtGoal[id-1]=lastFeedback[id-1];++writes;if(autoEnable&&(autoEnableId<0||id==autoEnableId)){torque[id-1]=true;++implicitEnables;}return !missingAck;}
 bool setTorque(uint8_t id,bool on){if(on){assert(writes==6);assert(goals[id-1]==(edgePosition>=0?(edgePosition<g_slot[id-1].lo?g_slot[id-1].lo:(edgePosition>g_slot[id-1].hi?g_slot[id-1].hi:edgePosition)):(slack?401:381)));++enables;if(id==failedEnable)return false;}torque[id-1]=on;return true;}
 }
 void safe(){++scs::safeCount;g_armed=false;for(int i=0;i<6;++i)scs::torque[i]=false;}

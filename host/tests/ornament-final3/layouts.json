@@ -1,0 +1,195 @@
+{
+  "evidence": [
+    {
+      "width": 960,
+      "height": 680,
+      "scroll": 680,
+      "client": 680,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 133,
+          "bottom": 354.8125,
+          "scroll": 222,
+          "client": 222
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 944,
+          "top": 360.8125,
+          "bottom": 610,
+          "scroll": 247,
+          "client": 247
+        },
+        "review-performance-controls": {
+          "visible": true,
+          "left": 338,
+          "right": 622,
+          "top": 427.8125,
+          "bottom": 529.8125,
+          "scroll": 100,
+          "client": 100
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 472,
+          "right": 617,
+          "top": 432.8125,
+          "bottom": 457.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 343,
+          "right": 431.65625,
+          "top": 497.8125,
+          "bottom": 524.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 728,
+          "right": 814,
+          "top": 572.40625,
+          "bottom": 601.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 822,
+          "right": 934,
+          "top": 571.8125,
+          "bottom": 602,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 692.40625,
+          "right": 760.40625,
+          "top": 622,
+          "bottom": 652,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "options": [
+        {
+          "value": "",
+          "text": "自动：颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "text": "下波音"
+        },
+        {
+          "value": "trill",
+          "text": "颤音"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "scroll": 800,
+      "client": 800,
+      "fields": {
+        "review-score-region": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 133,
+          "bottom": 474.8125,
+          "scroll": 342,
+          "client": 342
+        },
+        "review-inspector": {
+          "visible": true,
+          "left": 16,
+          "right": 1264,
+          "top": 480.8125,
+          "bottom": 730,
+          "scroll": 247,
+          "client": 247
+        },
+        "review-performance-controls": {
+          "visible": true,
+          "left": 444.65625,
+          "right": 835.328125,
+          "top": 547.8125,
+          "bottom": 635.8125,
+          "scroll": 86,
+          "client": 86
+        },
+        "review-performance-interpretation": {
+          "visible": true,
+          "left": 685.328125,
+          "right": 830.328125,
+          "top": 552.8125,
+          "bottom": 577.8125,
+          "scroll": 23,
+          "client": 23
+        },
+        "review-performance-auto": {
+          "visible": true,
+          "left": 449.65625,
+          "right": 573.875,
+          "top": 603.8125,
+          "bottom": 630.8125,
+          "scroll": 25,
+          "client": 25
+        },
+        "review-exclude-note": {
+          "visible": true,
+          "left": 1048,
+          "right": 1134,
+          "top": 692.40625,
+          "bottom": 721.40625,
+          "scroll": 27,
+          "client": 27
+        },
+        "review-next-problem": {
+          "visible": true,
+          "left": 1142,
+          "right": 1254,
+          "top": 691.8125,
+          "bottom": 722,
+          "scroll": 28,
+          "client": 28
+        },
+        "export": {
+          "visible": true,
+          "left": 1012.40625,
+          "right": 1080.40625,
+          "top": 742,
+          "bottom": 772,
+          "scroll": 28,
+          "client": 28
+        }
+      },
+      "options": [
+        {
+          "value": "",
+          "text": "自动：颤音"
+        },
+        {
+          "value": "mordent_lower",
+          "text": "下波音"
+        },
+        {
+          "value": "trill",
+          "text": "颤音"
+        }
+      ]
+    }
+  ],
+  "source_unchanged": true,
+  "ordinary_trill_no_extra_menu": true,
+  "page_errors": []
+}

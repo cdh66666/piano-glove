@@ -104,7 +104,13 @@ def _scan_windows_devices():
             result = config.CM_Get_DevNode_Status(ctypes.byref(flags), ctypes.byref(problem), info.DevInst, 0)
             device = {'name': names[0] if names else 'CP2102 USB to UART Bridge Controller',
                       'problem_code': int(problem.value) if result == 0 else None}
-            driver_keys = property_strings(info, 9, optional=True)  # SPDRP_DRIVER
+            try:
+                driver_keys = property_strings(info, 9)  # SPDRP_DRIVER; absent is ERROR_INVALID_DATA.
+                device['driver_assigned'] = bool(driver_keys)
+            except OSError:
+                # An unreadable optional property is unknown, never proof that
+                # a driver is missing; retain the Config Manager diagnosis.
+                driver_keys = []
             version = _read_driver_version(driver_keys[0]) if driver_keys else None
             if version:
                 device['driver_version'] = version
@@ -129,6 +135,7 @@ def classify_driver_status(devices, ports=(), error=None):
     # Keep only public diagnostics. Hardware instance IDs may contain a unique serial.
     devices = [dict(name=str(v.get('name') or 'CP210x USB 主控'),
                     problem_code=v.get('problem_code'),
+                    **({'driver_assigned': v['driver_assigned']} if type(v.get('driver_assigned')) is bool else {}),
                     **({'driver_version': str(v['driver_version'])}
                        if re.fullmatch(r'\d+(?:\.\d+){1,3}', str(v.get('driver_version', ''))) else {}))
                for v in devices or ()]
@@ -148,12 +155,13 @@ def classify_driver_status(devices, ports=(), error=None):
         result.update(state='unplugged', title='尚未检测到主控 USB',
                       message='请连接主控 USB 数据线；若设备管理器出现黄色感叹号，可查看驱动安装说明。')
     else:
-        missing = next((v for v in devices if v['problem_code'] == 28), None)
+        missing = next((v for v in devices if v['problem_code'] == 28 or
+                        v.get('driver_assigned') is False and v['problem_code'] == 0), None)
         failed = next((v for v in devices if v['problem_code'] not in (None, 0)), None)
         if missing:
             result.update(state='missing_driver', title='已找到主控，但尚未安装串口驱动',
-                          message='Windows 已检测到 CP2102（错误代码 28）。请安装 Silicon Labs CP210x 驱动，再点击重新检测。',
-                          problem_code=28)
+                          message='Windows 已检测到 CP2102，但尚未绑定 Silicon Labs 串口驱动。点击安装驱动即可自动连接。',
+                          problem_code=missing['problem_code'])
         elif failed:
             result.update(state='device_error', title='主控 USB 驱动或设备异常',
                           message='Windows 报告设备错误代码 '+str(failed['problem_code'])+'。请检查设备管理器中的设备状态；这不一定是缺少驱动。',

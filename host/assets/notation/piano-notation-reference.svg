@@ -1,0 +1,1230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2240" height="5424" viewBox="0 0 2240 5424" role="img" aria-labelledby="chart-title chart-desc" lang="zh-CN">
+<title id="chart-title">钢琴特殊音型与奏法速查表：24项符号、弹法与时值</title>
+<desc id="chart-desc">包含长短倚音、复倚音、后倚音、上下波音、顺逆回音、颤音、琶音、分解和弦、滑音、震音、连音组、附点、切分、延音线、连音线、延长记号、跳音、保持音、重音、八度移位、踏板，以及倚音拍上拍前的时间条和截图音长输入解释。</desc>
+<metadata>{&quot;title&quot;:&quot;钢琴特殊音型与奏法速查表&quot;,&quot;items&quot;:24,&quot;created&quot;:&quot;2026-10-28&quot;,&quot;scope&quot;:&quot;Chinese piano notation reference with grace-note timing diagrams&quot;,&quot;sources&quot;:[{&quot;title&quot;:&quot;MuseScore · Grace notes&quot;,&quot;url&quot;:&quot;https://handbook.musescore.org/notation/expressive-markings/grace-notes&quot;},{&quot;title&quot;:&quot;Gehrkens · 装饰音，第 22–26 页&quot;,&quot;url&quot;:&quot;https://www.ibiblio.org/guruguha/MusicResearchLibrary/Books-English/BkE-GehrkensKW-Music%20Notation%26Terminology-0027.pdf&quot;},{&quot;title&quot;:&quot;Dorico · Tremolos&quot;,&quot;url&quot;:&quot;https://www.steinberg.help/r/dorico-se/6.2/en/dorico/topics/notation_reference/notation_reference_tremolos/notation_reference_tremolos_c.html&quot;},{&quot;title&quot;:&quot;LilyPond · Acciaccatura&quot;,&quot;url&quot;:&quot;https://lilypond.org/doc/v2.26/Documentation/music-glossary/acciaccatura&quot;}],&quot;musicGlyphs&quot;:&quot;Bravura, Steinberg Media Technologies GmbH; SIL Open Font License 1.1. Selected outlines embedded; no external font required.&quot;,&quot;fontLicense&quot;:&quot;Copyright © 2026, Steinberg Media Technologies GmbH (http://www.steinberg.net/),\nwith Reserved Font Name \&quot;Bravura\&quot;.\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license is copied below, and is also available with a FAQ at:\nhttp://scripts.sil.org/OFL\n\n-----------------------------------------------------------\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n\nPREAMBLE\nThe goals of the Open Font License (OFL) are to stimulate worldwide\ndevelopment of collaborative font projects, to support the font creation\nefforts of academic and linguistic communities, and to provide a free and\nopen framework in which fonts may be shared and improved in partnership\nwith others.\n\nThe OFL allows the licensed fonts to be used, studied, modified and\nredistributed freely as long as they are not sold by themselves. The\nfonts, including any derivative works, can be bundled, embedded,\nredistributed and/or sold with any software provided that any reserved\nnames are not used by derivative works. The fonts and derivatives,\nhowever, cannot be released under any other type of license. The\nrequirement for fonts to remain under this license does not apply\nto any document created using the fonts or their derivatives.\n\nDEFINITIONS\n\&quot;Font Software\&quot; refers to the set of files released by the Copyright\nHolder(s) under this license and clearly marked as such. This may\ninclude source files, build scripts and documentation.\n\n\&quot;Reserved Font Name\&quot; refers to any names specified as such after the\ncopyright statement(s).\n\n\&quot;Original Version\&quot; refers to the collection of Font Software components as\ndistributed by the Copyright Holder(s).\n\n\&quot;Modified Version\&quot; refers to any derivative made by adding to, deleting,\nor substituting -- in part or in whole -- any of the components of the\nOriginal Version, by changing formats or by porting the Font Software to a\nnew environment.\n\n\&quot;Author\&quot; refers to any designer, engineer, programmer, technical\nwriter or other person who contributed to the Font Software.\n\nPERMISSION AND CONDITIONS\nPermission is hereby granted, free of charge, to any person obtaining\na copy of the Font Software, to use, study, copy, merge, embed, modify,\nredistribute, and sell modified and unmodified copies of the Font\nSoftware, subject to the following conditions:\n\n1) Neither the Font Software nor any of its individual components,\nin Original or Modified Versions, may be sold by itself.\n\n2) Original or Modified Versions of the Font Software may be bundled,\nredistributed and/or sold with any software, provided that each copy\ncontains the above copyright notice and this license. These can be\nincluded either as stand-alone text files, human-readable headers or\nin the appropriate machine-readable metadata fields within text or\nbinary files as long as those fields can be easily viewed by the user.\n\n3) No Modified Version of the Font Software may use the Reserved Font\nName(s) unless explicit written permission is granted by the corresponding\nCopyright Holder. This restriction only applies to the primary font name as\npresented to the users.\n\n4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font\nSoftware shall not be used to promote, endorse or advertise any\nModified Version, except to acknowledge the contribution(s) of the\nCopyright Holder(s) and the Author(s) or with their explicit written\npermission.\n\n5) The Font Software, modified or unmodified, in part or in whole,\nmust be distributed entirely under this license, and must not be\ndistributed under any other license. The requirement for fonts to\nremain under this license does not apply to any document created\nusing the Font Software.\n\nTERMINATION\nThis license becomes null and void if any of the above conditions are\nnot met.\n\nDISCLAIMER\nTHE FONT SOFTWARE IS PROVIDED \&quot;AS IS\&quot;, WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT\nOF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE\nCOPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nINCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM\nOTHER DEALINGS IN THE FONT SOFTWARE.\n&quot;}</metadata>
+<defs><path id="music-clef" d="M376-415C374-427 376-428 382-434C398-449 419-470 438-491C522-583 572-702 572-815C572-902 548-988 507-1048C492-1070 466-1098 455-1098C441-1098 410-1072 390-1050C316-968 292-843 292-739C292-681 299-616 306-575C308-563 309-561 297-551C233-498 164-437 112-373C43-287 0-194 0-87C0 87 119 252 364 252C387 252 413 250 433 246C444 244 446 243 448 255C460 322 475 409 475 456C475 604 375 622 316 622C262 622 236 606 236 593C236 586 245 583 268 576C299 567 335 540 335 482C335 427 300 380 239 380C172 380 132 433 132 495C132 560 171 658 322 658C389 658 519 628 519 458C519 401 501 306 490 244C488 232 489 233 503 227C604 187 671 102 671-11C671-139 577-252 430-252C404-252 404-252 401-270ZM470-943C503-943 530-916 530-861C530-792 497-728 419-650C403-634 379-611 356-591C349-585 345-586 343-599C339-625 337-659 337-691C337-847 409-943 470-943ZM361-262C364-243 364-244 346-238C258-208 201-129 201-44C201 46 248 110 316 133C324 136 336 139 343 139C351 139 355 134 355 128C355 121 347 118 340 115C298 97 268 54 268 8C268-49 307-92 368-109C384-113 386-112 388-101L438 197C440 208 439 208 424 211C408 214 388 216 368 216C193 216 80 119 80-20C80-79 90-158 173-252C233-319 279-356 326-394C336-402 338-401 340-390ZM430-103C428-115 429-118 441-117C522-110 589-42 589 46C589 109 551 160 495 188C483 194 481 194 479 182Z"/>
+<path id="music-trill" d="M266-390C262-390 256-388 253-387L204-371C195-368 191-365 187-355L151-267C147-257 146-255 143-255C139-255 133-260 124-264C110-270 97-273 82-273C35-273 0-245 0-203C0-172 21-146 66-146C78-146 91-148 97-148C99-148 100-147 100-145C100-143 99-140 97-135L86-108C75-81 67-61 67-40C67-12 86 10 124 10C176 10 226-32 226-106C226-130 222-152 213-174C211-179 210-181 210-184C210-190 216-195 232-204L238-207C273-228 297-242 316-242C325-242 329-239 329-227C329-217 326-205 323-198L250-17C248-12 247-9 247-6C247-2 250 0 258 0L307 0C316 0 319-2 323-12L388-174C401-207 433-244 455-244C461-244 465-242 465-238C465-229 443-226 443-198C443-178 458-166 479-166C503-166 521-186 521-221C521-250 506-274 469-274C443-274 422-260 407-243C398-233 397-229 393-229C388-229 392-236 384-251C377-264 362-273 340-273C300-273 262-253 241-242C228-235 222-231 217-231C215-231 214-232 214-234C214-238 217-244 219-249L269-373C271-378 272-381 272-384C272-388 270-390 266-390ZM82-250C94-250 109-246 120-240C129-235 133-231 133-226C133-223 131-218 129-213L125-203C120-190 116-187 103-184C90-181 78-179 68-179C35-179 27-195 27-209C27-227 42-250 82-250ZM189-167C192-167 192-164 194-159C202-141 203-123 203-105C203-61 176-21 147-21C139-21 136-26 136-33C136-41 140-54 144-64C144-65 145-65 183-160C185-165 186-167 189-167Z"/>
+<path id="music-turn" d="M371-218C340-218 315-204 315-174C315-152 330-138 351-138C380-138 381-161 402-161C419-161 435-140 435-114C435-71 405-50 370-50C338-50 305-77 262-125C213-179 169-217 104-217C38-217 0-167 0-103C0-31 46 0 89 0C120 0 145-14 145-44C145-66 130-80 109-80C80-80 79-57 58-57C41-57 25-78 25-104C25-147 55-168 90-168C122-168 155-141 198-93C247-39 291-1 356-1C422-1 460-51 460-115C460-187 414-218 371-218Z"/>
+<path id="music-invertedTurn" d="M86-218C43-218-3-187-3-115C-3-51 35-1 101-1C166-1 210-39 259-93C302-141 335-168 367-168C402-168 432-147 432-104C432-78 416-57 399-57C378-57 377-80 348-80C327-80 312-66 312-44C312-14 337 0 368 0C411 0 457-31 457-103C457-167 419-217 353-217C288-217 244-179 195-125C152-77 119-50 87-50C52-50 22-71 22-114C22-140 38-161 55-161C76-161 77-138 106-138C127-138 142-152 142-174C142-204 117-218 86-218Z"/>
+<path id="music-turnSlash" d="M231-306C219-306 215-301 215-290L215-190C215-179 214-175 210-175C204-175 199-182 181-193C158-207 133-216 104-216C38-216 0-166 0-102C0-30 46 1 89 1C120 1 145-13 145-43C145-65 130-79 109-79C80-79 79-56 58-56C41-56 25-77 25-103C25-146 55-167 90-167C122-167 154-137 198-89C211-75 213-73 213-55L213 74C213 85 217 90 229 90C241 90 245 85 245 74L245-26C245-37 245-41 250-41C256-41 261-34 279-23C302-9 327 0 356 0C422 0 460-50 460-114C460-186 414-217 371-217C340-217 315-203 315-173C315-151 330-137 351-137C380-137 381-160 402-160C419-160 435-139 435-113C435-70 405-49 370-49C338-49 306-79 262-127C249-141 247-143 247-161L247-290C247-301 243-306 231-306Z"/>
+<path id="music-fermata" d="M302-221C515-221 558-63 568-25C569-22 569-19 570-18C577-4 581 3 591 3C600 3 605-1 605-11C605-14 605-17 604-21C542-327 333-329 304-329C272-329 65-327 4-21C3-17 3-13 3-10C3 0 8 3 16 3C25 3 30-4 36-18C37-19 38-23 39-27C51-68 96-221 302-221ZM358-52C358-81 333-106 303-106C274-106 249-81 249-52C249-22 274 3 303 3C333 3 358-22 358-52Z"/>
+<path id="music-shortTrill" d="M298-116L209-226C202-235 196-243 178-245C171-245 165-243 156-236C110-186 61-129 11-73C6-67 0-60 0-50C0-44 5-40 20-40C20-40 20-40 21-40C29-40 38-43 49-53L110-107C113-110 117-111 121-111C126-111 130-107 137-99C141-94 215-17 223-7C227-2 235 0 243 0C251 0 258-2 262-5L370-103C377-109 382-111 385-111C390-111 393-107 401-99C406-94 479-17 488-7C492-2 500 0 508 0C516 0 523-2 527-5C534-11 698-189 711-204C717-212 725-223 725-227C725-230 723-234 719-237C712-242 705-245 698-245C692-245 686-242 680-238C669-229 600-142 589-131C581-124 575-121 570-121C563-121 558-126 553-131C544-140 478-221 468-230C460-238 452-244 445-244C436-244 430-243 421-236C412-228 405-219 398-211C370-180 340-148 308-116C305-112 301-112 298-116Z"/>
+<path id="music-mordent" d="M379-184L379-319L348-319L348-150L319-116C315-111 309-111 305-116C269-158 215-220 210-227C202-235 196-244 179-245C170-245 165-242 157-236L14-74C8-68 1-58 1-51C1-45 6-41 21-41C37-41 51-55 61-65C74-76 86-88 100-99C110-107 117-112 122-112C127-112 131-108 137-100L224-7C228-2 236 0 244 0C251 0 258-2 262-6C272-12 330-65 346-79L346 73L378 73L378-106C382-109 386-111 390-111C395-111 400-108 406-100C410-94 484-17 493-7C497-2 505 0 512 0C520 0 527-2 531-6C539-12 702-190 715-205L717-208C723-214 729-221 729-228C729-231 728-234 724-237C717-242 710-245 703-245C696-245 690-242 685-238C674-229 605-143 593-132C585-125 580-122 575-122C568-122 562-127 557-132C549-140 483-222 473-231C464-239 456-245 448-245C440-245 435-243 426-236C417-229 410-219 403-211Z"/></defs>
+<g font-family="'Microsoft YaHei','Noto Sans CJK SC','PingFang SC',Arial,sans-serif" text-rendering="optimizeLegibility">
+<rect x="0" y="0" width="2240" height="5424" rx="0" fill="#F5F3EE" stroke="none"/>
+<rect x="0" y="0" width="2240" height="230" rx="0" fill="#182C3A" stroke="none"/>
+<text x="64" y="56" font-size="22" font-weight="600" fill="#AAC2CD" letter-spacing="3">PIANO  /  读谱参考</text>
+<text x="64" y="131" font-size="66" font-weight="750" fill="#FFFFFF" >钢琴特殊音型与奏法速查表</text>
+<text x="68" y="185" font-size="28" font-weight="400" fill="#D8E5E9" >从倚音、琶音、颤音开始，看懂符号、弹法和真正的时值。</text>
+<text x="2080" y="129" font-size="104" font-weight="700" fill="#EEC6AB" text-anchor="end" font-family="Arial,sans-serif">24</text>
+<text x="2080" y="179" font-size="24" font-weight="500" fill="#D8E5E9" text-anchor="end">项常见读谱要点</text>
+<rect x="64" y="254" width="2112" height="260" rx="18" fill="#FFFFFF" stroke="#D9E0E3"/>
+<rect x="64" y="254" width="8" height="260" rx="4" fill="#BE572F" stroke="none"/>
+<text x="94" y="301" font-size="31" font-weight="700" fill="#182C3A" >先看你的截图</text>
+<path d="M100 364L445 364" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M100 376L445 376" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M100 388L445 388" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M100 400L445 400" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M100 412L445 412" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(108 400) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(243 420) scale(0.72)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+<path d="M10 -48 C13 -37 33 -35 25 -17 C24 -14 22 -12 20 -10 C26 -29 13 -24 10 -34Z" fill="#BE572F" stroke="none" stroke-width="1" />
+<path d="M0 -23L29 -44" stroke="#BE572F" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+</g>
+<g transform="translate(369 408) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<text x="241" y="366" font-size="20" font-weight="600" fill="#637782" text-anchor="middle">1</text>
+<text x="369" y="337" font-size="22" font-weight="600" fill="#637782" text-anchor="middle">2</text>
+<ellipse cx="252" cy="394" rx="42" ry="51" fill="none" stroke="#BE572F" stroke-width="2.2" stroke-dasharray="5 5"/>
+<text x="100" y="480" font-size="23" font-weight="700" fill="#BE572F" >带斜线的小音符：通常是短倚音</text>
+<path d="M485 284L485 484" stroke="#D9E0E3" stroke-width="1.5" fill="none" />
+<text x="522" y="306" font-size="32" font-weight="700" fill="#182C3A" >小音符的外形，不直接等于实际占拍</text>
+<text x="522" y="354" font-size="25" font-weight="400" fill="#182C3A" >小八分音符不一定弹半拍；短倚音没有固定的“几分之几拍”。</text>
+<text x="522" y="394" font-size="25" font-weight="400" fill="#182C3A" >装饰音通常借用周围音符的时间，不给小节另加拍数。</text>
+<text x="522" y="434" font-size="25" font-weight="400" fill="#182C3A" >截图里音符上方的 1、2、3…通常是指法；它们不是拍数。</text>
+<text x="522" y="476" font-size="23" font-weight="400" fill="#637782" >本表采用常见教学读法；旧版装饰音须结合年代、风格和版本说明。</text>
+<path d="M1455 284L1455 484" stroke="#D9E0E3" stroke-width="1.5" fill="none" />
+<text x="1491" y="306" font-size="28" font-weight="700" fill="#182C3A" >统一读法</text>
+<g transform="translate(1507 361) scale(0.57)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<text x="1530" y="361" font-size="25" font-weight="600" fill="#182C3A" >= 1 拍（本表所有算式）</text>
+<text x="1491" y="401" font-size="24" font-weight="400" fill="#182C3A" >T = 该主音或音组原记谱时值</text>
+<text x="1491" y="441" font-size="24" font-weight="400" fill="#182C3A" >主 = 被装饰的音；上 / 下 = 调内邻音</text>
+<circle cx="1501" cy="476" r="7" fill="#BE572F"/>
+<text x="1520" y="483" font-size="22" font-weight="600" fill="#BE572F" >倚音 / 辅助音</text>
+<circle cx="1747" cy="476" r="7" fill="#285F83"/>
+<text x="1766" y="483" font-size="22" font-weight="600" fill="#285F83" >原谱主音</text>
+<rect x="64" y="540" width="2112" height="64" rx="8" fill="#182C3A" stroke="none"/>
+<text x="88" y="582" font-size="25" font-weight="650" fill="#FFFFFF" >名称</text>
+<text x="338" y="582" font-size="25" font-weight="650" fill="#FFFFFF" >谱面记号 · 局部示例</text>
+<text x="648" y="582" font-size="25" font-weight="650" fill="#FFFFFF" >实际怎样弹</text>
+<text x="1248" y="582" font-size="25" font-weight="650" fill="#FFFFFF" >时值与占拍</text>
+<text x="1758" y="582" font-size="25" font-weight="650" fill="#FFFFFF" >容易弄错的地方</text>
+<rect x="64" y="604" width="2112" height="56" rx="0" fill="#FBF1E9" stroke="none"/>
+<rect x="64" y="604" width="6" height="56" rx="0" fill="#BE572F" stroke="none"/>
+<text x="88" y="642" font-size="29" font-weight="750" fill="#BE572F" >A  装饰音</text>
+<text x="570" y="641" font-size="23" font-weight="400" fill="#637782" >先识别装饰的音，再确定起音与占时。</text>
+<rect x="64" y="660" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="660" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-1" aria-label="长倚音">
+<text x="88" y="690" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">01</text>
+<text x="88" y="736" font-size="30" font-weight="700" fill="#182C3A" >长倚音</text>
+<text x="88" y="771" font-size="18" font-weight="400" fill="#637782" >Appoggiatura</text>
+<path d="M336 729L602 729" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 741L602 741" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 753L602 753" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 765L602 765" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 777L602 777" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 765) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(435 759) scale(0.65)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+<path d="M10 -48 C13 -37 33 -35 25 -17 C24 -14 22 -12 20 -10 C26 -29 13 -24 10 -34Z" fill="#BE572F" stroke="none" stroke-width="1" />
+</g>
+<g transform="translate(494 765) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M433 774Q463.5 791 494 781" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<text x="469" y="807" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">小音符，通常无斜线</text>
+<g class="text-cell" data-box="648,669,552,142">
+<text x="648" y="714" font-size="25" font-weight="650" fill="#182C3A" >倚音 → 主音</text>
+<text x="648" y="748" font-size="25" font-weight="400" fill="#182C3A" >通常从拍点开始；</text>
+<text x="648" y="782" font-size="25" font-weight="400" fill="#182C3A" >先“倚住”，再解决到主音。</text>
+</g>
+<g class="text-cell" data-box="1248,669,462,142">
+<text x="1248" y="716" font-size="24" font-weight="650" fill="#182C3A" >无附点：常见 1/2 T + 1/2 T</text>
+<text x="1248" y="748" font-size="24" font-weight="400" fill="#182C3A" >有附点：常见 2/3 T + 1/3 T</text>
+<text x="1248" y="780" font-size="24" font-weight="400" fill="#182C3A" >例：1 拍 = 1/2 + 1/2</text>
+</g>
+<g class="text-cell" data-box="1758,669,394,142">
+<text x="1758" y="715" font-size="23" font-weight="400" fill="#182C3A" >这是常见传统分法；</text>
+<text x="1758" y="747" font-size="23" font-weight="400" fill="#182C3A" >拍子、乐句与版本可影响分配。</text>
+<text x="1758" y="779" font-size="23" font-weight="400" fill="#182C3A" >无斜线不自动等于长倚音。</text>
+</g>
+<path d="M314 660L314 820" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 660L624 820" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 660L1224 820" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 660L1734 820" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 820L2176 820" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="820" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="820" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-2" aria-label="短倚音">
+<text x="88" y="850" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">02</text>
+<text x="88" y="896" font-size="30" font-weight="700" fill="#182C3A" >短倚音</text>
+<text x="88" y="931" font-size="18" font-weight="400" fill="#637782" >Acciaccatura</text>
+<path d="M336 889L602 889" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 901L602 901" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 913L602 913" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 925L602 925" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 937L602 937" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 925) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(435 919) scale(0.65)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+<path d="M10 -48 C13 -37 33 -35 25 -17 C24 -14 22 -12 20 -10 C26 -29 13 -24 10 -34Z" fill="#BE572F" stroke="none" stroke-width="1" />
+<path d="M0 -23L29 -44" stroke="#BE572F" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+</g>
+<g transform="translate(494 925) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M433 934Q463.5 951 494 941" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<text x="469" y="967" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">小音符 + 斜线（与你截图同类）</text>
+<g class="text-cell" data-box="648,829,552,142">
+<text x="648" y="874" font-size="25" font-weight="650" fill="#182C3A" >倚音 → 主音</text>
+<text x="648" y="908" font-size="25" font-weight="400" fill="#182C3A" >短促带过，通常重在主音。</text>
+<text x="648" y="942" font-size="25" font-weight="400" fill="#182C3A" >可在拍前，也可从拍点开始。</text>
+</g>
+<g class="text-cell" data-box="1248,829,462,142">
+<text x="1248" y="876" font-size="24" font-weight="650" fill="#182C3A" >没有固定“几分之几拍”</text>
+<text x="1248" y="908" font-size="24" font-weight="400" fill="#182C3A" >拍上：ε + (T − ε) = T</text>
+<text x="1248" y="940" font-size="24" font-weight="400" fill="#182C3A" >拍前：从前音或休止借 ε</text>
+</g>
+<g class="text-cell" data-box="1758,829,394,142">
+<text x="1758" y="875" font-size="23" font-weight="400" fill="#182C3A" >小八分外形 ≠ 必弹半拍。</text>
+<text x="1758" y="907" font-size="23" font-weight="400" fill="#182C3A" >ε 是很短的实际时间；</text>
+<text x="1758" y="939" font-size="23" font-weight="400" fill="#182C3A" >由速度、风格和版本决定。</text>
+</g>
+<path d="M314 820L314 980" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 820L624 980" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 820L1224 980" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 820L1734 980" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 980L2176 980" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="980" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="980" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-3" aria-label="复倚音">
+<text x="88" y="1010" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">03</text>
+<text x="88" y="1056" font-size="30" font-weight="700" fill="#182C3A" >复倚音</text>
+<text x="88" y="1091" font-size="18" font-weight="400" fill="#637782" >Two or more grace</text>
+<text x="88" y="1114" font-size="18" font-weight="400" fill="#637782" >notes</text>
+<path d="M336 1049L602 1049" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1061L602 1061" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1073L602 1073" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1085L602 1085" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1097L602 1097" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1085) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(417 1085) scale(0.62)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(455 1079) scale(0.62)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+</g>
+<path d="M423 1055L461 1049L461 1053L423 1059Z" fill="#BE572F" stroke="none" stroke-width="1" />
+<g transform="translate(529 1085) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M416 1099Q472.5 1111 529 1101" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<text x="469" y="1127" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">两个或更多小音符</text>
+<g class="text-cell" data-box="648,989,552,142">
+<text x="648" y="1034" font-size="25" font-weight="650" fill="#182C3A" >倚 1 → 倚 2 → … → 主音</text>
+<text x="648" y="1068" font-size="25" font-weight="400" fill="#182C3A" >按小音符顺序快速奏出。</text>
+<text x="648" y="1102" font-size="25" font-weight="400" fill="#182C3A" >“复”说的是数量，不是时长。</text>
+</g>
+<g class="text-cell" data-box="1248,989,462,142">
+<text x="1248" y="1036" font-size="24" font-weight="650" fill="#182C3A" >整组借用一小段时间，</text>
+<text x="1248" y="1068" font-size="24" font-weight="400" fill="#182C3A" >不按每个小音符另加拍。</text>
+<text x="1248" y="1100" font-size="24" font-weight="400" fill="#182C3A" >若属长倚音，依其分配。</text>
+</g>
+<g class="text-cell" data-box="1758,989,394,142">
+<text x="1758" y="1035" font-size="23" font-weight="400" fill="#182C3A" >两枚小音符 ≠ 二连音。</text>
+<text x="1758" y="1067" font-size="23" font-weight="400" fill="#182C3A" >连成组时可以不画斜线；</text>
+<text x="1758" y="1099" font-size="23" font-weight="400" fill="#182C3A" >须结合风格判断长短。</text>
+</g>
+<path d="M314 980L314 1140" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 980L624 1140" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 980L1224 1140" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 980L1734 1140" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1140L2176 1140" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1140" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1140" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-4" aria-label="后倚音">
+<text x="88" y="1170" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">04</text>
+<text x="88" y="1216" font-size="30" font-weight="700" fill="#182C3A" >后倚音</text>
+<text x="88" y="1251" font-size="18" font-weight="400" fill="#637782" >Grace notes after</text>
+<path d="M336 1209L602 1209" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1221L602 1221" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1233L602 1233" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1245L602 1245" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1257L602 1257" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1245) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(424 1245) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(502 1251) scale(0.62)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(542 1245) scale(0.62)" color="#BE572F">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#BE572F" stroke="#BE572F" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#BE572F" stroke-width="2.6" fill="none" />
+</g>
+<path d="M508 1221L548 1215L548 1219L508 1225Z" fill="#BE572F" stroke="none" stroke-width="1" />
+<path d="M424 1261Q483 1273 542 1260" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<text x="469" y="1287" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">小音符写在所装饰的主音后</text>
+<g class="text-cell" data-box="648,1149,552,142">
+<text x="648" y="1194" font-size="25" font-weight="650" fill="#182C3A" >主音 → 倚 1 → 倚 2</text>
+<text x="648" y="1228" font-size="25" font-weight="400" fill="#182C3A" >主音先响，尾部接短小装饰。</text>
+<text x="648" y="1262" font-size="25" font-weight="400" fill="#182C3A" >常见于颤音等装饰的结尾。</text>
+</g>
+<g class="text-cell" data-box="1248,1149,462,142">
+<text x="1248" y="1196" font-size="24" font-weight="650" fill="#182C3A" >通常分用前面主音的尾部：</text>
+<text x="1248" y="1228" font-size="24" font-weight="400" fill="#182C3A" >主音缩短，装饰接入；</text>
+<text x="1248" y="1260" font-size="24" font-weight="400" fill="#182C3A" >原小节拍数不另加。</text>
+</g>
+<g class="text-cell" data-box="1758,1149,394,142">
+<text x="1758" y="1195" font-size="23" font-weight="400" fill="#182C3A" >“前 / 后”说的是位置。</text>
+<text x="1758" y="1227" font-size="23" font-weight="400" fill="#182C3A" >它与“单 / 复、长 / 短”</text>
+<text x="1758" y="1259" font-size="23" font-weight="400" fill="#182C3A" >不是同一条分类标准。</text>
+</g>
+<path d="M314 1140L314 1300" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1140L624 1300" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1140L1224 1300" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1140L1734 1300" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1300L2176 1300" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1300" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1300" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-5" aria-label="上波音">
+<text x="88" y="1330" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">05</text>
+<text x="88" y="1376" font-size="30" font-weight="700" fill="#182C3A" >上波音</text>
+<text x="88" y="1411" font-size="18" font-weight="400" fill="#637782" >Upper mordent /</text>
+<text x="88" y="1434" font-size="18" font-weight="400" fill="#637782" >short trill</text>
+<path d="M336 1369L602 1369" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1381L602 1381" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1393L602 1393" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1405L602 1405" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1417L602 1417" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1405) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(494 1405) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-shortTrill" transform="translate(460.96938775510205 1350) scale(0.09387755102040816)" fill="#182C3A"/>
+<text x="469" y="1447" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">短波形：常见上波音记法</text>
+<g class="text-cell" data-box="648,1309,552,142">
+<text x="648" y="1354" font-size="25" font-weight="650" fill="#182C3A" >主 → 上 → 主</text>
+<text x="648" y="1388" font-size="25" font-weight="400" fill="#182C3A" >碰一下上邻音，立即回来。</text>
+<text x="648" y="1422" font-size="25" font-weight="400" fill="#182C3A" >例如：sol → la → sol。</text>
+</g>
+<g class="text-cell" data-box="1248,1309,462,142">
+<text x="1248" y="1356" font-size="24" font-weight="650" fill="#182C3A" >常见为短促的三音型，</text>
+<text x="1248" y="1388" font-size="24" font-weight="400" fill="#182C3A" >通常在主音时值内完成；</text>
+<text x="1248" y="1420" font-size="24" font-weight="400" fill="#182C3A" >末尾主音接着保持。</text>
+</g>
+<g class="text-cell" data-box="1758,1309,394,142">
+<text x="1758" y="1355" font-size="23" font-weight="400" fill="#182C3A" >与持续交替的颤音有区别。</text>
+<text x="1758" y="1387" font-size="23" font-weight="400" fill="#182C3A" >旧谱的同形符号可能另有所指，</text>
+<text x="1758" y="1419" font-size="23" font-weight="400" fill="#182C3A" >以版本装饰音表为准。</text>
+</g>
+<path d="M314 1300L314 1460" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1300L624 1460" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1300L1224 1460" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1300L1734 1460" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1460L2176 1460" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1460" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1460" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-6" aria-label="下波音">
+<text x="88" y="1490" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">06</text>
+<text x="88" y="1536" font-size="30" font-weight="700" fill="#182C3A" >下波音</text>
+<text x="88" y="1571" font-size="18" font-weight="400" fill="#637782" >Lower mordent</text>
+<path d="M336 1529L602 1529" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1541L602 1541" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1553L602 1553" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1565L602 1565" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1577L602 1577" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1565) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(494 1565) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-mordent" transform="translate(460.5484693877551 1504.109693877551) scale(0.09438775510204081)" fill="#182C3A"/>
+<text x="469" y="1607" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">波形加竖划：常见下波音记法</text>
+<g class="text-cell" data-box="648,1469,552,142">
+<text x="648" y="1514" font-size="25" font-weight="650" fill="#182C3A" >主 → 下 → 主</text>
+<text x="648" y="1548" font-size="25" font-weight="400" fill="#182C3A" >碰一下下邻音，立即回来。</text>
+<text x="648" y="1582" font-size="25" font-weight="400" fill="#182C3A" >例如：sol → fa → sol。</text>
+</g>
+<g class="text-cell" data-box="1248,1469,462,142">
+<text x="1248" y="1516" font-size="24" font-weight="650" fill="#182C3A" >通常从主音时值内分出</text>
+<text x="1248" y="1548" font-size="24" font-weight="400" fill="#182C3A" >短小的装饰时间；</text>
+<text x="1248" y="1580" font-size="24" font-weight="400" fill="#182C3A" >不额外增加小节拍数。</text>
+</g>
+<g class="text-cell" data-box="1758,1469,394,142">
+<text x="1758" y="1515" font-size="23" font-weight="400" fill="#182C3A" >常见记号中央有竖划。</text>
+<text x="1758" y="1547" font-size="23" font-weight="400" fill="#182C3A" >邻音按调号与临时升降号定，</text>
+<text x="1758" y="1579" font-size="23" font-weight="400" fill="#182C3A" >不固定是半音或全音。</text>
+</g>
+<path d="M314 1460L314 1620" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1460L624 1620" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1460L1224 1620" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1460L1734 1620" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1620L2176 1620" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1620" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1620" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-7" aria-label="顺回音">
+<text x="88" y="1650" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">07</text>
+<text x="88" y="1696" font-size="30" font-weight="700" fill="#182C3A" >顺回音</text>
+<text x="88" y="1731" font-size="18" font-weight="400" fill="#637782" >Turn</text>
+<path d="M336 1689L602 1689" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1701L602 1701" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1713L602 1713" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1725L602 1725" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1737L602 1737" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1725) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(494 1725) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-turn" transform="translate(466 1666) scale(0.11926605504587157)" fill="#182C3A"/>
+<text x="469" y="1767" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">横向回音形</text>
+<g class="text-cell" data-box="648,1629,552,142">
+<text x="648" y="1674" font-size="25" font-weight="650" fill="#182C3A" >上 → 主 → 下 → 主</text>
+<text x="648" y="1708" font-size="25" font-weight="400" fill="#182C3A" >正上方：常直接回转；</text>
+<text x="648" y="1742" font-size="25" font-weight="400" fill="#182C3A" >两音之间：常先主音，再回转。</text>
+</g>
+<g class="text-cell" data-box="1248,1629,462,142">
+<text x="1248" y="1676" font-size="24" font-weight="650" fill="#182C3A" >在相关主音的时值内安排。</text>
+<text x="1248" y="1708" font-size="24" font-weight="400" fill="#182C3A" >四音未必等分，</text>
+<text x="1248" y="1740" font-size="24" font-weight="400" fill="#182C3A" >也不固定占 1 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,1629,394,142">
+<text x="1758" y="1675" font-size="23" font-weight="400" fill="#182C3A" >“顺”不是一直向上弹。</text>
+<text x="1758" y="1707" font-size="23" font-weight="400" fill="#182C3A" >看记号位置及上下方升降号，</text>
+<text x="1758" y="1739" font-size="23" font-weight="400" fill="#182C3A" >再确定起音和邻音。</text>
+</g>
+<path d="M314 1620L314 1780" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1620L624 1780" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1620L1224 1780" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1620L1734 1780" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1780L2176 1780" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1780" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1780" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-8" aria-label="逆回音">
+<text x="88" y="1810" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">08</text>
+<text x="88" y="1856" font-size="30" font-weight="700" fill="#182C3A" >逆回音</text>
+<text x="88" y="1891" font-size="18" font-weight="400" fill="#637782" >Inverted turn</text>
+<path d="M336 1849L602 1849" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1861L602 1861" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1873L602 1873" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1885L602 1885" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 1897L602 1897" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 1885) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(443 1885) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(548 1885) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-invertedTurn" transform="translate(416.35779816513764 1826) scale(0.11926605504587157)" fill="#182C3A"/>
+<use href="#music-turnSlash" transform="translate(527 1821.8181818181818) scale(0.09090909090909091)" fill="#182C3A"/>
+<text x="469" y="1927" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">倒置回音形 / 加竖划的写法</text>
+<g class="text-cell" data-box="648,1789,552,142">
+<text x="648" y="1834" font-size="25" font-weight="650" fill="#182C3A" >下 → 主 → 上 → 主</text>
+<text x="648" y="1868" font-size="25" font-weight="400" fill="#182C3A" >先触下邻音，再绕向上邻音，</text>
+<text x="648" y="1902" font-size="25" font-weight="400" fill="#182C3A" >最后回到主音。</text>
+</g>
+<g class="text-cell" data-box="1248,1789,462,142">
+<text x="1248" y="1836" font-size="24" font-weight="650" fill="#182C3A" >通常借用主音时值。</text>
+<text x="1248" y="1868" font-size="24" font-weight="400" fill="#182C3A" >摆在两音之间时，</text>
+<text x="1248" y="1900" font-size="24" font-weight="400" fill="#182C3A" >常在主音之后接入。</text>
+</g>
+<g class="text-cell" data-box="1758,1789,394,142">
+<text x="1758" y="1835" font-size="23" font-weight="400" fill="#182C3A" >可用倒置的回音形，</text>
+<text x="1758" y="1867" font-size="23" font-weight="400" fill="#182C3A" >也可用带竖划的回音记号；</text>
+<text x="1758" y="1899" font-size="23" font-weight="400" fill="#182C3A" >核对该版本的说明。</text>
+</g>
+<path d="M314 1780L314 1940" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1780L624 1940" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1780L1224 1940" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1780L1734 1940" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 1940L2176 1940" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="1940" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="1940" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-9" aria-label="颤音">
+<text x="88" y="1970" font-size="18" font-weight="650" fill="#BE572F" font-family="Arial,sans-serif" letter-spacing="2">09</text>
+<text x="88" y="2016" font-size="30" font-weight="700" fill="#182C3A" >颤音</text>
+<text x="88" y="2051" font-size="18" font-weight="400" fill="#637782" >Trill</text>
+<path d="M336 2009L602 2009" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2021L602 2021" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2033L602 2033" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2045L602 2045" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2057L602 2057" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2045) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(438 2045) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#FFFFFF" stroke="#285F83" stroke-width="2.4"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-trill" transform="translate(422 1984.25) scale(0.075)" fill="#182C3A"/>
+<path d="M471 1979q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0q3 -7 6 0q3 7 6 0" fill="none" stroke="#182C3A" stroke-width="2.7" />
+<text x="469" y="2087" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">tr 后可接延长波浪线</text>
+<g class="text-cell" data-box="648,1949,552,142">
+<text x="648" y="1994" font-size="25" font-weight="650" fill="#182C3A" >主 ↔ 上 ↔ 主 ↔ 上 …</text>
+<text x="648" y="2028" font-size="25" font-weight="400" fill="#182C3A" >两相邻音快速、持续交替。</text>
+<text x="648" y="2062" font-size="25" font-weight="400" fill="#182C3A" >起音与结尾按风格处理。</text>
+</g>
+<g class="text-cell" data-box="1248,1949,462,142">
+<text x="1248" y="1996" font-size="24" font-weight="650" fill="#182C3A" >持续到该音或延长线终点。</text>
+<text x="1248" y="2028" font-size="24" font-weight="400" fill="#182C3A" >例如原音 2 拍，</text>
+<text x="1248" y="2060" font-size="24" font-weight="400" fill="#182C3A" >整段颤音仍占 2 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,1949,394,142">
+<text x="1758" y="1995" font-size="23" font-weight="400" fill="#182C3A" >不少巴洛克、古典用法</text>
+<text x="1758" y="2027" font-size="23" font-weight="400" fill="#182C3A" >从上邻音开始，不能一概而论。</text>
+<text x="1758" y="2059" font-size="23" font-weight="400" fill="#182C3A" >速度、次数不由 tr 固定。</text>
+</g>
+<path d="M314 1940L314 2100" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 1940L624 2100" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 1940L1224 2100" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 1940L1734 2100" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2100L2176 2100" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2100" width="2112" height="56" rx="0" fill="#EDF4F8" stroke="none"/>
+<rect x="64" y="2100" width="6" height="56" rx="0" fill="#285F83" stroke="none"/>
+<text x="88" y="2138" font-size="29" font-weight="750" fill="#285F83" >B  琶音与快速音型</text>
+<text x="570" y="2137" font-size="23" font-weight="400" fill="#637782" >和弦展开、连续跑动与快速重复，读法各不相同。</text>
+<rect x="64" y="2156" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="2156" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-10" aria-label="琶音记号">
+<text x="88" y="2186" font-size="18" font-weight="650" fill="#285F83" font-family="Arial,sans-serif" letter-spacing="2">10</text>
+<text x="88" y="2232" font-size="30" font-weight="700" fill="#182C3A" >琶音记号</text>
+<text x="88" y="2267" font-size="18" font-weight="400" fill="#637782" >Rolled chord</text>
+<path d="M336 2225L602 2225" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2237L602 2237" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2249L602 2249" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2261L602 2261" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2273L602 2273" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2261) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(440 2273) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(440 2261) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(440 2249) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M411 2244q7 3 0 6q-7 3 0 6q7 3 0 6q-7 3 0 6q7 3 0 6q-7 3 0 6" fill="none" stroke="#BE572F" stroke-width="2.7" />
+<g transform="translate(559 2273) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(559 2261) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(559 2249) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M530 2244q7 3 0 6q-7 3 0 6q7 3 0 6q-7 3 0 6q7 3 0 6q-7 3 0 6" fill="none" stroke="#BE572F" stroke-width="2.7" />
+<path d="M523 2282l7 11l7 -11" fill="none" stroke="#BE572F" stroke-width="3" />
+<text x="469" y="2303" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">普通上行 / 箭头向下则下行</text>
+<g class="text-cell" data-box="648,2165,552,142">
+<text x="648" y="2210" font-size="25" font-weight="650" fill="#182C3A" >低 → 中 → 高（或反向）</text>
+<text x="648" y="2244" font-size="25" font-weight="400" fill="#182C3A" >和弦各音依次进入并保持。</text>
+<text x="648" y="2278" font-size="25" font-weight="400" fill="#182C3A" >无箭头通常由低向高。</text>
+</g>
+<g class="text-cell" data-box="1248,2165,462,142">
+<text x="1248" y="2212" font-size="24" font-weight="650" fill="#182C3A" >整个和弦仍按原时值。</text>
+<text x="1248" y="2244" font-size="24" font-weight="400" fill="#182C3A" >展开速度、哪个音对拍点，</text>
+<text x="1248" y="2276" font-size="24" font-weight="400" fill="#182C3A" >依乐句、风格与谱注处理。</text>
+</g>
+<g class="text-cell" data-box="1758,2165,394,142">
+<text x="1758" y="2211" font-size="23" font-weight="400" fill="#182C3A" >箭头向下时由高向低。</text>
+<text x="1758" y="2243" font-size="23" font-weight="400" fill="#182C3A" >竖波浪线表示展开和弦；</text>
+<text x="1758" y="2275" font-size="23" font-weight="400" fill="#182C3A" >tr 后的横波浪线延续颤音。</text>
+</g>
+<path d="M314 2156L314 2316" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 2156L624 2316" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 2156L1224 2316" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 2156L1734 2316" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2316L2176 2316" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2316" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="2316" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-11" aria-label="分解和弦／琶音音型">
+<text x="88" y="2346" font-size="18" font-weight="650" fill="#285F83" font-family="Arial,sans-serif" letter-spacing="2">11</text>
+<text x="88" y="2383" font-size="30" font-weight="700" fill="#182C3A" >分解和弦</text>
+<text x="88" y="2420" font-size="30" font-weight="700" fill="#182C3A" >／琶音音型</text>
+<text x="88" y="2446" font-size="18" font-weight="400" fill="#637782" >Broken chord /</text>
+<text x="88" y="2469" font-size="18" font-weight="400" fill="#637782" >arpeggio</text>
+<path d="M336 2385L602 2385" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2397L602 2397" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2409L602 2409" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2421L602 2421" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2433L602 2433" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2421) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(409 2445) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -74" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(459 2433) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -62" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(509 2421) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -50" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(559 2403) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -32" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<rect x="418" y="2371" width="153" height="5.6" rx="0" fill="#285F83" stroke="none"/>
+<rect x="418" y="2381" width="153" height="5.6" rx="0" fill="#285F83" stroke="none"/>
+<path d="M392 2445L425 2445" stroke="#285F83" stroke-width="1.4" fill="none" />
+<text x="469" y="2463" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">例：四个十六分音符</text>
+<g class="text-cell" data-box="648,2325,552,142">
+<text x="648" y="2370" font-size="25" font-weight="650" fill="#182C3A" >do → mi → sol → do′</text>
+<text x="648" y="2404" font-size="25" font-weight="400" fill="#182C3A" >将和弦音逐个写成普通音符，</text>
+<text x="648" y="2438" font-size="25" font-weight="400" fill="#182C3A" >可用于伴奏、练习与跑动句。</text>
+</g>
+<g class="text-cell" data-box="1248,2325,462,142">
+<text x="1248" y="2372" font-size="24" font-weight="650" fill="#182C3A" >逐个照写出的音值数拍。</text>
+<text x="1248" y="2404" font-size="24" font-weight="400" fill="#182C3A" >例：4 个十六分音符</text>
+<text x="1248" y="2436" font-size="24" font-weight="400" fill="#182C3A" >= 4 × 1/4 拍 = 1 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,2325,394,142">
+<text x="1758" y="2371" font-size="23" font-weight="400" fill="#182C3A" >它不一定是装饰音。</text>
+<text x="1758" y="2403" font-size="23" font-weight="400" fill="#182C3A" >长短由写出的音符决定，</text>
+<text x="1758" y="2435" font-size="23" font-weight="400" fill="#182C3A" >不会自动压成很短的一串。</text>
+</g>
+<path d="M314 2316L314 2476" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 2316L624 2476" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 2316L1224 2476" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 2316L1734 2476" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2476L2176 2476" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2476" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="2476" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-12" aria-label="滑音">
+<text x="88" y="2506" font-size="18" font-weight="650" fill="#285F83" font-family="Arial,sans-serif" letter-spacing="2">12</text>
+<text x="88" y="2552" font-size="30" font-weight="700" fill="#182C3A" >滑音</text>
+<text x="88" y="2587" font-size="18" font-weight="400" fill="#637782" >Glissando</text>
+<path d="M336 2545L602 2545" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2557L602 2557" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2569L602 2569" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2581L602 2581" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2593L602 2593" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2581) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(417 2593) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(567 2557) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M439 2582L546 2553" stroke="#182C3A" stroke-width="2.3" fill="none" />
+<text x="469" y="2552" font-size="22" font-weight="400" fill="#182C3A" font-family="Georgia,serif" font-style="italic" transform="rotate(-14 469 2552)">gliss.</text>
+<text x="469" y="2623" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">两音之间的斜线或波浪线</text>
+<g class="text-cell" data-box="648,2485,552,142">
+<text x="648" y="2530" font-size="25" font-weight="650" fill="#182C3A" >起音 → 沿键盘 → 目标音</text>
+<text x="648" y="2564" font-size="25" font-weight="400" fill="#182C3A" >快速扫过指定范围内的音。</text>
+<text x="648" y="2598" font-size="25" font-weight="400" fill="#182C3A" >钢琴常见白键或黑键滑奏。</text>
+</g>
+<g class="text-cell" data-box="1248,2485,462,142">
+<text x="1248" y="2532" font-size="24" font-weight="650" fill="#182C3A" >在标出的时间范围内滑过，</text>
+<text x="1248" y="2564" font-size="24" font-weight="400" fill="#182C3A" >按谱面到达目标音；</text>
+<text x="1248" y="2596" font-size="24" font-weight="400" fill="#182C3A" >没有统一的“每键几拍”。</text>
+</g>
+<g class="text-cell" data-box="1758,2485,394,142">
+<text x="1758" y="2531" font-size="23" font-weight="400" fill="#182C3A" >按谱注确定白键、黑键等。</text>
+<text x="1758" y="2563" font-size="23" font-weight="400" fill="#182C3A" >普通钢琴逐键发声，</text>
+<text x="1758" y="2595" font-size="23" font-weight="400" fill="#182C3A" >并非弦乐式连续音高变化。</text>
+</g>
+<path d="M314 2476L314 2636" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 2476L624 2636" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 2476L1224 2636" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 2476L1734 2636" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2636L2176 2636" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2636" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="2636" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-13" aria-label="同音震音">
+<text x="88" y="2666" font-size="18" font-weight="650" fill="#285F83" font-family="Arial,sans-serif" letter-spacing="2">13</text>
+<text x="88" y="2712" font-size="30" font-weight="700" fill="#182C3A" >同音震音</text>
+<text x="88" y="2747" font-size="18" font-weight="400" fill="#637782" >Single-note tremolo</text>
+<path d="M336 2705L602 2705" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2717L602 2717" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2729L602 2729" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2741L602 2741" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2753L602 2753" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2741) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(494 2741) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M492 2709l25 -10v6l-25 10Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<path d="M492 2720l25 -10v6l-25 10Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<text x="469" y="2783" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">符干上两斜杠：此例按十六分细分</text>
+<g class="text-cell" data-box="648,2645,552,142">
+<text x="648" y="2690" font-size="25" font-weight="650" fill="#182C3A" >同一音／和弦反复重奏</text>
+<text x="648" y="2724" font-size="25" font-weight="400" fill="#182C3A" >例如：sol sol sol sol …</text>
+<text x="648" y="2758" font-size="25" font-weight="400" fill="#182C3A" >可均匀细分，也可不计次数。</text>
+</g>
+<g class="text-cell" data-box="1248,2645,462,142">
+<text x="1248" y="2692" font-size="24" font-weight="650" fill="#182C3A" >定量例：四分音符两斜杠</text>
+<text x="1248" y="2724" font-size="24" font-weight="400" fill="#182C3A" >= 4 个十六分音符，共 1 拍。</text>
+<text x="1248" y="2756" font-size="24" font-weight="400" fill="#182C3A" >非定量则在时值内快速重复。</text>
+</g>
+<g class="text-cell" data-box="1758,2645,394,142">
+<text x="1758" y="2691" font-size="23" font-weight="400" fill="#182C3A" >斜杠数结合原有符尾/符杠读。</text>
+<text x="1758" y="2723" font-size="23" font-weight="400" fill="#182C3A" >三斜杠常用于非定量震音；</text>
+<text x="1758" y="2755" font-size="23" font-weight="400" fill="#182C3A" >是否定量仍须看上下文。</text>
+</g>
+<path d="M314 2636L314 2796" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 2636L624 2796" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 2636L1224 2796" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 2636L1734 2796" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2796L2176 2796" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2796" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="2796" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-14" aria-label="交替震音">
+<text x="88" y="2826" font-size="18" font-weight="650" fill="#285F83" font-family="Arial,sans-serif" letter-spacing="2">14</text>
+<text x="88" y="2872" font-size="30" font-weight="700" fill="#182C3A" >交替震音</text>
+<text x="88" y="2907" font-size="18" font-weight="400" fill="#637782" >Two-note / chord</text>
+<text x="88" y="2930" font-size="18" font-weight="400" fill="#637782" >tremolo</text>
+<path d="M336 2865L602 2865" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2877L602 2877" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2889L602 2889" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2901L602 2901" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 2913L602 2913" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 2901) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(423 2907) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#FFFFFF" stroke="#285F83" stroke-width="2.4"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(556 2883) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#FFFFFF" stroke="#285F83" stroke-width="2.4"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M443 2856L553 2836v5L443 2861Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<path d="M443 2866L553 2846v5L443 2871Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<path d="M443 2876L553 2856v5L443 2881Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<text x="469" y="2943" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">两音之间的斜杠：全组合计 2 拍</text>
+<g class="text-cell" data-box="648,2805,552,142">
+<text x="648" y="2850" font-size="25" font-weight="650" fill="#182C3A" >音 A ↔ 音 B ↔ 音 A …</text>
+<text x="648" y="2884" font-size="25" font-weight="400" fill="#182C3A" >两个音或两个和弦快速交替。</text>
+<text x="648" y="2918" font-size="25" font-weight="400" fill="#182C3A" >图示为两音之间的震音。</text>
+</g>
+<g class="text-cell" data-box="1248,2805,462,142">
+<text x="1248" y="2852" font-size="24" font-weight="650" fill="#182C3A" >常见写法：两端各标总时值。</text>
+<text x="1248" y="2884" font-size="24" font-weight="400" fill="#182C3A" >图中两枚二分音符作震音，</text>
+<text x="1248" y="2916" font-size="24" font-weight="400" fill="#182C3A" >这一组共 2 拍，不是 4 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,2805,394,142">
+<text x="1758" y="2851" font-size="23" font-weight="400" fill="#182C3A" >跨度可超过二度，甚至两和弦。</text>
+<text x="1758" y="2883" font-size="23" font-weight="400" fill="#182C3A" >这是震音 tremolo；</text>
+<text x="1758" y="2915" font-size="23" font-weight="400" fill="#182C3A" >相邻两音的 tr 通常是颤音。</text>
+</g>
+<path d="M314 2796L314 2956" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 2796L624 2956" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 2796L1224 2956" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 2796L1734 2956" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 2956L2176 2956" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="2956" width="2112" height="56" rx="0" fill="#EEF6F3" stroke="none"/>
+<rect x="64" y="2956" width="6" height="56" rx="0" fill="#26776D" stroke="none"/>
+<text x="88" y="2994" font-size="29" font-weight="750" fill="#26776D" >C  节奏与连线</text>
+<text x="570" y="2993" font-size="23" font-weight="400" fill="#637782" >这些改变时间组织或连接方式，并非全是装饰音。</text>
+<rect x="64" y="3012" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3012" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-15" aria-label="连音组">
+<text x="88" y="3042" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">15</text>
+<text x="88" y="3088" font-size="30" font-weight="700" fill="#182C3A" >连音组</text>
+<text x="88" y="3123" font-size="18" font-weight="400" fill="#637782" >Tuplets: 3 / 5 / 6 /</text>
+<text x="88" y="3146" font-size="18" font-weight="400" fill="#637782" >7 …</text>
+<path d="M336 3081L602 3081" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3093L602 3093" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3105L602 3105" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3117L602 3117" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3129L602 3129" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3117) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(419 3123) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -54" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(488 3117) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(557 3111) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -42" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<rect x="428" y="3069" width="141" height="5.6" rx="0" fill="#285F83" stroke="none"/>
+<path d="M418 3049L418 3040" stroke="#182C3A" stroke-width="2" fill="none" />
+<path d="M418 3040L473 3040" stroke="#182C3A" stroke-width="2" fill="none" />
+<path d="M513 3040L568 3040" stroke="#182C3A" stroke-width="2" fill="none" />
+<path d="M568 3040L568 3049" stroke="#182C3A" stroke-width="2" fill="none" />
+<text x="493" y="3048" font-size="24" font-weight="650" fill="#182C3A" text-anchor="middle">3</text>
+<text x="469" y="3159" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">三枚八分音符，共占 1 拍</text>
+<g class="text-cell" data-box="648,3021,552,142">
+<text x="648" y="3066" font-size="25" font-weight="650" fill="#182C3A" >将指定的总时长重新等分</text>
+<text x="648" y="3100" font-size="25" font-weight="400" fill="#182C3A" >常见三连音：3 个音均分</text>
+<text x="648" y="3134" font-size="25" font-weight="400" fill="#182C3A" >原本 2 个同类音符的时间。</text>
+</g>
+<g class="text-cell" data-box="1248,3021,462,142">
+<text x="1248" y="3068" font-size="24" font-weight="650" fill="#182C3A" >八分三连音：每个 1/3 拍。</text>
+<text x="1248" y="3100" font-size="24" font-weight="400" fill="#182C3A" >5:4 的十六分五连音：</text>
+<text x="1248" y="3132" font-size="24" font-weight="400" fill="#182C3A" >5 个共 1 拍，每个 1/5 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,3021,394,142">
+<text x="1758" y="3067" font-size="23" font-weight="400" fill="#182C3A" >总时长须结合音值和比例，</text>
+<text x="1758" y="3099" font-size="23" font-weight="400" fill="#182C3A" >不能见数字就另加拍。</text>
+<text x="1758" y="3131" font-size="23" font-weight="400" fill="#182C3A" >三连音也可能包含休止符。</text>
+</g>
+<path d="M314 3012L314 3172" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3012L624 3172" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3012L1224 3172" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3012L1734 3172" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3172L2176 3172" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3172" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3172" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-16" aria-label="附点／复附点">
+<text x="88" y="3202" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">16</text>
+<text x="88" y="3248" font-size="30" font-weight="700" fill="#182C3A" >附点／复附点</text>
+<text x="88" y="3283" font-size="18" font-weight="400" fill="#637782" >Dotted /</text>
+<text x="88" y="3306" font-size="18" font-weight="400" fill="#637782" >double-dotted</text>
+<path d="M336 3241L602 3241" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3253L602 3253" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3265L602 3265" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3277L602 3277" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3289L602 3289" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3277) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(431 3277) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+<circle cx="22" cy="-4" r="2.8" fill="#285F83"/>
+</g>
+<g transform="translate(542 3277) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+<circle cx="22" cy="-4" r="2.8" fill="#285F83"/>
+<circle cx="32" cy="-4" r="2.8" fill="#285F83"/>
+</g>
+<text x="469" y="3319" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">右侧一附点 / 两附点</text>
+<g class="text-cell" data-box="648,3181,552,142">
+<text x="648" y="3226" font-size="25" font-weight="650" fill="#182C3A" >附点：原值再加一半</text>
+<text x="648" y="3260" font-size="25" font-weight="400" fill="#182C3A" >复附点：再加原值的四分之一。</text>
+<text x="648" y="3294" font-size="25" font-weight="400" fill="#182C3A" >点画在音符右侧。</text>
+</g>
+<g class="text-cell" data-box="1248,3181,462,142">
+<text x="1248" y="3228" font-size="24" font-weight="650" fill="#182C3A" >附点四分：1 + 1/2 = 1½ 拍。</text>
+<text x="1248" y="3260" font-size="24" font-weight="400" fill="#182C3A" >复附点四分：</text>
+<text x="1248" y="3292" font-size="24" font-weight="400" fill="#182C3A" >1 + 1/2 + 1/4 = 1¾ 拍。</text>
+</g>
+<g class="text-cell" data-box="1758,3181,394,142">
+<text x="1758" y="3227" font-size="23" font-weight="400" fill="#182C3A" >右侧的点增加记谱时值；</text>
+<text x="1758" y="3259" font-size="23" font-weight="400" fill="#182C3A" >音符上/下的点是跳音。</text>
+<text x="1758" y="3291" font-size="23" font-weight="400" fill="#182C3A" >这两种点含义不同。</text>
+</g>
+<path d="M314 3172L314 3332" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3172L624 3332" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3172L1224 3332" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3172L1734 3332" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3332L2176 3332" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3332" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3332" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-17" aria-label="切分音">
+<text x="88" y="3362" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">17</text>
+<text x="88" y="3408" font-size="30" font-weight="700" fill="#182C3A" >切分音</text>
+<text x="88" y="3443" font-size="18" font-weight="400" fill="#637782" >Syncopation</text>
+<path d="M336 3401L602 3401" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3413L602 3413" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3425L602 3425" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3437L602 3437" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3449L602 3449" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3437) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(415 3437) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+<path d="M10 -48 C13 -37 33 -35 25 -17 C24 -14 22 -12 20 -10 C26 -29 13 -24 10 -34Z" fill="#285F83" stroke="none" stroke-width="1" />
+</g>
+<g transform="translate(487 3437) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(559 3437) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+<path d="M10 -48 C13 -37 33 -35 25 -17 C24 -14 22 -12 20 -10 C26 -29 13 -24 10 -34Z" fill="#285F83" stroke="none" stroke-width="1" />
+</g>
+<text x="469" y="3479" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">1/2 拍 + 1 拍 + 1/2 拍</text>
+<g class="text-cell" data-box="648,3341,552,142">
+<text x="648" y="3386" font-size="25" font-weight="650" fill="#182C3A" >弱位起音，延续或强调到强位</text>
+<text x="648" y="3420" font-size="25" font-weight="400" fill="#182C3A" >例：八分 → 四分 → 八分，</text>
+<text x="648" y="3454" font-size="25" font-weight="400" fill="#182C3A" >中间的音从半拍处开始。</text>
+</g>
+<g class="text-cell" data-box="1248,3341,462,142">
+<text x="1248" y="3388" font-size="24" font-weight="650" fill="#182C3A" >例：1/2 + 1 + 1/2 = 2 拍。</text>
+<text x="1248" y="3420" font-size="24" font-weight="400" fill="#182C3A" >重音或跨拍关系发生变化；</text>
+<text x="1248" y="3452" font-size="24" font-weight="400" fill="#182C3A" >小节总拍数照常。</text>
+</g>
+<g class="text-cell" data-box="1758,3341,394,142">
+<text x="1758" y="3387" font-size="23" font-weight="400" fill="#182C3A" >不要为强调切分而加拍。</text>
+<text x="1758" y="3419" font-size="23" font-weight="400" fill="#182C3A" >先保持拍点稳定，</text>
+<text x="1758" y="3451" font-size="23" font-weight="400" fill="#182C3A" >再把弱位起音准确放进去。</text>
+</g>
+<path d="M314 3332L314 3492" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3332L624 3492" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3332L1224 3492" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3332L1734 3492" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3492L2176 3492" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3492" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3492" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-18" aria-label="延音线">
+<text x="88" y="3522" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">18</text>
+<text x="88" y="3568" font-size="30" font-weight="700" fill="#182C3A" >延音线</text>
+<text x="88" y="3603" font-size="18" font-weight="400" fill="#637782" >Tie</text>
+<path d="M336 3561L602 3561" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3573L602 3573" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3585L602 3585" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3597L602 3597" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3609L602 3609" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3597) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(426 3603) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(548 3603) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M426 3618Q487 3637 548 3618" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<path d="M488 3561L488 3609" stroke="#A2AFB7" stroke-width="1.4" fill="none" />
+<text x="469" y="3639" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">同音相连，可跨小节</text>
+<g class="text-cell" data-box="648,3501,552,142">
+<text x="648" y="3546" font-size="25" font-weight="650" fill="#182C3A" >同音相连，只按一次键</text>
+<text x="648" y="3580" font-size="25" font-weight="400" fill="#182C3A" >后一个音继续保持，</text>
+<text x="648" y="3614" font-size="25" font-weight="400" fill="#182C3A" >不再重新敲击。</text>
+</g>
+<g class="text-cell" data-box="1248,3501,462,142">
+<text x="1248" y="3548" font-size="24" font-weight="650" fill="#182C3A" >两个四分音符相连：</text>
+<text x="1248" y="3580" font-size="24" font-weight="400" fill="#182C3A" >1 + 1 = 2 拍。</text>
+<text x="1248" y="3612" font-size="24" font-weight="400" fill="#182C3A" >可跨拍、跨小节延续。</text>
+</g>
+<g class="text-cell" data-box="1758,3501,394,142">
+<text x="1758" y="3547" font-size="23" font-weight="400" fill="#182C3A" >连接的是同音高。</text>
+<text x="1758" y="3579" font-size="23" font-weight="400" fill="#182C3A" >与连接不同音高的连音线</text>
+<text x="1758" y="3611" font-size="23" font-weight="400" fill="#182C3A" >读法不同。</text>
+</g>
+<path d="M314 3492L314 3652" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3492L624 3652" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3492L1224 3652" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3492L1734 3652" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3652L2176 3652" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3652" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3652" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-19" aria-label="连音线">
+<text x="88" y="3682" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">19</text>
+<text x="88" y="3728" font-size="30" font-weight="700" fill="#182C3A" >连音线</text>
+<text x="88" y="3763" font-size="18" font-weight="400" fill="#637782" >Slur / phrase mark</text>
+<path d="M336 3721L602 3721" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3733L602 3733" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3745L602 3745" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3757L602 3757" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3769L602 3769" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3757) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(426 3763) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(548 3751) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M426 3778Q487 3797 548 3766" fill="none" stroke="#182C3A" stroke-width="2.4" />
+<text x="469" y="3799" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">异音相连，逐音连贯弹出</text>
+<g class="text-cell" data-box="648,3661,552,142">
+<text x="648" y="3706" font-size="25" font-weight="650" fill="#182C3A" >每个音仍分别弹出</text>
+<text x="648" y="3740" font-size="25" font-weight="400" fill="#182C3A" >尽量连贯地衔接，</text>
+<text x="648" y="3774" font-size="25" font-weight="400" fill="#182C3A" >或按连线组织乐句。</text>
+</g>
+<g class="text-cell" data-box="1248,3661,462,142">
+<text x="1248" y="3708" font-size="24" font-weight="650" fill="#182C3A" >每个音各按自身时值。</text>
+<text x="1248" y="3740" font-size="24" font-weight="400" fill="#182C3A" >两个四分音符仍为 1 + 1；</text>
+<text x="1248" y="3772" font-size="24" font-weight="400" fill="#182C3A" >不会变成只按一次的长音。</text>
+</g>
+<g class="text-cell" data-box="1758,3661,394,142">
+<text x="1758" y="3707" font-size="23" font-weight="400" fill="#182C3A" >连音线/乐句线不等于延音线。</text>
+<text x="1758" y="3739" font-size="23" font-weight="400" fill="#182C3A" >连贯靠触键与衔接，</text>
+<text x="1758" y="3771" font-size="23" font-weight="400" fill="#182C3A" >踏板只是可能的辅助。</text>
+</g>
+<path d="M314 3652L314 3812" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3652L624 3812" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3652L1224 3812" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3652L1734 3812" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3812L2176 3812" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3812" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="3812" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-20" aria-label="延长记号">
+<text x="88" y="3842" font-size="18" font-weight="650" fill="#26776D" font-family="Arial,sans-serif" letter-spacing="2">20</text>
+<text x="88" y="3888" font-size="30" font-weight="700" fill="#182C3A" >延长记号</text>
+<text x="88" y="3923" font-size="18" font-weight="400" fill="#637782" >Fermata</text>
+<path d="M336 3881L602 3881" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3893L602 3893" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3905L602 3905" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3917L602 3917" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 3929L602 3929" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 3917) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(494 3917) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<use href="#music-fermata" transform="translate(465.7198795180723 3857.7198795180725) scale(0.09337349397590361)" fill="#182C3A"/>
+<text x="469" y="3959" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">半圆弧内有一点</text>
+<g class="text-cell" data-box="648,3821,552,142">
+<text x="648" y="3866" font-size="25" font-weight="650" fill="#182C3A" >在该音、休止或停顿处停留</text>
+<text x="648" y="3900" font-size="25" font-weight="400" fill="#182C3A" >适当延长，</text>
+<text x="648" y="3934" font-size="25" font-weight="400" fill="#182C3A" >随后依乐句或指挥继续。</text>
+</g>
+<g class="text-cell" data-box="1248,3821,462,142">
+<text x="1248" y="3868" font-size="24" font-weight="650" fill="#182C3A" >延长原时值，长度由音乐决定。</text>
+<text x="1248" y="3900" font-size="24" font-weight="400" fill="#182C3A" >没有统一的“必须两倍”。</text>
+<text x="1248" y="3932" font-size="24" font-weight="400" fill="#182C3A" >与附点的固定加值不同。</text>
+</g>
+<g class="text-cell" data-box="1758,3821,394,142">
+<text x="1758" y="3867" font-size="23" font-weight="400" fill="#182C3A" >这是明确的自由延长记号；</text>
+<text x="1758" y="3899" font-size="23" font-weight="400" fill="#182C3A" >不能把所有装饰音</text>
+<text x="1758" y="3931" font-size="23" font-weight="400" fill="#182C3A" >都理解成可以随意拖长。</text>
+</g>
+<path d="M314 3812L314 3972" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 3812L624 3972" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 3812L1224 3972" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 3812L1734 3972" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 3972L2176 3972" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="3972" width="2112" height="56" rx="0" fill="#F3F0F8" stroke="none"/>
+<rect x="64" y="3972" width="6" height="56" rx="0" fill="#76589A" stroke="none"/>
+<text x="88" y="4010" font-size="29" font-weight="750" fill="#76589A" >D  触键、音区与踏板</text>
+<text x="570" y="4009" font-size="23" font-weight="400" fill="#637782" >区分声音效果与记谱时值。</text>
+<rect x="64" y="4028" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="4028" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-21" aria-label="跳音／极短跳音">
+<text x="88" y="4058" font-size="18" font-weight="650" fill="#76589A" font-family="Arial,sans-serif" letter-spacing="2">21</text>
+<text x="88" y="4104" font-size="30" font-weight="700" fill="#182C3A" >跳音／极短跳音</text>
+<text x="88" y="4139" font-size="18" font-weight="400" fill="#637782" >Staccato /</text>
+<text x="88" y="4162" font-size="18" font-weight="400" fill="#637782" >staccatissimo</text>
+<path d="M336 4097L602 4097" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4109L602 4109" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4121L602 4121" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4133L602 4133" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4145L602 4145" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 4133) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(430 4133) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(545 4133) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<circle cx="430" cy="4067" r="4" fill="undefined"/>
+<path d="M538 4053h14l-7 20Z" fill="#182C3A" stroke="none" stroke-width="1" />
+<text x="469" y="4175" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">点：跳音 / 楔形：极短跳音</text>
+<g class="text-cell" data-box="648,4037,552,142">
+<text x="648" y="4082" font-size="25" font-weight="650" fill="#182C3A" >短而分离地弹出</text>
+<text x="648" y="4116" font-size="25" font-weight="400" fill="#182C3A" >极短跳音通常更短、更明确。</text>
+<text x="648" y="4150" font-size="25" font-weight="400" fill="#182C3A" >下一音仍按原拍点开始。</text>
+</g>
+<g class="text-cell" data-box="1248,4037,462,142">
+<text x="1248" y="4084" font-size="24" font-weight="650" fill="#182C3A" >记谱时值仍是原来的值。</text>
+<text x="1248" y="4116" font-size="24" font-weight="400" fill="#182C3A" >实际按键发声较短，</text>
+<text x="1248" y="4148" font-size="24" font-weight="400" fill="#182C3A" >余下部分留出间隔。</text>
+</g>
+<g class="text-cell" data-box="1758,4037,394,142">
+<text x="1758" y="4083" font-size="23" font-weight="400" fill="#182C3A" >跳音不固定“奏一半”。</text>
+<text x="1758" y="4115" font-size="23" font-weight="400" fill="#182C3A" >长短看速度、风格与音响；</text>
+<text x="1758" y="4147" font-size="23" font-weight="400" fill="#182C3A" >点画在音符上方或下方。</text>
+</g>
+<path d="M314 4028L314 4188" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 4028L624 4188" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 4028L1224 4188" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 4028L1734 4188" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 4188L2176 4188" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="4188" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="4188" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-22" aria-label="保持音／重音">
+<text x="88" y="4218" font-size="18" font-weight="650" fill="#76589A" font-family="Arial,sans-serif" letter-spacing="2">22</text>
+<text x="88" y="4264" font-size="30" font-weight="700" fill="#182C3A" >保持音／重音</text>
+<text x="88" y="4299" font-size="18" font-weight="400" fill="#637782" >Tenuto / accent</text>
+<path d="M336 4257L602 4257" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4269L602 4269" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4281L602 4281" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4293L602 4293" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4305L602 4305" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 4293) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(430 4293) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(545 4293) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<path d="M417 4224L443 4224" stroke="#182C3A" stroke-width="3" fill="none" />
+<path d="M530 4214l28 10l-28 10" fill="none" stroke="#182C3A" stroke-width="3" />
+<text x="469" y="4335" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">横线：保持 / &gt;：重音</text>
+<g class="text-cell" data-box="648,4197,552,142">
+<text x="648" y="4242" font-size="25" font-weight="650" fill="#182C3A" >保持音：较充分保持、支撑</text>
+<text x="648" y="4276" font-size="25" font-weight="400" fill="#182C3A" >重音：突出这个音的起音。</text>
+<text x="648" y="4310" font-size="25" font-weight="400" fill="#182C3A" >可以与其他奏法叠加。</text>
+</g>
+<g class="text-cell" data-box="1248,4197,462,142">
+<text x="1248" y="4244" font-size="24" font-weight="650" fill="#182C3A" >通常不改写记谱拍数。</text>
+<text x="1248" y="4276" font-size="24" font-weight="400" fill="#182C3A" >横线不自动加拍；</text>
+<text x="1248" y="4308" font-size="24" font-weight="400" fill="#182C3A" >重音也不等于延长两倍。</text>
+</g>
+<g class="text-cell" data-box="1758,4197,394,142">
+<text x="1758" y="4243" font-size="23" font-weight="400" fill="#182C3A" >横线是保持，&gt; 是重音。</text>
+<text x="1758" y="4275" font-size="23" font-weight="400" fill="#182C3A" >力度上的突出与时值延长</text>
+<text x="1758" y="4307" font-size="23" font-weight="400" fill="#182C3A" >需要分别判断。</text>
+</g>
+<path d="M314 4188L314 4348" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 4188L624 4348" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 4188L1224 4348" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 4188L1734 4348" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 4348L2176 4348" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="4348" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="4348" width="250" height="160" rx="0" fill="#FCFCFB" stroke="none"/>
+<g id="row-23" aria-label="八度移位">
+<text x="88" y="4378" font-size="18" font-weight="650" fill="#76589A" font-family="Arial,sans-serif" letter-spacing="2">23</text>
+<text x="88" y="4424" font-size="30" font-weight="700" fill="#182C3A" >八度移位</text>
+<text x="88" y="4459" font-size="18" font-weight="400" fill="#637782" >Ottava</text>
+<path d="M336 4417L602 4417" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4429L602 4429" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4441L602 4441" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4453L602 4453" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4465L602 4465" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 4453) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(437 4459) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(549 4447) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<text x="415" y="4387" font-size="27" font-weight="400" fill="#182C3A" font-family="Georgia,serif" font-style="italic">8va</text>
+<path d="M464 4378L586 4378" stroke="#182C3A" stroke-width="2" fill="none" stroke-dasharray="8 5"/>
+<path d="M586 4378L586 4390" stroke="#182C3A" stroke-width="2" fill="none" />
+<text x="469" y="4495" font-size="18" font-weight="400" fill="#637782" text-anchor="middle">虚线标出移位范围</text>
+<g class="text-cell" data-box="648,4357,552,142">
+<text x="648" y="4402" font-size="25" font-weight="650" fill="#182C3A" >上方 8va：高八度演奏</text>
+<text x="648" y="4436" font-size="25" font-weight="400" fill="#182C3A" >下方 8vb：低八度演奏。</text>
+<text x="648" y="4470" font-size="25" font-weight="400" fill="#182C3A" >到虚线结束处恢复原音区。</text>
+</g>
+<g class="text-cell" data-box="1248,4357,462,142">
+<text x="1248" y="4404" font-size="24" font-weight="650" fill="#182C3A" >只移动音高，拍数不变。</text>
+<text x="1248" y="4436" font-size="24" font-weight="400" fill="#182C3A" >15ma / 15mb 表示</text>
+<text x="1248" y="4468" font-size="24" font-weight="400" fill="#182C3A" >向上 / 向下两个八度。</text>
+</g>
+<g class="text-cell" data-box="1758,4357,394,142">
+<text x="1758" y="4403" font-size="23" font-weight="400" fill="#182C3A" >是移到另一个音区弹，</text>
+<text x="1758" y="4435" font-size="23" font-weight="400" fill="#182C3A" >不表示再加弹一个八度和音。</text>
+<text x="1758" y="4467" font-size="23" font-weight="400" fill="#182C3A" >实际方向也要看线的位置。</text>
+</g>
+<path d="M314 4348L314 4508" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 4348L624 4508" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 4348L1224 4508" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 4348L1734 4508" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 4508L2176 4508" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="4508" width="2112" height="160" rx="0" fill="#FFFFFF" stroke="none"/>
+<rect x="64" y="4508" width="250" height="160" rx="0" fill="#F9FAFA" stroke="none"/>
+<g id="row-24" aria-label="延音踏板">
+<text x="88" y="4538" font-size="18" font-weight="650" fill="#76589A" font-family="Arial,sans-serif" letter-spacing="2">24</text>
+<text x="88" y="4584" font-size="30" font-weight="700" fill="#182C3A" >延音踏板</text>
+<text x="88" y="4619" font-size="18" font-weight="400" fill="#637782" >Sustain pedal</text>
+<path d="M336 4577L602 4577" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4589L602 4589" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4601L602 4601" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4613L602 4613" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<path d="M336 4625L602 4625" stroke="#B7C2C8" stroke-width="1.25" fill="none" />
+<use href="#music-clef" transform="translate(344 4613) scale(0.048)" fill="#182C3A"/>
+<g transform="translate(423 4607) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<g transform="translate(544 4595) scale(1)" color="#285F83">
+<ellipse cx="0" cy="0" rx="11" ry="4.8" transform="rotate(-20)" fill="#285F83" stroke="#285F83" stroke-width="0"/>
+<path d="M10 -2L10 -48" stroke="#285F83" stroke-width="2.6" fill="none" />
+</g>
+<text x="403" y="4651" font-size="25" font-weight="400" fill="#182C3A" font-family="Georgia,serif" font-style="italic">Ped.</text>
+<path d="M463 4637v13h27l9 -13l9 13h67v-13" fill="none" stroke="#182C3A" stroke-width="2.5" />
+<g class="text-cell" data-box="648,4517,552,142">
+<text x="648" y="4562" font-size="25" font-weight="650" fill="#182C3A" >Ped. 或踏板线起处踩下</text>
+<text x="648" y="4596" font-size="25" font-weight="400" fill="#182C3A" >星号或线终端抬起；</text>
+<text x="648" y="4630" font-size="25" font-weight="400" fill="#182C3A" >折角处换踏板。</text>
+</g>
+<g class="text-cell" data-box="1248,4517,462,142">
+<text x="1248" y="4564" font-size="24" font-weight="650" fill="#182C3A" >改变共鸣与声音延续，</text>
+<text x="1248" y="4596" font-size="24" font-weight="400" fill="#182C3A" >不将后面的起音整体推迟；</text>
+<text x="1248" y="4628" font-size="24" font-weight="400" fill="#182C3A" >手的节奏仍照谱面数。</text>
+</g>
+<g class="text-cell" data-box="1758,4517,394,142">
+<text x="1758" y="4563" font-size="23" font-weight="400" fill="#182C3A" >踩踏板与按住琴键作用不同。</text>
+<text x="1758" y="4595" font-size="23" font-weight="400" fill="#182C3A" >换踏板要听和声是否清楚；</text>
+<text x="1758" y="4627" font-size="23" font-weight="400" fill="#182C3A" >此行示右踏板。</text>
+</g>
+<path d="M314 4508L314 4668" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M624 4508L624 4668" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1224 4508L1224 4668" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M1734 4508L1734 4668" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+<path d="M64 4668L2176 4668" stroke="#D9E0E3" stroke-width="1.2" fill="none" />
+</g>
+<rect x="64" y="4696" width="1042" height="498" rx="16" fill="#FFFFFF" stroke="#D9E0E3"/>
+<rect x="1134" y="4696" width="1042" height="498" rx="16" fill="#FFFFFF" stroke="#D9E0E3"/>
+<text x="96" y="4747" font-size="32" font-weight="700" fill="#182C3A" >倚音时值：用时间条看清楚</text>
+<text x="96" y="4785" font-size="23" font-weight="400" fill="#637782" >橙色先弹，蓝色随后；以下按四分音符 = 1 拍。</text>
+<text x="96" y="4835" font-size="24" font-weight="650" fill="#182C3A" >长倚音 · 原音 1 拍</text>
+<rect x="350" y="4809" width="230" height="38" rx="0" fill="#BE572F" stroke="none"/>
+<text x="465" y="4836" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">倚音 1/2 拍</text>
+<rect x="580" y="4809" width="230" height="38" rx="0" fill="#285F83" stroke="none"/>
+<text x="695" y="4836" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">主音 1/2 拍</text>
+<text x="96" y="4892" font-size="24" font-weight="650" fill="#182C3A" >长倚音 · 原音 1½ 拍</text>
+<rect x="350" y="4866" width="460" height="38" rx="0" fill="#BE572F" stroke="none"/>
+<text x="580" y="4893" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">倚音 1 拍</text>
+<rect x="810" y="4866" width="230" height="38" rx="0" fill="#285F83" stroke="none"/>
+<text x="925" y="4893" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">主音 1/2 拍</text>
+<text x="96" y="4945" font-size="24" font-weight="650" fill="#182C3A" >短倚音 · 拍上奏</text>
+<rect x="350" y="4919" width="46" height="38" rx="0" fill="#BE572F" stroke="none"/>
+<text x="373" y="4946" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">ε</text>
+<rect x="396" y="4919" width="414" height="38" rx="0" fill="#285F83" stroke="none"/>
+<text x="603" y="4946" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">主音 T − ε</text>
+<path d="M350 4909L350 4965" stroke="#182C3A" stroke-width="2" fill="none" />
+<text x="350" y="4985" font-size="20" font-weight="400" fill="#637782" >拍点：倚音先起</text>
+<text x="96" y="5033" font-size="24" font-weight="650" fill="#182C3A" >短倚音 · 拍前奏</text>
+<rect x="350" y="5007" width="138" height="38" rx="0" fill="#9BA9B1" stroke="none"/>
+<text x="419" y="5034" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">前音</text>
+<rect x="488" y="5007" width="46.00000000000001" height="38" rx="0" fill="#BE572F" stroke="none"/>
+<text x="511" y="5034" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">ε</text>
+<rect x="534" y="5007" width="460" height="38" rx="0" fill="#285F83" stroke="none"/>
+<text x="764" y="5034" font-size="21" font-weight="650" fill="#FFFFFF" text-anchor="middle">主音保持 T</text>
+<path d="M534 4997L534 5053" stroke="#182C3A" stroke-width="2" fill="none" />
+<text x="534" y="5073" font-size="20" font-weight="400" fill="#637782" >拍点：主音起</text>
+<text x="96" y="5120" font-size="23" font-weight="400" fill="#637782" >短倚音两例按 T = 1 拍画；ε 的宽度仅示意，并非规定比例。</text>
+<text x="96" y="5158" font-size="23" font-weight="400" fill="#637782" >长倚音的 1/2、2/3 是常见传统分法，具体作品可以不同。</text>
+<text x="1166" y="4747" font-size="32" font-weight="700" fill="#182C3A" >回到截图里的「音长」按钮</text>
+<rect x="1166" y="4773" width="126" height="36" rx="18" fill="#FBF1E9" stroke="none"/>
+<text x="1229" y="4798" font-size="20" font-weight="650" fill="#BE572F" text-anchor="middle">先分清字段</text>
+<text x="1311" y="4799" font-size="25" font-weight="650" fill="#182C3A" >记谱音值，还是实际播放时长？</text>
+<text x="1166" y="4852" font-size="25" font-weight="700" fill="#182C3A" >① 如果录的是记谱：</text>
+<text x="1202" y="4890" font-size="24" font-weight="400" fill="#182C3A" >保留小音符的外形，并设置“倚音 / 装饰音”属性。</text>
+<text x="1202" y="4927" font-size="24" font-weight="400" fill="#182C3A" >小八分外形可记为八分，但实际占时不能据此填半拍。</text>
+<text x="1166" y="4978" font-size="25" font-weight="700" fill="#182C3A" >② 如果录的是实际时长：</text>
+<text x="1202" y="5016" font-size="24" font-weight="400" fill="#182C3A" >先确定拍前或拍上，再定短促程度，同时调整被借时的音。</text>
+<text x="1202" y="5053" font-size="24" font-weight="400" fill="#182C3A" >练习假设：原音 1 拍，拍上短倚音取 1/8，主音余 7/8。</text>
+<text x="1202" y="5090" font-size="24" font-weight="650" fill="#BE572F" >这个 1/8 只是演示，并不是短倚音的固定标准。</text>
+<text x="1166" y="5150" font-size="23" font-weight="400" fill="#637782" >仅凭截图无法确认软件字段的含义，不能机械地替你选“半拍”。</text>
+<text x="64" y="5232" font-size="27" font-weight="650" fill="#182C3A" >查表顺序：看符号 → 找主音与邻音 → 确定实际顺序 → 核对小节总时值。</text>
+<text x="64" y="5274" font-size="23" font-weight="400" fill="#637782" >“主音”在本表指被装饰的原音，不专指调式主音；局部谱例不代表原曲音高。其他拍号须重新换算“1 拍”。</text>
+<text x="64" y="5312" font-size="21" font-weight="600" fill="#637782" >依据与延伸阅读（可点击）：</text>
+<a href="https://handbook.musescore.org/notation/expressive-markings/grace-notes" target="_blank">
+<text x="390" y="5312" font-size="21" font-weight="500" fill="#285F83" text-decoration="underline">MuseScore · Grace notes</text>
+</a>
+<a href="https://www.ibiblio.org/guruguha/MusicResearchLibrary/Books-English/BkE-GehrkensKW-Music%20Notation%26Terminology-0027.pdf" target="_blank">
+<text x="760" y="5312" font-size="21" font-weight="500" fill="#285F83" text-decoration="underline">Gehrkens · 装饰音，第 22–26 页</text>
+</a>
+<a href="https://www.steinberg.help/r/dorico-se/6.2/en/dorico/topics/notation_reference/notation_reference_tremolos/notation_reference_tremolos_c.html" target="_blank">
+<text x="1240" y="5312" font-size="21" font-weight="500" fill="#285F83" text-decoration="underline">Dorico · Tremolos</text>
+</a>
+<a href="https://lilypond.org/doc/v2.26/Documentation/music-glossary/acciaccatura" target="_blank">
+<text x="1570" y="5312" font-size="21" font-weight="500" fill="#285F83" text-decoration="underline">LilyPond · Acciaccatura</text>
+</a>
+<text x="64" y="5352" font-size="21" font-weight="400" fill="#637782" >涵盖常见钢琴读谱要点，并非所有历史装饰音或现代扩展技巧；具体执行以作品、版本说明及演奏指导为准。</text>
+</g></svg>

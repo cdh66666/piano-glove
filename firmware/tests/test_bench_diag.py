@@ -2,7 +2,7 @@ from pathlib import Path
 r=Path(__file__).resolve().parent
 s=(r.parent/'src/glove.cpp').read_text(encoding='utf-8')
 m=(r.parent/'src/main.cpp').read_text(encoding='utf-8')
-bench=s[s.index('static int armFeedbackMargin('):s.index('// Position commands may engage')]+s[s.index('bool benchActive()'):s.index('bool mountActive(')]
+bench=s[s.index('static int armFeedbackMargin('):s.index('static int armCurrentGoal(')]+s[s.index('bool benchActive()'):s.index('bool mountActive(')]
 safe=s[s.index('void safe()'):s.index('bool motionCalibrationSupported()')]
 diag=m[m.index('static bool servoDiag('):m.index('static void cmdLine(')]
 prefix=r"""
@@ -16,6 +16,7 @@ prefix=r"""
 bool g_mountActive=false;uint32_t g_mountDeadline=0,g_mountArrivalDeadline=0;uint8_t g_mountReady=0;const char*g_mountReason="none";
 uint32_t now=0;uint32_t millis(){return now;}
 bool g_benchActive=false,g_armed=true,g_calibrated=true,g_sweep=false,g_rate=false,g_rateSent=false,g_demo=false,g_auto=false;uint32_t g_benchDeadline=0;const char*g_benchFailure="none";
+bool g_libraryArm=false,g_libraryOffhand=false,g_librarySoftware=false; // BENCH keeps its ordinary calibration checks.
 std::string output;void sayf(const char*f,...){char b[384];va_list a;va_start(a,f);vsnprintf(b,sizeof(b),f,a);va_end(a);output+=b;output+="\n";}void errf(const char*f,...){output+="ERR";}void okf(const char*f,...){output+="OK";}
 struct SerialMock{void println(const char*p){output+=p;}}Serial;
 struct Slot{bool valid=true;int lo=50,hi=300;};Slot g_slot[6];

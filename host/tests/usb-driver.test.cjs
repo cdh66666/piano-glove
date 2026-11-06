@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {view}=require('../usb-driver.js');
 test('missing driver is distinct from unplugged and device error',()=>{
  assert.match(view({state:'missing_driver'}).title,/已检测到|检测到主控/);
- assert.match(view({state:'missing_driver'}).detail,/自动安装并连接/);
+ assert.match(view({state:'missing_driver'}).detail,/安装驱动并连接/);
  assert.match(view({state:'device_error',problem_code:10}).detail,/代码 10/);
  assert.match(view({state:'unplugged'}).detail,/数据传输/);
  assert.doesNotMatch(view({state:'unplugged'}).title,/未安装/);

@@ -1,25 +1,30 @@
+const ORIGINAL_TEST_DIR=__dirname;
 // Execute the actual browser script with deterministic DOM, clocks, audio and HTTP.
 // No serial access or hardware commands are made by this test harness.
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 class Node {
- constructor(id=''){this.id=id;this.children=[];this.value='';this.checked=false;this.hidden=false;this.disabled=false;this.style={};this.dataset={};this.classes=new Set();this.classList={toggle:(name,value)=>value?this.classes.add(name):this.classes.delete(name)};this.lastChild={textContent:''};}
+ constructor(id=''){this.id=id;this.children=[];this.value='';this.checked=false;this.hidden=false;this.disabled=false;this.style={};this.dataset={};this.classes=new Set();this.classList={toggle:(name,value)=>value?this.classes.add(name):this.classes.delete(name),add:name=>this.classes.add(name),remove:name=>this.classes.delete(name),contains:name=>this.classes.has(name)};this.lastChild={textContent:''};}
  set innerHTML(s){this._html=s;this.lastChild={textContent:s.includes('抬起')?'抬起':''};}get innerHTML(){return this._html;}
- appendChild(x){if(x.parentNode)x.parentNode.children=x.parentNode.children.filter(n=>n!==x);this.children.push(x);x.parentNode=this;return x;}append(...x){for(const node of x)this.appendChild(node);}replaceChildren(){this.children=[];}setAttribute(){}click(){return this.onclick?.();}
+ appendChild(x){if(x.parentNode)x.parentNode.children=x.parentNode.children.filter(n=>n!==x);this.children.push(x);x.parentNode=this;return x;}append(...x){for(const node of x)this.appendChild(node);}replaceChildren(){this.children=[];}setAttribute(){}click(){return this.onclick?.();}focus(){this.focused=true;}
 }
 function harness({visualReview=false,mobile=false,model='STS3032-C001',ready=true,fastTimers=false,manualTimers=false,initialStatus,initialLibrary}={}){
- const html=fs.readFileSync(path.join(__dirname,'../software.html'),'utf8'),nodes={};for(const[,id]of html.matchAll(/id="([^"]+)"/g))nodes[id]=new Node(id);
+ const html=fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../software.html'),'utf8'),nodes={};for(const[,id]of html.matchAll(/id="([^"]+)"/g))nodes[id]=new Node(id);
  Object.assign(nodes.tempo,{value:'100'});Object.assign(nodes.amplitude,{value:'100'});Object.assign(nodes.hold,{value:'50',step:'10'});nodes.sound.checked=true;nodes.repeats.value='3';
- const nav=[new Node(),new Node(),new Node()];nav.forEach((b,i)=>b.dataset.tab=['train','library','convert'][i]);const patterns=['single','combination','alternating'].map(name=>{const b=new Node();b.dataset.pattern=name;return b;});const link=new Node();const intervals=[],timers=[],events={},sent=[],stops=[],sounds=[];let now=0,state={active:false,model,error:'none'},status=initialStatus??(mobile?{model,hold_adjustable:model!=='SC09'}:{bridge:1,connected:true,port:'COM3',device_info:'model='+model}),library=initialLibrary??{ready,count:0,max:100,free:100000,slots:[]};
+ const nav=[new Node(),new Node(),new Node()];nav.forEach((b,i)=>b.dataset.tab=['train','library','convert'][i]);const patterns=['single','combination','alternating'].map(name=>{const b=new Node();b.dataset.pattern=name;return b;});const link=new Node();const intervals=[],timers=[],events={},sent=[],stops=[],sounds=[];let now=0,state={active:false,model,error:'none',encoder_range:4095,feedback:[{id:2,position:2171,position_valid:true,sample_age_ms:10}]},status=initialStatus??(mobile?{model,hold_adjustable:model!=='SC09'}:{bridge:1,connected:true,port:'COM3',device_info:'model='+model}),library=initialLibrary??{ready,count:0,max:100,free:100000,slots:[]};
  const document={body:new Node('body'),hidden:false,addEventListener:(n,f)=>events[n]=f,getElementById:id=>nodes[id]||(nodes[id]=new Node(id)),createElement:()=>new Node(),querySelector:()=>link,querySelectorAll:s=>s==='[data-tab]'?nav:s==='[data-pattern]'?patterns:s.includes('#train')?[...nodes.fingers.children,nodes.upload,...nodes.songs.children.flatMap(x=>x.children.filter(y=>y.onclick))]:[]};
  class AudioContext{get currentTime(){return now/1000;}resume(){return Promise.resolve();}createGain(){return{gain:{value:0,setValueAtTime(){},linearRampToValueAtTime(){},cancelScheduledValues(){},setTargetAtTime(){}},connect(){}};}createOscillator(){const v={frequency:{value:0},connect(){},start(){sounds.push(v.frequency.value);},stop(){stops.push(v.frequency.value);}};return v;}}
- const context={document,console,URL,URLSearchParams,Blob,Uint8Array,TextEncoder,TextDecoder,DataView,AbortController,atob,btoa,confirm:()=>true,performance:{now:()=>now},window:{AudioContext,addEventListener:(n,f)=>events[n]=f},navigator:{sendBeacon:(p,b)=>sent.push({path:p,body:b,beacon:true})},setInterval:(f,ms)=>intervals.push({f,ms}),setTimeout:manualTimers?(f,ms)=>{if(ms>=1000)return setTimeout(f,ms);timers.push({f,ms});return timers.length;}:fastTimers?(f,ms)=>{if(ms>=1000)return setTimeout(f,ms);queueMicrotask(f);return 1;}:setTimeout,clearTimeout,requestAnimationFrame:()=>{},fetch:async(url,opts={})=>{sent.push({path:url,body:opts.body,headers:opts.headers});let data;if(url==='/api/software/status')data=status;else if(url==='/api/library')data=library;else if(url==='/api/state')data=state;else data={ok:true};if(typeof data==='function')data=await data();if(data instanceof Error)throw data;return {ok:true,json:async()=>data};}};
- let source=fs.readFileSync(path.join(__dirname,'../software.js'),'utf8');source=source.replace("init();window.addEventListener", "globalThis.subject={train,stop,frame(){audioTick();lastVisualFrame=-Infinity;frame();},audioTick,expireFeedback,sampleState,refresh,applyState,friendly,capability,encodeScore,loadReview,renderOriginal,selection,addNote,openPlayer,renderPlayer,showTab,uploadScore,resolvePlayerSource,sourceCache,setUploadCapabilities(s){uploadCapabilities=s;},setOriginal(p){project=p;originalSourceSha=p.source_sha256||'';originalPreviews=p.page_previews||[];},setPlayback(v,s){score=v;state=s;clock=performance.now();lastElapsed=0;active=true;openPlayer(v);deviceClock.sync(s,clock,clock);audioTransport?.load(v);audioTransport?.sync(s,clock,clock);},get active(){return active;},get activePitches(){const p=audioTransport?.clock.position(performance.now());return [...(audioTransport?.voices.values()||[])].filter(v=>v.note.t_ms<=p&&p<v.note.t_ms+v.note.duration_ms&&audioTransport.clock.permitted(v.note)).map(v=>v.note.pitch);},get voiceCount(){return voices.size+(audioTransport?.soundingCount||0);},getAudio:enableAudio};init();window.addEventListener");vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../software-pack.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../software-audio.js'),'utf8'),context);if(visualReview)vm.runInContext(fs.readFileSync(path.join(__dirname,'../software-review.js'),'utf8'),context);vm.runInContext(source,context);
+ const context={document,console,URL,URLSearchParams,Blob,Uint8Array,TextEncoder,TextDecoder,DataView,AbortController,atob,btoa,performance:{now:()=>now},window:{AudioContext,addEventListener:(n,f)=>events[n]=f},navigator:{sendBeacon:(p,b)=>sent.push({path:p,body:b,beacon:true})},setInterval:(f,ms)=>intervals.push({f,ms}),setTimeout:manualTimers?(f,ms)=>{if(ms>=1000)return setTimeout(f,ms);timers.push({f,ms});return timers.length;}:fastTimers?(f,ms)=>{if(ms>=1000)return setTimeout(f,ms);queueMicrotask(f);return 1;}:setTimeout,clearTimeout,requestAnimationFrame:()=>{},fetch:async(url,opts={})=>{sent.push({path:url,body:opts.body,headers:opts.headers});let data;if(url==='/api/software/status'||url==='/api/status')data=status;else if(url==='/api/library')data=library;else if(url==='/api/state')data=state;else data={ok:true};if(typeof data==='function')data=await data();if(data instanceof Error)throw data;return {ok:true,json:async()=>data};}};
+ let source=fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../software.js'),'utf8');source=source.replace("init();window.addEventListener", "globalThis.subject={get visualReview(){return visualReview;},train,stop,frame(){audioTick();lastVisualFrame=-Infinity;frame();},audioTick,expireFeedback,sampleState,refresh,applyState,friendly,capability,encodeScore,as64,loadReview,renderOriginal,selection,addNote:openManualNote,acceptRecognized,scheduleReviewCheck,checkCurrentReview,reviewChanged,openPlayer,renderPlayer,showTab,uploadScore,resolvePlayerSource,sourceCache,setUploadCapabilities(s){uploadCapabilities={...uploadCapabilities,...s};},setOriginal(p){project=p;originalSourceSha=p.source_sha256||'';originalPreviews=p.page_previews||[];},setPlayback(v,s){score=v;state=s;clock=performance.now();lastElapsed=0;active=true;openPlayer(v);deviceClock.sync(s,clock,clock);audioTransport?.load(v);audioTransport?.sync(s,clock,clock);},get active(){return active;},get activePitches(){const p=audioTransport?.clock.position(performance.now());return [...(audioTransport?.voices.values()||[])].filter(v=>v.note.t_ms<=p&&p<v.note.t_ms+v.note.duration_ms&&audioTransport.clock.permitted(v.note)).map(v=>v.note.pitch);},get voiceCount(){return voices.size+(audioTransport?.soundingCount||0);},getAudio:enableAudio};init();window.addEventListener");vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../software-pack.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../software-audio.js'),'utf8'),context);if(visualReview)vm.runInContext(fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../software-review.js'),'utf8'),context);vm.runInContext(source,context);
  return {context,nodes,nav,patterns,link,events,sent,intervals,timers,sounds,stops,subject:context.subject,setNow:v=>now=v,setState:v=>state=v,setStatus:v=>status=v,setLibrary:v=>library=v,flush:async()=>{await new Promise(resolve=>setImmediate(resolve));}};
 }
 function uploadFixture(h,count=55){return h.subject.encodeScore({version:1,hand:'right',title:'上传测试',duration_ms:count*100,notes:Array.from({length:count},(_,i)=>({t_ms:i*100,duration_ms:50,pitch:60,finger:2,velocity:96,amplitude_pct:40}))}).buffer;}
 
-test('desktop initializes real five finger controls and capability gate',async()=>{const h=harness();await h.flush();assert.equal(h.nodes.fingers.children.length,5);assert.equal(h.nodes.upload.disabled,false);assert.match(h.nodes.connection.textContent,/USB COM3.*STS3032/);});
-test('phone identifies hotspot and hides PC conversion without expecting bridge fields',async()=>{const h=harness({mobile:true});await h.flush();assert.match(h.nodes.connection.textContent,/手套热点.*STS3032/);assert.equal(h.nodes['convert-tab'].hidden,true);assert.equal(h.link.hidden,true);});
+async function assertOriginalPngBytes(actual,expected){const want=Buffer.from(expected.slice(expected.indexOf(',')+1),'base64'),bytes=actual.startsWith('data:')?Buffer.from(actual.slice(actual.indexOf(',')+1),'base64'):Buffer.from(await(await fetch(actual)).arrayBuffer());assert.deepEqual(bytes,want);}
+
+test('desktop initializes real five finger controls and capability gate',async()=>{const h=harness();await h.flush();assert.equal(h.nodes.fingers.children.length,5);assert.equal(h.nodes.upload.disabled,false);assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM3.*STS3032/);});
+test('USB enrollment waiting state is distinct from disconnect and disables motion',async()=>{const h=harness({initialStatus:{bridge:1,connected:true,port:'COM9',enrollment_active:true}});await h.flush();assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM9.*手套（USB）.*等待舵机/);assert.equal(h.nodes.upload.disabled,true);assert.equal(h.sent.filter(r=>r.path==='/api/library').length,0);h.setState({active:false,connected:true,port:'COM9',connection_state:'waiting_servos',device_ready:false,feedback:[],error:'enrollment_active'});for(let i=0;i<8;i++){h.setNow(i*600);await h.subject.sampleState();h.subject.expireFeedback();assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);}assert.equal(h.sent.filter(r=>r.path==='/api/train'||r.path==='/api/play'||r.path==='/api/keep').length,0);});
+test('waiting servos still reports a real USB transport failure',async()=>{const h=harness({initialStatus:{bridge:1,connected:true,port:'COM9',enrollment_active:true}});await h.flush();h.setState(new Error('串口读失败'));h.setNow(200);await h.intervals.find(r=>r.ms===50).f();assert.match(h.nodes.connection.textContent,/连接中断/);assert.equal(h.nodes.upload.disabled,true);});
+test('phone identifies hotspot and hides PC conversion without expecting bridge fields',async()=>{const h=harness({mobile:true});await h.flush();assert.match(h.nodes.connection.title,/手套热点.*STS3032/);assert.match(h.nodes.connection.textContent,/手套（热点）/);assert.equal(h.nodes['convert-tab'].hidden,true);assert.equal(h.link.hidden,true);});
 test('SC09 holds expose only zero or full and sensible labels',async()=>{const h=harness({model:'SC09'});await h.flush();assert.equal(h.nodes.hold.step,'100');assert.equal(h.nodes.hold.value,'100');h.nodes.hold.value='0';h.nodes.hold.oninput();assert.equal(h.nodes['hold-label'].textContent,'卸力');});
 test('filesystem not ready keeps motion disabled',async()=>{const h=harness({ready:false});await h.flush();assert.equal(h.nodes.upload.disabled,true);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.match(h.nodes.message.textContent,/存储尚未就绪/);});
 test('heartbeat is sent only while local page owns active training',async()=>{const h=harness();await h.flush();const heart=h.intervals.find(x=>x.ms===500);await heart.f();assert.equal(h.sent.filter(x=>x.path==='/api/keep').length,0);await h.subject.train(1);await heart.f();assert.equal(h.sent.filter(x=>x.path==='/api/keep').length,1);await h.subject.stop();await heart.f();assert.equal(h.sent.filter(x=>x.path==='/api/keep').length,1);});
@@ -48,20 +53,279 @@ test('changing any reviewed beat or page bound invalidates range confirmation',a
 test('feedback arm failure identifies the correct finger and real cause',async()=>{const h=harness();await h.flush();assert.equal(h.subject.friendly('stage=feedback_outside slot=2 id=3 observed=2522 expected=-1 bus_error=0 speed=1200 acc=30'),'食指当前位置超出校准允许余量，先回到范围内再试（当前位置 2522）；动作已停止');assert.match(h.subject.friendly('stage=feedback_read slot=4 id=5 observed=-1 expected=-1'),/无名指.*反馈未读到/);assert.match(h.subject.friendly('stage=hardware_limits_invalid slot=0 id=1'),/拇指侧摆.*舵机允许范围/);});
 test('upload contention, controller ownership and lost feedback have distinct explanations',async()=>{const h=harness();await h.flush();assert.match(h.subject.friendly('ERR LIB TRAIN upload_active_finish_or_abort_first'),/正在上传曲谱/);assert.match(h.subject.friendly('upload_owned_by_other_transport'),/另一个控制页面/);assert.match(h.subject.friendly('tempo_bounds_or_owner'),/其他控制页面/);assert.match(h.subject.friendly('feedback_lost'),/位置反馈丢失/);assert.match(h.subject.friendly('outside_calibrated_range_15pct'),/超出允许的校准范围/);});
 test('loading library disables actions with a visible loading message',async()=>{const h=harness();assert.equal(h.nodes.upload.disabled,true);assert.equal(h.nodes.activity.textContent,'正在读取曲库');assert.equal(h.nodes.capacity.textContent,'正在读取曲库');await h.flush();assert.equal(h.nodes.activity.textContent,'待机');});
+
+const deletionLibrary=(title='删除测试曲谱')=>({ready:true,count:1,max:100,free:8192,slots:[{slot:4,title,notes:2,duration_ms:1000,stored:160}]});
+
+test('late validation cannot restore a previous edit or a different PDF state',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const requests=[];
+ const originalFetch=h.context.fetch;h.context.fetch=(url,options)=>url==='/api/software/check'?new Promise(resolve=>requests.push({resolve,body:JSON.parse(options.body)})):originalFetch(url,options);
+ h.subject.loadReview({name:'开发样例',source_sha256:'dev-one',notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});
+ const first=h.subject.checkCurrentReview();await h.flush();
+ const current=h.subject.selection();current.notes[0].finger=3;current.notes[0].manual_fields=['finger'];h.subject.reviewChanged();
+ const second=h.subject.checkCurrentReview();await h.flush();
+ requests[1].resolve({ok:true,json:async()=>({ok:true,automatic:{ready:true,attention_notes:0},report:{ready:true},notes:[{id:'a',automatic_ready:true,automatic_reasons:[]}]})});await second;
+ requests[0].resolve({ok:true,json:async()=>({ok:true,automatic:{ready:false,attention_notes:1},report:{ready:false},notes:[{id:'a',automatic_ready:false,automatic_reasons:['旧错误']}]})});await first;
+ assert.equal(current.notes[0].finger,3);assert.equal(current.notes[0].automatic_ready,true);assert.equal(current.notes[0].automatic_reasons.length,0);
+ const third=h.subject.checkCurrentReview();await h.flush();
+ h.subject.loadReview({name:'第二份',source_sha256:'dev-two',notes:[{id:'b',hand:'right',pitch:'E4',finger:4,beat:1,duration_beats:1}],selection:{}});
+ requests[2].resolve({ok:true,json:async()=>({ok:true,automatic:{ready:false},notes:[{id:'a',automatic_ready:false,automatic_reasons:['更旧']}]})});await third;
+ assert.equal(h.subject.selection().source_sha256,'dev-two');assert.equal(h.subject.selection().notes[0].finger,4);
+ assert.equal(h.sent.some(r=>r.path==='/api/train'||r.path==='/api/play'),false);
+});
+
+test('validation request omits preview bytes and never replaces musical values',async()=>{
+ const h=harness({manualTimers:true});await h.flush();let sent;
+ const old=h.context.fetch;h.context.fetch=async(url,options)=>{if(url!=='/api/software/check')return old(url,options);sent=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,automatic:{ready:true},report:{ready:true},notes:[{id:'a',automatic_ready:true,automatic_reasons:[],finger:5,beat:99}]})};};
+ h.subject.loadReview({name:'开发校验',notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:4,duration_beats:.5}],page_previews:[{data:'large-image'}],selection:{}});
+ await h.subject.checkCurrentReview();const p=h.subject.selection();
+ assert.equal(sent.project.page_previews,undefined);assert.equal(p.notes[0].finger,2);assert.equal(p.notes[0].beat,4);assert.equal(p.notes[0].automatic_ready,true);
+});
+
+test('right-hand timing check merges derived positions and refreshes the table without rewriting note identity',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const old=h.context.fetch;
+ h.context.fetch=async(url,options)=>url!=='/api/software/check'?old(url,options):{ok:true,json:async()=>({ok:true,right_hand_timing:{version:1},written_duration_beats:9,rests:[{id:'rest',beat:7,duration:1}],repeat_sections:[{start_beat:6,end_beat:9,count:2}],repeat_markers:[],ending_brackets:[],automatic:{ready:true,timing_warning_notes:1,timing_warning_note_ids:['a'],timing_estimated_notes:2},report:{ready:true},scope:{},notes:[{id:'a',automatic_ready:true,automatic_reasons:[],in_export_scope:true,beat:6,start_beat:6,written_beat:6,measure_start_beat:6,measure_beat:0,timing_warning:'起首位置估计',timing_estimated:true,timing_source_id:'a',timing_basis:{local:0},finger:5,pitch:'D9',duration_beats:99},{id:'b',automatic_ready:true,automatic_reasons:[],in_export_scope:true,beat:8,start_beat:8,written_beat:8,measure_start_beat:6,measure_beat:2,timing_warning:null,timing_estimated:true,timing_source_id:'a'}]})};
+ h.subject.loadReview({name:'合成右手时序',notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:4,duration_beats:1},{id:'b',hand:'right',pitch:'D4',finger:3,beat:6,duration_beats:1}],selection:{}});
+ h.nodes['review-full-list'].open=true;h.nodes['review-full-list'].ontoggle();const draft=h.nodes['review-notes'].children[1].children[3];draft.value='7.25';h.context.document.activeElement=draft;await h.subject.checkCurrentReview();const p=h.subject.selection();
+ assert.deepEqual(Array.from(p.notes,n=>n.beat),[6,8]);assert.equal(p.notes[0].finger,2);assert.equal(p.notes[0].pitch,'C4');assert.equal(p.notes[0].duration_beats,1);assert.equal(p.notes[0].timing_basis.local,0);
+ assert.equal(p.written_duration_beats,9);assert.equal(p.rests[0].beat,7);assert.equal(p.repeat_sections[0].start_beat,6);assert.equal(h.nodes['review-notes'].children[2].children[3].value,8);assert.equal(h.nodes['review-notes'].children[1].children[3],draft);assert.equal(draft.value,'7.25');
+ assert.equal(h.nodes.export.disabled,false);assert.equal(h.sent.some(x=>x.path==='/api/train'||x.path==='/api/play'),false);
+});
+
+test('a stale timing calculation cannot undo a newer source edit or its dependent positions',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const requests=[],old=h.context.fetch;
+ h.context.fetch=(url,options)=>url==='/api/software/check'?new Promise(resolve=>requests.push(resolve)):old(url,options);
+ h.subject.loadReview({name:'合成联动',right_hand_timing:{version:1},notes:[{id:'a',hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1},{id:'b',hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1}],selection:{}});
+ const prior=h.subject.checkCurrentReview();await h.flush();const p=h.subject.selection();p.notes[0].beat=2;p.notes[0].manual_fields=['beat'];h.subject.reviewChanged();const latest=h.subject.checkCurrentReview();await h.flush();
+ const response=start=>({ok:true,json:async()=>({ok:true,right_hand_timing:{version:1},automatic:{ready:true},report:{ready:true},notes:[{id:'a',automatic_ready:true,automatic_reasons:[],beat:start,timing_warning:null},{id:'b',automatic_ready:true,automatic_reasons:[],beat:start+1,timing_warning:null}]})});
+ requests[1](response(2));await latest;requests[0](response(0));await prior;assert.deepEqual(Array.from(p.notes,n=>n.beat),[2,3]);assert.equal(p.notes[0].manual_fields[0],'beat');
+});
+
+test('auto-next waits for the latest asynchronous validation before advancing',async()=>{
+ const h=harness({visualReview:true,manualTimers:true});await h.flush();const requests=[],old=h.context.fetch;
+ h.context.fetch=(url,options)=>url==='/api/software/check'?new Promise(resolve=>requests.push(resolve)):old(url,options);
+ const n=(id,page,finger)=>({id,page,system:1,measure:1,hand:'right',pitch:'C4',finger,beat:page-1,duration_beats:1,bbox:[20,20,30,30],automatic_reasons:finger==null?['选择指法']:[]});
+ h.subject.loadReview({name:'合成校对',automatic_mode:true,notes:[n('first',1,null),n('later',2,null)],pages:[{page:1,width:100,height:100},{page:2,width:100,height:100}],selection:{auto_skip_processed:true}});
+ const selected=()=>h.subject.visualReview.current()?.id;
+ assert.equal(selected(),'first');const stale=h.subject.checkCurrentReview();await h.flush();
+ h.nodes['review-finger-2'].onclick();const latest=h.subject.checkCurrentReview();await h.flush();
+ const response=()=>({ok:true,json:async()=>({ok:true,automatic:{ready:false,attention_notes:1},report:{},scope:{},notes:[
+  {id:'first',automatic_ready:true,automatic_reasons:[],in_export_scope:true},
+  {id:'later',automatic_ready:false,automatic_reasons:['选择指法'],in_export_scope:true}]})});
+ requests[0](response());await stale;assert.equal(selected(),'first');
+ requests[1](response());await latest;assert.equal(selected(),'later');assert.equal(h.nodes['review-row-select'].value,'2:1');
+});
+
+test('partial export button sends explicit opt-in and names the saved file with actual skipped count',async()=>{
+ const h=harness({visualReview:true,manualTimers:true});await h.flush();let payload,saved;
+ h.subject.loadReview({name:'合成部分导出',notes:[
+  {id:'pending',page:1,system:1,hand:'right',pitch:'C4',finger:null,source_fingering_state:'unresolved',beat:0,duration_beats:1,automatic_ready:false,automatic_reasons:['选择指法']},
+  {id:'ready',page:1,system:1,hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1,automatic_ready:true,automatic_reasons:[]}],selection:{bpm:120}});
+ const p=h.subject.selection();p.validation_pending=false;p.validation_error='';p.automatic={ready:false,attention_notes:1};
+ h.subject.visualReview.refreshValidation();assert.equal(h.nodes['review-export-skip-pending'].disabled,false);
+ const old=h.context.fetch;h.context.fetch=async(url,options)=>url==='/api/software/export'?(payload=JSON.parse(options.body),{ok:true,json:async()=>({ok:true,bytes:packFixture.score.length,base64:packFixture.score.toString('base64'),skipped_pending_count:1})}):old(url,options);
+ h.context.NativeApp=h.context.window.NativeApp={save:async(data,name)=>(saved=name,true)};
+ await h.nodes['review-export-skip-pending'].onclick();
+ assert.equal(payload.skip_pending,true);assert.match(saved,/部分动作，跳过1处/);assert.match(h.nodes.message.textContent,/跳过 1 处待处理/);
+ assert.equal(p.notes[0].excluded,undefined);assert.equal(p.notes[1].excluded,undefined);
+});
+
+test('offline PDF conversion does not show a device-disconnected failure',async()=>{
+ const h=harness({initialStatus:{bridge:1,connected:false}});await h.flush();h.subject.showTab('convert');
+ assert.equal(h.nodes.message.textContent,'');assert.match(h.nodes.connection.textContent,/离线转换/);
+ h.setState(new Error('未连接手套'));await h.intervals.find(t=>t.ms===50).f();
+ assert.equal(h.nodes.message.textContent,'');assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);
+ assert.equal(h.nodes.upload.disabled,true);
+});
+
+test('PDF and save errors are not disguised as motor-stop instructions',async()=>{
+ const h=harness();await h.flush();h.subject.showTab('convert');
+ h.context.window.GloveWorkspace.notice('Failed to load PDF document: Data format error',true);
+ assert.match(h.nodes.message.textContent,/曲谱操作未完成.*PDF/);assert.doesNotMatch(h.nodes.message.textContent,/停止后重试/);
+ h.context.window.GloveWorkspace.notice('Permission denied',true);assert.match(h.nodes.message.textContent,/写入权限/);
+ h.context.window.GloveWorkspace.notice('disk full',true);assert.match(h.nodes.message.textContent,/磁盘空间不足/);
+});
+
+test('new PDF never inherits previous score tempo while re-recognition preserves its saved tempo',async()=>{
+ const h=harness({manualTimers:true});await h.flush();
+ h.subject.loadReview({name:'前一首',source_sha256:'previous',source_tempo_bpm:62,notes:[],selection:{bpm:62}});
+ const requested=[];const originalFetch=h.context.fetch;
+ h.context.fetch=async(url,options)=>{if(url!=='/api/software/convert')return originalFetch(url,options);const input=JSON.parse(options.body);requested.push(input.bpm);return {ok:true,json:async()=>({project:{name:'无数字速度的新谱',source_sha256:'new-score',notes:[],selection:{bpm:input.bpm}}})};};
+ h.nodes.pdf.files=[{name:'新谱.pdf',arrayBuffer:async()=>new Uint8Array([37,80,68,70]).buffer}];
+ await h.nodes.recognize.onclick();assert.equal(h.subject.selection().selection.bpm,120);
+ h.nodes.bpm.value='96';h.subject.selection();
+ await h.nodes.recognize.onclick();assert.equal(h.subject.selection().selection.bpm,96);
+ assert.deepEqual(requested,[120,120]);
+});
+
+test('row export preset preserves full project while selecting exactly the visible source row',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({name:'范围示例',notes:[
+  {id:'a',page:1,system:1,hand:'right',pitch:'C4',finger:null,beat:0,duration_beats:1},
+  {id:'b',page:2,system:3,hand:'right',pitch:'D4',finger:2,beat:65,duration_beats:1}],selection:{}});
+ h.nodes['review-row-select'].value='2:3';h.nodes['review-export-preset'].value='row';h.nodes['review-export-preset'].onchange();
+ const selection=h.subject.selection().selection;
+ assert.equal(selection.start_page,2);assert.equal(selection.end_page,2);assert.equal(selection.start_system,3);assert.equal(selection.end_system,3);
+ assert.equal(selection.start_beat,0);assert.equal(selection.end_beat,null);assert.equal(h.subject.selection().notes.length,2);
+ assert.match(h.nodes['review-export-scope'].textContent,/第 2 页.*第 3 行/);
+ h.nodes['review-export-preset'].value='all';h.nodes['review-export-preset'].onchange();
+ assert.equal(h.subject.selection().selection.start_page,null);assert.equal(h.subject.selection().selection.start_system,undefined);
+});
+
+test('native saves are ordered and a failed save is observable to navigation and close callers',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({name:'开发保存',source_sha256:'dev-save',notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});
+ const writes=[];let completeFirst;
+ h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);if(writes.length===1)await new Promise(resolve=>completeFirst=resolve);}})};
+ const first=h.context.window.GloveWorkspace.flush();await h.flush();h.subject.selection().notes[0].finger=3;h.subject.reviewChanged();
+ const second=h.context.window.GloveWorkspace.flush();await h.flush();assert.equal(writes.length,1);
+ completeFirst();assert.equal(await first,true);assert.equal(await second,true);assert.equal(writes.length,2);
+ assert.equal(writes[0].project.notes[0].finger,2);assert.equal(writes[1].project.notes[0].finger,3);
+ h.context.NativeApp.ready=Promise.resolve({save_workspace:async()=>{throw Error('disk full')}});
+ h.subject.selection().notes[0].finger=4;h.subject.reviewChanged();
+ assert.equal(await h.context.window.GloveWorkspace.flush(),false);assert.match(h.nodes.message.textContent,/进度未保存/);
+ assert.equal(h.subject.selection().notes[0].finger,4);
+});
+
+test('unmatched saved edits remain recoverable and can match a later recognizer output',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({name:'旧修改',source_sha256:'dev-unmatched',notes:[
+  {id:'old',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:4,beat:0,duration_beats:1,manual_fields:['finger']}],selection:{}});
+ h.subject.acceptRecognized({project:{name:'新识别',source_sha256:'dev-unmatched',notes:[
+  {id:'fresh',page:1,origin:[120,100],hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1}],selection:{}}});
+ assert.equal(h.subject.selection().notes.length,1);assert.equal(h.subject.selection().notes[0].finger,1);
+ assert.equal(h.subject.selection().unmatched_review_notes[0].finger,4);assert.match(h.nodes.report.textContent,/旧修改未能对应/);
+ h.subject.acceptRecognized({project:{name:'再次识别',source_sha256:'dev-unmatched',notes:[
+  {id:'matched',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1}],selection:{}}});
+ assert.equal(h.subject.selection().notes.length,1);assert.equal(h.subject.selection().notes[0].finger,4);
+ assert.equal(h.subject.selection().unmatched_review_notes.length,0);
+});
+
+test('recognizer refresh preserves unconfirmed manual fields and reversible omissions',async()=>{
+ const h=harness({manualTimers:true});await h.flush();
+ h.subject.loadReview({name:'开发旧结果',source_sha256:'dev-merge',recognizer:'v5',notes:[
+  {id:'old-a',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:4,beat:0,duration_beats:1,confirmed:false,manual_fields:['finger']},
+  {id:'old-b',page:1,origin:[200,100],hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1,excluded:true,excluded_manual:true},
+  {id:'old-c',page:1,origin:[300,100],hand:'right',pitch:'E4',finger:3,beat:2,duration_beats:1,excluded:false,excluded_manual:true}],selection:{bpm:95}});
+ h.subject.acceptRecognized({project:{name:'新结果',source_sha256:'dev-merge',recognizer:'v6',automatic_mode:true,notes:[
+  {id:'new-a',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1},
+  {id:'new-b',page:1,origin:[200,100],hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1},
+  {id:'new-c',page:1,origin:[300,100],hand:'right',pitch:'E4',finger:3,beat:2,duration_beats:1,excluded:true}],selection:{bpm:120}}});
+ const p=h.subject.selection();assert.equal(p.notes[0].finger,4);assert.equal(p.notes[0].confirmed,undefined);assert.equal(p.notes[1].excluded,true);assert.equal(p.notes[2].excluded,false);assert.equal(p.selection.bpm,95);
+ const fresh=JSON.parse(JSON.stringify(p));fresh.notes[0].finger=1;fresh.notes[1].excluded=false;fresh.notes[2].excluded=true;
+ h.subject.acceptRecognized({project:fresh});assert.equal(h.subject.selection().notes[0].finger,4);assert.equal(h.subject.selection().notes[1].excluded,true);assert.equal(h.subject.selection().notes[2].excluded,false);
+});
+
+test('same-source re-recognition preserves only valid explicitly manual measure anchors',async()=>{
+ const h=harness({manualTimers:true});await h.flush();
+ h.subject.loadReview({name:'旧局部修改',source_sha256:'development-scope',notes:[
+  {id:'a',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:1,beat:296.25,measure_beat:.25,timing_anchor_scope:'measure',manual_fields:['beat'],duration_beats:1},
+  {id:'b',page:1,origin:[200,100],hand:'right',pitch:'D4',finger:2,beat:300,measure_beat:0,manual_fields:['beat'],duration_beats:1},
+  {id:'c',page:1,origin:[300,100],hand:'right',pitch:'E4',finger:3,beat:304,measure_beat:-1,timing_anchor_scope:'measure',manual_fields:['beat'],duration_beats:1},
+  {id:'d',page:1,origin:[400,100],hand:'right',pitch:'F4',finger:4,beat:308,measure_beat:.5,timing_anchor_scope:'measure',manual_fields:['finger'],duration_beats:1}
+ ],selection:{}});
+ const fresh={name:'新识别',source_sha256:'development-scope',notes:[100,200,300,400].map((x,i)=>({id:'new-'+i,page:1,origin:[x,100],hand:'right',pitch:'C4',finger:1,beat:i,measure_beat:0,duration_beats:1})),selection:{}};
+ fresh.notes[1].timing_anchor_scope='measure';fresh.notes[2].timing_anchor_scope='measure';
+ h.subject.acceptRecognized({project:fresh});const out=h.subject.selection().notes;
+ assert.equal(out[0].beat,296.25);assert.equal(out[0].measure_beat,.25);assert.equal(out[0].timing_anchor_scope,'measure');assert.ok(out[0].manual_fields.includes('beat'));
+ assert.equal(out[1].beat,300);assert.equal(out[1].timing_anchor_scope,undefined,'legacy beat remains absolute');
+ assert.equal(out[2].beat,304);assert.equal(out[2].timing_anchor_scope,undefined,'invalid local anchor is not propagated');
+ assert.equal(out[3].beat,3);assert.equal(out[3].timing_anchor_scope,undefined,'non-manual beat cannot introduce a local anchor');
+ const saved=JSON.parse(JSON.stringify(h.subject.selection()));assert.equal(saved.notes[0].timing_anchor_scope,'measure');assert.equal(saved.notes[0].measure_beat,.25);
+});
+
+test('editing the full-list absolute beat removes an existing measure anchor',async()=>{
+ const h=harness();await h.flush();const n={id:'n',page:1,hand:'right',pitch:'C4',finger:1,beat:296.25,measure_beat:.25,measure_start_beat:296,timing_anchor_scope:'measure',manual_fields:['beat'],duration_beats:1};
+ h.subject.loadReview({notes:[n],selection:{}});const row=h.nodes['review-notes'].children[1],absolute=row.children[3];absolute.value='297.5';absolute.onchange();
+ assert.equal(n.beat,297.5);assert.equal(n.timing_anchor_scope,undefined);assert.ok(n.manual_fields.includes('beat'));
+});
+
+test('local timing scope survives a check response and native workspace save/restore',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const old=h.context.fetch;
+ const note={id:'a',page:1,origin:[100,100],hand:'right',pitch:'C4',finger:1,beat:296.25,measure_start_beat:296,measure_beat:.25,timing_anchor_scope:'measure',manual_fields:['beat'],duration_beats:1};
+ h.subject.loadReview({name:'局部修改',source_sha256:'dev-scope',right_hand_timing:{version:1},notes:[note],selection:{}});
+ h.context.fetch=async(url,options)=>url!=='/api/software/check'?old(url,options):{ok:true,json:async()=>({ok:true,right_hand_timing:{version:1},automatic:{ready:true},report:{ready:true},scope:{},notes:[{id:'a',automatic_ready:true,automatic_reasons:[],in_export_scope:true,beat:296.25,measure_start_beat:296,measure_beat:.25,timing_anchor_scope:'measure',timing_warning:null}]})};
+ await h.subject.checkCurrentReview();assert.equal(h.subject.selection().notes[0].timing_anchor_scope,'measure');assert.equal(h.subject.selection().notes[0].measure_beat,.25);
+ let saved=null;h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{saved=JSON.parse(JSON.stringify(value));}})};
+ assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.equal(saved.project.notes[0].timing_anchor_scope,'measure');assert.equal(saved.project.notes[0].measure_beat,.25);
+ h.context.window.GloveWorkspace.restore(saved);const restored=h.subject.selection().notes[0];assert.equal(restored.timing_anchor_scope,'measure');assert.equal(restored.measure_beat,.25);assert.ok(restored.manual_fields.includes('beat'));
+});
+
+async function recognizeProjectFixture(h,project){
+ const previous=h.context.fetch;
+ h.context.fetch=async(url,opts)=>url==='/api/software/convert'?{ok:true,json:async()=>({ok:true,project})}:previous(url,opts);
+ h.nodes.pdf.files=[{name:'客户新谱.pdf',arrayBuffer:async()=>new Uint8Array([37,80,68,70]).buffer}];
+ await h.nodes.pdf.onchange();
+}
+test('updated recognizer replaces a prior empty same-PDF workspace automatically',async()=>{
+ const h=harness();await h.flush();
+ h.subject.loadReview({name:'旧失败结果',source_sha256:'same-source',recognizer:'v4',notes:[],selection:{}});
+ await recognizeProjectFixture(h,{name:'新识别结果',source_sha256:'same-source',recognizer:'v5',automatic_mode:true,
+  notes:[{id:'p1-n1',hand:'right',pitch:'D4',finger:2,beat:0,duration_beats:1,origin:[100,100]}],selection:{}});
+ assert.equal(h.subject.selection().notes.length,1);assert.equal(h.subject.selection().recognizer,'v5');
+});
+test('recognizer upgrade retains confirmed edits only on the same source location',async()=>{
+ const h=harness();await h.flush();
+ h.subject.loadReview({name:'旧手改',source_sha256:'same-source',recognizer:'v4',notes:[
+  {id:'p1-n1',page:1,hand:'right',pitch:'C4',finger:4,beat:0,duration_beats:1,origin:[100,100],confirmed:true},
+  {id:'p1-n2',page:1,hand:'right',pitch:'E4',finger:5,beat:1,duration_beats:1,origin:[200,100],confirmed:true}],selection:{}});
+ await recognizeProjectFixture(h,{name:'新识别',source_sha256:'same-source',recognizer:'v5',automatic_mode:true,notes:[
+  {id:'p1-n1',page:1,hand:'right',pitch:'D4',finger:2,beat:0,duration_beats:1,origin:[100,100]},
+  {id:'p1-n2',page:1,hand:'right',pitch:'F4',finger:3,beat:1,duration_beats:1,origin:[300,100]}],selection:{}});
+ const notes=h.subject.selection().notes;assert.equal(notes[0].finger,4);assert.equal(notes[0].finger_source,'manual');
+ assert.equal(notes[1].finger,3);assert.equal(notes[1].pitch,'F4');
+});
+test('fingerless PDF reports unsupported and cannot offer a misleading automatic export',async()=>{
+ const h=harness();await h.flush();
+ await recognizeProjectFixture(h,{name:'无印号',source_sha256:'fingerless',recognizer:'v5',automatic_mode:true,
+  automatic:{unsupported:true},notes:[{id:'n',hand:'right',pitch:'C4',finger:null,beat:0,duration_beats:1}],selection:{}});
+ assert.match(h.nodes.report.textContent,/没有右手印刷指法/);assert.equal(h.nodes.export.disabled,true);
+ assert.equal(h.subject.selection().notes[0].finger,null);
+ assert.equal(h.sent.some(r=>r.path==='/api/train'||r.path==='/api/play'),false);
+});
+test('library deletion opens an in-page confirmation with slot and title; cancelling sends no delete',async()=>{
+ const h=harness({initialLibrary:deletionLibrary('A <B> 曲谱')});await h.flush();const trigger=h.nodes.songs.children[0].children[2];
+ trigger.onclick();assert.equal(h.nodes['song-delete-dialog'].hidden,false);assert.equal(h.nodes['song-delete-name'].textContent,'第 4 首 · A <B> 曲谱');assert.equal(trigger.disabled,true);assert.equal(h.nodes['song-delete-cancel'].focused,true);assert.equal(readCount(h,'/api/delete'),0);
+ h.nodes['song-delete-cancel'].onclick();assert.equal(h.nodes['song-delete-dialog'].hidden,true);assert.equal(trigger.disabled,false);assert.equal(trigger.focused,true);assert.equal(readCount(h,'/api/delete'),0);
+});
+test('confirming library deletion submits the selected slot once and refreshes the list',async()=>{
+ const h=harness({initialLibrary:deletionLibrary()});await h.flush();h.nodes.songs.children[0].children[2].onclick();const reads=readCount(h,'/api/library');h.setLibrary({ready:true,count:0,max:100,free:9000,slots:[]});
+ await h.nodes['song-delete-confirm'].onclick();const writes=h.sent.filter(x=>x.path==='/api/delete');assert.equal(writes.length,1);assert.equal(String(writes[0].body),'slot=4');assert.equal(readCount(h,'/api/library'),reads+1);assert.equal(h.nodes['song-delete-dialog'].hidden,true);assert.equal(h.nodes.songs.children.length,0);assert.match(h.nodes.message.textContent,/已删除.*删除测试曲谱/);
+});
+test('repeated delete and confirm clicks cannot duplicate an in-flight delete request',async()=>{
+ const h=harness({initialLibrary:deletionLibrary()});await h.flush();const trigger=h.nodes.songs.children[0].children[2],previous=h.context.fetch;let complete,calls=0;
+ h.context.fetch=async(url,opts)=>{if(url==='/api/delete'){calls++;return new Promise(resolve=>complete=resolve);}return previous(url,opts);};trigger.onclick();trigger.onclick();const pending=h.nodes['song-delete-confirm'].onclick();await h.flush();
+ assert.equal(h.nodes['song-delete-confirm'].disabled,true);assert.equal(h.nodes['song-delete-cancel'].disabled,true);assert.equal(trigger.disabled,true);h.subject.capability(true);assert.equal(trigger.disabled,true);await h.nodes['song-delete-confirm'].onclick();trigger.onclick();h.nodes['song-delete-cancel'].onclick();assert.equal(calls,1);assert.equal(h.nodes['song-delete-dialog'].hidden,false);
+ complete({ok:true,json:async()=>({ok:true})});await pending;assert.equal(calls,1);assert.equal(h.nodes['song-delete-dialog'].hidden,true);
+});
+test('a failed delete remains visible and closable without allowing a duplicate retry',async()=>{
+ const h=harness({initialLibrary:deletionLibrary()});await h.flush();const trigger=h.nodes.songs.children[0].children[2],previous=h.context.fetch;let calls=0;
+ h.context.fetch=async(url,opts)=>{if(url==='/api/delete'){calls++;return {ok:false,json:async()=>({error:'busy_or_slot_missing'})};}return previous(url,opts);};trigger.onclick();await h.nodes['song-delete-confirm'].onclick();
+ assert.equal(h.nodes['song-delete-dialog'].hidden,false);assert.match(h.nodes['song-delete-status'].textContent,/曲谱不存在.*先停止/);assert.match(h.nodes.message.textContent,/曲谱不存在.*先停止/);assert.equal(h.nodes['song-delete-confirm'].disabled,true);assert.equal(h.nodes['song-delete-cancel'].disabled,false);assert.equal(h.nodes['song-delete-cancel'].textContent,'关闭');await h.nodes['song-delete-confirm'].onclick();assert.equal(calls,1);
+ h.nodes['song-delete-cancel'].onclick();assert.equal(h.nodes['song-delete-dialog'].hidden,true);assert.equal(trigger.disabled,false);assert.equal(trigger.focused,true);
+});
+test('refresh cancels pending deletion and old row clicks cannot target a replaced slot',async()=>{
+ const h=harness({initialLibrary:deletionLibrary('旧曲谱')});await h.flush();const old=h.nodes.songs.children[0].children[2];old.onclick();let complete;h.setLibrary(()=>new Promise(resolve=>complete=resolve));const refreshing=h.subject.refresh();await h.flush();
+ assert.equal(h.nodes['song-delete-dialog'].hidden,true);old.onclick();await h.nodes['song-delete-confirm'].onclick();assert.equal(readCount(h,'/api/delete'),0);assert.equal(h.nodes['song-delete-dialog'].hidden,true);
+ complete(deletionLibrary('新曲谱'));await refreshing;old.onclick();assert.equal(h.nodes['song-delete-dialog'].hidden,true);h.nodes.songs.children[0].children[2].onclick();assert.equal(h.nodes['song-delete-name'].textContent,'第 4 首 · 新曲谱');h.nodes['song-delete-cancel'].onclick();
+});
+test('disconnect cancels a pending deletion so a late confirm cannot delete after reconnect',async()=>{
+ const h=harness({initialLibrary:deletionLibrary('原设备曲谱')});await h.flush();h.nodes.songs.children[0].children[2].onclick();await expireConnection(h);assert.equal(h.nodes['song-delete-dialog'].hidden,true);await h.nodes['song-delete-confirm'].onclick();assert.equal(readCount(h,'/api/delete'),0);
+ h.setLibrary(deletionLibrary('重连后的曲谱'));await freshRecovery(h);await h.nodes['song-delete-confirm'].onclick();assert.equal(readCount(h,'/api/delete'),0);assert.equal(h.nodes['song-delete-dialog'].hidden,true);h.nodes.songs.children[0].children[2].onclick();assert.equal(h.nodes['song-delete-name'].textContent,'第 4 首 · 重连后的曲谱');h.nodes['song-delete-cancel'].onclick();
+});
+test('Escape closes an unsubmitted deletion confirmation and restores focus',async()=>{
+ const h=harness({initialLibrary:deletionLibrary()});await h.flush();const trigger=h.nodes.songs.children[0].children[2];trigger.onclick();let prevented=false;h.events.keydown({key:'Escape',preventDefault(){prevented=true;}});assert.equal(prevented,true);assert.equal(h.nodes['song-delete-dialog'].hidden,true);assert.equal(trigger.focused,true);assert.equal(readCount(h,'/api/delete'),0);
+});
 test('pattern start rejection sends terminal stop and never keeps held fingers active',async()=>{const h=harness();await h.flush();const previous=h.context.fetch;h.context.fetch=async(url,opts)=>{if(url==='/api/pattern'){h.sent.push({path:url,body:opts.body});return {ok:false,json:async()=>({ok:false,error:'feedback_lost'})};}return previous(url,opts);};await h.patterns.find(b=>b.dataset.pattern==='alternating').onclick();assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,1);assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);assert.equal(h.sent.at(-1).path,'/api/stop');assert.match(h.nodes.message.textContent,/位置反馈丢失/);assert.match(h.nodes['training-status'].textContent,/位置反馈丢失/);const count=h.sent.length;await h.intervals.find(x=>x.ms===500).f();assert.equal(h.sent.length,count);});
 
 test('new sampled-position and health stop reasons remain explicit Chinese',async()=>{const h=harness();await h.flush();for(const [reason,expected] of [['position_feedback_lost',/位置反馈丢失/],['health_feedback_lost',/电压或温度反馈丢失/],['feedback_hardware_limit',/硬件行程限制/],['outside_calibrated_range_slack',/校准范围余量/],['recovery_moved_farther_outside',/继续向范围外移动/]]){assert.match(h.subject.friendly(reason),expected);assert.doesNotMatch(h.subject.friendly(reason),/具体原因尚未读到/);}});
 
-function backendExport(project){return require('node:child_process').spawnSync(process.env.PIANO_TEST_PYTHON||'python',['-c',"import sys,json;sys.path.insert(0,sys.argv[1]);from score_converter import export_reviewed;from score_codec import encode,decode;p=json.load(sys.stdin);b=encode(export_reviewed(p));s=decode(b);print(json.dumps({'bytes':len(b),'notes':s['notes']}))",path.join(__dirname,'..')],{input:JSON.stringify(project),encoding:'utf8',env:{...process.env,PYTHONIOENCODING:'utf-8'}});}
+function backendExport(project){return require('node:child_process').spawnSync(process.env.PIANO_TEST_PYTHON||'python',['-c',"import sys,json;sys.path.insert(0,sys.argv[1]);from score_automatic import export_automatic;from score_codec import encode,decode;p=json.load(sys.stdin);b=encode(export_automatic(p));s=decode(b);print(json.dumps({'bytes':len(b),'notes':s['notes']}))",path.join(ORIGINAL_TEST_DIR,'..')],{input:JSON.stringify(project),encoding:'utf8',env:{...process.env,PYTHONIOENCODING:'utf-8'}});}
 test('manual notes use unique ids and current original page with blank unconfirmed fields',async()=>{const h=harness();await h.flush();h.subject.setOriginal({name:'扫描谱',source_sha256:'scan-source',notes:[],pages:[{},{}],selection:{bpm:120,range_reviewed:true},page_previews:[{page:1,data:'page-one'},{page:2,data:'page-two'}]});h.subject.renderOriginal();h.nodes['original-next'].onclick();h.subject.addNote();h.subject.addNote();const p=h.subject.selection();assert.notEqual(p.notes[0].id,p.notes[1].id);for(const note of p.notes){assert.match(note.id,/^manual-/);assert.equal(note.page,2);assert.equal(note.hand,'right');assert.equal(note.pitch,null);assert.equal(note.finger,null);assert.equal(note.beat,null);assert.equal(note.duration_beats,null);assert.equal(note.confirmed,false);}assert.equal(p.selection.range_reviewed,false);});
-test('empty PDF clearly requires manual entry and blank note cannot bypass backend review',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'空扫描谱',notes:[],pages:[{}],selection:{bpm:120,start_beat:0,range_reviewed:false}});assert.match(h.nodes.report.textContent,/未自动识别到音符.*补录/);h.subject.addNote();h.nodes['range-reviewed'].checked=true;assert.notEqual(backendExport(h.subject.selection()).status,0);const row=h.nodes['review-notes'].children[1];row.children[6].checked=true;row.children[6].onchange();h.nodes['range-reviewed'].checked=true;const result=backendExport(h.subject.selection());assert.notEqual(result.status,0);assert.match(result.stderr,/核对起拍与时值/);});
-test('manual note filled and confirmed in actual UI exports valid PGL through Python backend',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'扫描手录',notes:[],pages:[{}],selection:{bpm:120,start_beat:0,range_reviewed:false}});h.subject.addNote();const row=h.nodes['review-notes'].children[1];for(const [index,value] of [[1,'C4'],[2,'1'],[3,'0'],[4,'1']]){row.children[index].value=value;row.children[index].onchange();}row.children[6].checked=true;row.children[6].onchange();h.nodes['range-reviewed'].checked=true;const result=backendExport(h.subject.selection());assert.equal(result.status,0,result.stderr);const output=JSON.parse(result.stdout);assert.equal(output.bytes,144);assert.equal(output.notes[0].pitch,60);assert.equal(output.notes[0].finger,1);assert.equal(output.notes[0].t_ms,0);assert.equal(output.notes[0].duration_ms,500);});
-test('editing fields and excluding notes both revoke reviewed range',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'节选',notes:[{id:1,page:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:true}],selection:{bpm:120,range_reviewed:true}});const row=h.nodes['review-notes'].children[1];for(const index of [1,2,3,4]){h.nodes['range-reviewed'].checked=true;row.children[index].onchange();assert.equal(h.nodes['range-reviewed'].checked,false);}h.nodes['range-reviewed'].checked=true;row.children[7].checked=true;row.children[7].onchange();assert.equal(h.nodes['range-reviewed'].checked,false);assert.equal(h.subject.selection().notes[0].excluded,true);});
+test('empty PDF clearly requires manual entry and blank note cannot bypass backend review',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'空扫描谱',notes:[],pages:[{}],selection:{bpm:120,start_beat:0,range_reviewed:false}});assert.match(h.nodes.report.textContent,/未自动识别到音符.*补录/);h.subject.addNote();h.nodes['range-reviewed'].checked=true;assert.notEqual(backendExport(h.subject.selection()).status,0);const row=h.nodes['review-notes'].children[1];row.children[2].value='1';row.children[2].onchange();const result=backendExport(h.subject.selection());assert.notEqual(result.status,0);assert.match(result.stderr,/开始位置|音值/);});
+test('manual note filled without approval checkboxes exports valid PGL through actual automatic backend',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'扫描手录',notes:[],pages:[{}],selection:{bpm:120,start_beat:0,range_reviewed:false}});h.subject.addNote();const row=h.nodes['review-notes'].children[1];for(const [index,value] of [[1,'C4'],[2,'1'],[3,'0'],[4,'1']]){row.children[index].value=value;row.children[index].onchange();}assert.equal(row.children.length,7);assert.equal(h.subject.selection().notes[0].confirmed,false);const result=backendExport(h.subject.selection());assert.equal(result.status,0,result.stderr);const output=JSON.parse(result.stdout);assert.equal(output.bytes,144);assert.equal(output.notes[0].pitch,60);assert.equal(output.notes[0].finger,1);assert.equal(output.notes[0].t_ms,0);assert.equal(output.notes[0].duration_ms,500);});
+test('editing fields and excluding notes both revoke reviewed range',async()=>{const h=harness();await h.flush();h.subject.loadReview({name:'节选',notes:[{id:1,page:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:true}],selection:{bpm:120,range_reviewed:true}});const row=h.nodes['review-notes'].children[1];for(const index of [1,2,3,4]){h.nodes['range-reviewed'].checked=true;row.children[index].onchange();assert.equal(h.nodes['range-reviewed'].checked,false);}h.nodes['range-reviewed'].checked=true;row.children[6].checked=true;row.children[6].onchange();assert.equal(h.nodes['range-reviewed'].checked,false);assert.equal(h.subject.selection().notes[0].excluded,true);});
 
 test('training started muted can enable and disable sound without restarting movement',async()=>{const h=harness();await h.flush();h.nodes.sound.checked=false;await h.subject.train(5);assert.equal(h.subject.voiceCount,0);h.nodes.sound.checked=true;await h.nodes.sound.onchange();assert.equal(h.subject.voiceCount,2);assert.equal(h.sounds.length,4);assert.equal(h.sent.filter(x=>x.path==='/api/train').length,1);h.nodes.sound.checked=false;await h.nodes.sound.onchange();assert.equal(h.subject.voiceCount,0);assert.equal(h.subject.active,true);});
 test('device stop cancels locally owned pattern without resending a restart command',async()=>{const h=harness();await h.flush();h.setState({active:true,mode:'pattern',pattern:2,pattern_step:0,pattern_total:12,mask:21,fastest:true,initializing:false});await h.patterns.find(b=>b.dataset.pattern==='alternating').onclick();assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,1);assert.equal(h.subject.active,true);h.setState({active:false,error:'movement_opposite_target'});await h.intervals.find(x=>x.ms===50).f();assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);assert.match(h.nodes.activity.textContent,/相反方向/);await h.intervals.find(x=>x.ms===50).f();assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,1);assert.equal(h.sent.filter(x=>x.path==='/api/train').length,0);});
 test('stopping while a pattern start waits for STOP cannot let it adopt a newer generation',async()=>{const h=harness();await h.flush();const previous=h.context.fetch;let release;h.context.fetch=async(url,opts)=>url==='/api/stop'&&!release?await new Promise(r=>release=r):previous(url,opts);const pattern=h.patterns[0].onclick();await h.flush();h.events.pagehide();release({ok:true,json:async()=>({ok:true})});await pattern;assert.equal(h.subject.active,false);assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,0);});
-test('play failure clears pending score and sends terminal STOP',async()=>{const h=harness();await h.flush();const previous=h.context.fetch;h.context.fetch=async(url,opts)=>url==='/api/library'?{ok:true,json:async()=>({ready:true,slots:[{slot:1,title:'失败曲谱',notes:1}]})}:url.startsWith('/api/score')?{ok:true,json:async()=>({notes:[{t_ms:0,duration_ms:500,pitch:60,finger:1}]})}:url==='/api/play'?{ok:false,json:async()=>({error:'initialization_timeout'})}:previous(url,opts);await h.subject.refresh();await h.nodes.songs.children[0].children[1].onclick();assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);assert.match(h.nodes.message.textContent,/未到准备位置/);assert.equal(h.sent.filter(x=>x.path==='/api/stop').length,2);});
+test('play failure clears pending score and sends terminal STOP',async()=>{const h=harness();await h.flush();h.setState({active:false,encoder_range:4095,feedback:[freshAxis(2171)]});const previous=h.context.fetch;h.context.fetch=async(url,opts)=>url==='/api/library'?{ok:true,json:async()=>({ready:true,slots:[{slot:1,title:'失败曲谱',notes:1}]})}:url.startsWith('/api/score')?{ok:true,json:async()=>({notes:[{t_ms:0,duration_ms:500,pitch:60,finger:1}]})}:url==='/api/play'?{ok:false,json:async()=>({error:'initialization_timeout'})}:previous(url,opts);await h.subject.refresh();await h.nodes.songs.children[0].children[1].onclick();assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);assert.match(h.nodes.message.textContent,/未到准备位置/);assert.equal(h.sent.filter(x=>x.path==='/api/stop').length,2);});
 test('state RTT midpoint corrects elapsed clock and labels communication time separately',async()=>{const h=harness();await h.flush();await h.subject.getAudio();h.subject.setPlayback({notes:[{t_ms:0,duration_ms:600,pitch:60,finger:1},{t_ms:600,duration_ms:400,pitch:62,finger:2}]},{active:true,elapsed_ms:0,tempo:200});h.setNow(100);const previous=h.context.fetch;h.context.fetch=async(url,opts)=>{if(url==='/api/state'){h.setNow(300);return {ok:true,json:async()=>({active:true,elapsed_ms:500,tempo:200})};}return previous(url,opts);};await h.subject.sampleState();h.subject.frame();assert.equal(h.subject.voiceCount,1);assert.ok(h.sounds.at(-2)>290&&h.sounds.at(-2)<300);assert.match(h.nodes['player-note'].textContent,/D4/);assert.equal(h.nodes.sync.textContent,'通信 200 ms · 设备时钟同步');});
 test('older simultaneous state query cannot overwrite a newer tempo clock response',async()=>{const h=harness();await h.flush();await h.subject.getAudio();h.subject.setPlayback({notes:[{t_ms:0,duration_ms:600,pitch:60,finger:1},{t_ms:600,duration_ms:400,pitch:62,finger:2}]},{active:true,elapsed_ms:0,tempo:100});const resolves=[];h.context.fetch=async()=>new Promise(r=>resolves.push(r));const old=h.subject.sampleState(),newer=h.subject.sampleState();resolves[1]({ok:true,json:async()=>({active:true,elapsed_ms:700,tempo:200})});await newer;resolves[0]({ok:true,json:async()=>({active:true,elapsed_ms:100,tempo:100})});await old;h.subject.frame();assert.ok(h.sounds.at(-2)>290);assert.match(h.nodes['player-note'].textContent,/D4/);});
 test('reopening matching PDF after importing review restores original without losing manual notes',async()=>{const h=harness();await h.flush();const note={id:'manual-1',page:1,pitch:'C4',finger:1,hand:'right',beat:0,duration_beats:1,confirmed:true};h.subject.loadReview({name:'我的复核',source_sha256:'source-one',notes:[note],selection:{bpm:110,start_beat:0,end_beat:2,range_reviewed:true}});await recognizeFixture(h);const p=h.subject.selection();assert.equal(p.name,'我的复核');assert.equal(p.notes.length,1);assert.equal(p.notes[0].confirmed,true);assert.equal(p.selection.bpm,110);assert.equal(p.selection.range_reviewed,true);assert.equal(h.nodes['original-image'].hidden,false);assert.match(h.nodes.message.textContent,/保留复核和补录/);});
@@ -71,12 +335,12 @@ test('USB score uploads keep a longer transfer deadline than control writes',asy
 test('first finger click while following a score stops playback then begins manual finger training',async()=>{const h=harness();await h.flush();h.subject.setPlayback({title:'曲谱',notes:[]},{active:true,elapsed_ms:100,tempo:100});await h.nodes.fingers.children[0].onclick();const writes=h.sent.filter(x=>x.path==='/api/stop'||x.path==='/api/train');assert.equal(writes.length,2);assert.equal(writes[0].path,'/api/stop');assert.equal(writes[1].path,'/api/train');assert.match(String(writes[1].body),/^mask=1&/);assert.equal(h.subject.active,true);assert.equal(h.nodes.activity.textContent,'手指训练');});
 test('ready playback state replaces the compact preparation message',async()=>{const h=harness();await h.flush();h.subject.setPlayback({title:'长音练习',notes:[]},{active:true,initializing:true,elapsed_ms:0,tempo:100});h.subject.applyState({active:true,initializing:true});assert.equal(h.nodes.activity.textContent,'准备中');h.subject.applyState({active:true,initializing:false});assert.equal(h.nodes.activity.textContent,'演奏中');});
 
-async function songFixture(h,error=null){const previous=h.context.fetch;h.setState({active:true,initializing:false,elapsed_ms:0,tempo:100});h.context.fetch=async(url,opts)=>url==='/api/library'?{ok:true,json:async()=>({ready:true,slots:[{slot:1,title:'入口复测',notes:1}]})}:url.startsWith('/api/score')?{ok:true,json:async()=>({title:'入口复测',notes:[{t_ms:0,duration_ms:500,pitch:60,finger:1}]})}:url==='/api/play'&&error?{ok:false,json:async()=>({error})}:previous(url,opts);await h.subject.refresh();return h.nodes.songs.children[0];}
-test('play entry proceeds even when browser audio resume stays pending',async()=>{const h=harness();await h.flush();const row=await songFixture(h);let resume;h.context.window.AudioContext.prototype.resume=()=>new Promise(r=>resume=r);const clicked=row.children[1].onclick();await h.flush();try{assert.ok(h.sent.some(x=>x.path==='/api/play'),'PLAY must not wait for AudioContext.resume');}finally{resume();await clicked;}});
+async function songFixture(h,error=null){const previous=h.context.fetch,fresh={active:false,initializing:false,elapsed_ms:0,tempo:100,encoder_range:4095,feedback:[freshAxis(2171)]};h.setState(fresh);h.context.fetch=async(url,opts)=>{if(url==='/api/library')return {ok:true,json:async()=>({ready:true,slots:[{slot:1,title:'入口复测',notes:1}]})};if(url.startsWith('/api/score'))return {ok:true,json:async()=>({title:'入口复测',notes:[{t_ms:0,duration_ms:500,pitch:60,finger:1}]})};if(url==='/api/play'){if(error)return {ok:false,json:async()=>({error})};h.setState({...fresh,active:true});}return previous(url,opts);};await h.subject.refresh();return h.nodes.songs.children[0];}
+test('play entry proceeds even when browser audio resume stays pending',async()=>{const h=harness();await h.flush();const row=await songFixture(h);let resume;h.context.window.AudioContext.prototype.resume=()=>new Promise(r=>resume=r);const clicked=row.children[1].onclick();await h.flush();await new Promise(r=>setTimeout(r,3000));await h.flush(); /* 11-05：开弹前有 3 2 1 倒计时 */try{assert.ok(h.sent.some(x=>x.path==='/api/play'),'PLAY must not wait for AudioContext.resume');}finally{resume();await clicked;}});
 test('real little-finger outside-range error is visible beside the clicked song button',async()=>{const h=harness();await h.flush();const row=await songFixture(h,'stage=feedback_outside slot=5 id=6 observed=2672 expected=-1 bus_error=0');await row.children[1].onclick();const status=row.children.find(x=>x.className==='song-state');assert.ok(status,'song needs its own status beside the action buttons');assert.match(status.textContent,/小指.*校准允许余量.*回到范围/);assert.match(status.textContent,/2672/);assert.equal(h.subject.active,false);});
 test('clicking play shows immediate local preparation state before a delayed score request',async()=>{const h=harness();await h.flush();const row=await songFixture(h),previous=h.context.fetch;let reply;h.context.fetch=async(url,opts)=>url.startsWith('/api/score')?new Promise(r=>reply=r):previous(url,opts);const pending=row.children[1].onclick();const status=row.children.find(x=>x.className==='song-state');assert.match(status.textContent,/读取中/);assert.equal(row.children[1].disabled,true);await h.flush();reply({ok:true,json:async()=>({title:'入口复测',notes:[]})});await pending;assert.match(status.textContent,/演奏中/);assert.equal(row.children[1].disabled,false);});
 test('pattern controls send one local executor command and follow live masks for audio',async()=>{const h=harness();await h.flush();h.setState({active:true,mode:'pattern',pattern:2,pattern_step:0,pattern_total:12,mask:21,fastest:false,initializing:false});await h.patterns.find(b=>b.dataset.pattern==='alternating').onclick();assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,1);assert.equal(h.sent.filter(x=>x.path==='/api/train').length,0);assert.equal(h.subject.voiceCount,3);assert.equal(h.nodes['finger-action-0'].textContent,'按下');assert.equal(h.nodes['finger-action-1'].textContent,'抬起');h.setState({active:true,mode:'pattern',pattern:2,pattern_step:1,pattern_total:12,mask:10,fastest:false,initializing:false});await h.intervals.find(x=>x.ms===50).f();assert.equal(h.subject.voiceCount,2);assert.equal(h.nodes['finger-action-0'].textContent,'抬起');assert.equal(h.nodes['finger-action-1'].textContent,'按下');assert.match(h.nodes['training-status'].textContent,/交替 2\/12/);assert.equal(h.sent.filter(x=>x.path==='/api/pattern').length,1);});
-test('fastest training sends zero rate without reducing selected working amplitude',async()=>{const h=harness();await h.flush();h.nodes['fastest-training'].onclick();h.setState({active:true,mode:'pattern',pattern:0,pattern_step:0,pattern_total:30,mask:1,fastest:true});await h.patterns[0].onclick();const params=new URLSearchParams(h.sent.find(x=>x.path==='/api/pattern').body);assert.equal(params.get('tempo'),'0');assert.equal(params.get('amplitude'),'100');assert.equal(params.get('pattern'),'0');assert.equal(params.get('repeats'),'3');assert.match(h.nodes['training-status'].textContent,/最快/);});
+test('fastest button sets the speed slider to its maximum without reducing selected working amplitude',async()=>{const h=harness();await h.flush();h.nodes.tempo.max='1000';await h.nodes['fastest-training'].onclick();assert.equal(h.nodes.tempo.value,'1000');assert.equal(h.nodes['tempo-label'].textContent,'1000%');assert.match(h.nodes['training-status'].textContent,/最快/);h.setState({active:true,mode:'pattern',pattern:0,pattern_step:0,pattern_total:30,mask:1});await h.patterns[0].onclick();const params=new URLSearchParams(h.sent.find(x=>x.path==='/api/pattern').body);assert.equal(params.get('tempo'),'1000');assert.equal(params.get('amplitude'),'100');assert.equal(params.get('pattern'),'0');assert.equal(params.get('repeats'),'3');});
 test('score maximum tempo button sends 1000 percent and never the pattern-only zero rate',async()=>{const h=harness();await h.flush();h.subject.setPlayback({notes:[]},{active:true,tempo:100,elapsed_ms:0});h.setState({active:true,tempo:1000,elapsed_ms:0});await h.nodes['max-score-tempo'].onclick();assert.equal(h.nodes.tempo.value,'1000');assert.equal(h.nodes['tempo-label'].textContent,'1000%');const tempos=h.sent.filter(x=>x.path==='/api/tempo').map(x=>new URLSearchParams(x.body).get('tempo'));assert.deepEqual(tempos,['1000']);});
 test('water level uses fresh raw position, exact calibration bounds and allowed window',async()=>{const h=harness();await h.flush();h.subject.applyState({encoder_range:4095,feedback:[{id:6,position:2672,position_valid:true,sample_age_ms:25,min:1667,max:2480,allowed_min:1545,allowed_max:2602,calibration_valid:true}]});assert.equal(h.nodes['meter-value-6'].textContent,2672);assert.equal(h.nodes['meter-max-6'].textContent,'上限 2480');assert.equal(h.nodes['meter-min-6'].textContent,'下限 1667');assert.equal(h.nodes['meter-margin-6'].textContent,'余量 1545–2602');assert.equal(h.nodes['meter-status-6'].textContent,'校准偏高 70');assert.equal(h.nodes['meter-6'].classes.has('calibration-warning'),true);assert.ok(Math.abs(parseFloat(h.nodes['meter-water-6'].style.height)-2672/4095*100)<.001);});
 test('water level distinguishes reference slack from a soft calibration warning',async()=>{const h=harness();await h.flush();const axis={id:2,position:2520,position_valid:true,sample_age_ms:25,min:1920,max:2422,allowed_min:1806,allowed_max:2536,calibration_valid:true};h.subject.applyState({encoder_range:4095,feedback:[axis]});assert.equal(h.nodes['meter-2'].classes.has('outside'),false);assert.equal(h.nodes['meter-status-2'].textContent,'');assert.equal(h.nodes['meter-status-2'].hidden,true);axis.position=1805;h.subject.applyState({encoder_range:4095,feedback:[axis]});assert.equal(h.nodes['meter-2'].classes.has('calibration-warning'),true);assert.equal(h.nodes['meter-status-2'].textContent,'校准偏低 1');assert.equal(h.nodes['meter-status-2'].hidden,false);});
@@ -94,10 +358,10 @@ test('normal water card has one numeric range while keeping exact bounds in its 
 test('out-of-window status remains visible after compacting a formerly normal card',async()=>{const h=harness();await h.flush();const axis={id:6,position:2400,position_valid:true,sample_age_ms:1,min:1667,max:2480,allowed_min:1545,allowed_max:2602,calibration_valid:true};h.subject.applyState({encoder_range:4095,feedback:[axis]});assert.equal(h.nodes['meter-status-6'].hidden,true);axis.position=2672;h.subject.applyState({encoder_range:4095,feedback:[axis]});assert.equal(h.nodes['meter-status-6'].hidden,false);assert.equal(h.nodes['meter-status-6'].textContent,'校准偏高 70');assert.equal(h.nodes['meter-6'].classes.has('calibration-warning'),true);assert.equal(h.nodes['meter-range-6'].textContent,'1667–2480');});
 test('completed uses the same short completion wording for device patterns and scores',async()=>{const h=harness();await h.flush();assert.equal(h.subject.friendly('completed'),'已完成');assert.equal(h.subject.friendly('ERR LIB STATE completed'),'已完成');});
 test('manual training clears an old error immediately and again after current successful acknowledgment',async()=>{const h=harness();await h.flush();const previous=h.context.fetch;let reply;h.context.fetch=async(url,opts)=>url==='/api/train'?new Promise(r=>reply=r):previous(url,opts);h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';const pending=h.subject.train(1);assert.equal(h.nodes.message.textContent,'');assert.equal(h.nodes.message.style.color,'');await h.flush();h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';reply({ok:true,json:async()=>({ok:true})});await pending;assert.equal(h.nodes.message.textContent,'');assert.equal(h.nodes.message.style.color,'');assert.equal(h.subject.active,true);});
-test('pattern and song starts discard old red errors while a new rejection remains visible',async()=>{const h=harness();await h.flush();h.setState({active:true,mode:'pattern',pattern:2,pattern_step:0,pattern_total:12,mask:21});h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';const pattern=h.patterns[2].onclick();assert.equal(h.nodes.message.textContent,'');await pattern;assert.equal(h.nodes.message.textContent,'');assert.equal(h.nodes.message.style.color,'');await h.subject.stop();const row=await songFixture(h,'stage=feedback_outside slot=5 id=6 observed=2635 expected=-1');h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';const playing=row.children[1].onclick();assert.equal(h.nodes.message.textContent,'');await playing;assert.match(h.nodes.message.textContent,/小指.*2635/);assert.equal(h.nodes.message.style.color,'#ffc1b3');});
+test('pattern and song starts discard old red errors while a new rejection remains visible',async()=>{const h=harness();await h.flush();h.setState({active:true,mode:'pattern',pattern:2,pattern_step:0,pattern_total:12,mask:21});h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';const pattern=h.patterns[2].onclick();assert.equal(h.nodes.message.textContent,'');await pattern;assert.equal(h.nodes.message.textContent,'');assert.equal(h.nodes.message.style.color,'');await h.subject.stop();const row=await songFixture(h,'stage=feedback_outside slot=5 id=6 observed=2635 expected=-1');h.nodes.message.textContent='旧错误';h.nodes.message.style.color='#ffc1b3';const playing=row.children[1].onclick();assert.equal(h.nodes.message.textContent,'');await playing;assert.match(h.nodes.message.textContent,/小指.*2635/);assert.equal(h.nodes.message.style.color,'var(--error, #ffc1b3)');});
 test('a cancelled old TRAIN response never clears the newer operation error message',async()=>{const h=harness();await h.flush();const previous=h.context.fetch;let reply;h.context.fetch=async(url,opts)=>url==='/api/train'?new Promise(r=>reply=r):previous(url,opts);const pending=h.subject.train(1);await h.flush();const stopped=h.subject.stop();h.nodes.message.textContent='后续操作错误';h.nodes.message.style.color='#ffc1b3';reply({ok:true,json:async()=>({ok:true})});await pending;await stopped;assert.equal(h.nodes.message.textContent,'后续操作错误');assert.equal(h.nodes.message.style.color,'#ffc1b3');assert.equal(h.subject.active,false);});
 test('song opens the dedicated performance stage and returning stops before restoring the same meters',async()=>{const h=harness();await h.flush();const row=await songFixture(h);await row.children[1].onclick();assert.equal(h.nodes.player.hidden,false);assert.ok(h.context.document.body.classes.has('playing-view'));assert.equal(h.nodes['feedback-panel'].parentNode,h.nodes['player-feedback']);assert.equal(h.nodes.library.hidden,true);assert.match(h.nodes['player-title'].textContent,/入口复测/);assert.match(h.nodes['player-note'].textContent,/C4/);assert.ok(h.nodes['player-timeline'].innerHTML.includes('timeline-current'));await h.nodes['player-back'].onclick();assert.equal(h.subject.active,false);assert.equal(h.nodes.player.hidden,true);assert.equal(h.nodes.library.hidden,false);assert.equal(h.nodes['feedback-panel'].parentNode,h.nodes['feedback-home']);assert.equal(h.sent.at(-1).path,'/api/stop');});
-test('genuine original page and optional original coordinates follow the matching note only',async()=>{const h=harness();await h.flush();h.nodes['player-source-image'].clientHeight=2000;h.nodes['player-source'].clientHeight=400;h.subject.openPlayer({title:'原谱',notes:[{t_ms:0,duration_ms:1000,pitch:60,finger:1}],source_preview:{available:true,pages:[{page:1,width:1000,height:2000,image_url:'/api/software/source/known/1'},{page:2,width:1000,height:2000,image_url:'/api/software/source/known/2'}],note_pages:[{index:0,page:2,x:200,y:400,width:100,height:50}]}});h.subject.renderPlayer(100);assert.equal(h.nodes['player-source-label'].textContent,'原谱');assert.equal(h.nodes['player-source-image'].src,'/api/software/source/known/2');assert.equal(h.nodes['player-source-cursor'].style.left,'20%');assert.equal(h.nodes['player-source-cursor'].style.top,'20%');assert.equal(h.nodes['player-source-cursor'].hidden,false);assert.equal(h.nodes['player-source'].scrollTop,225);h.nodes['player-source-image'].onerror();assert.equal(h.nodes['player-source'].hidden,true);assert.equal(h.nodes['player-source-label'].textContent,'音符进度');assert.equal(h.nodes['player-source-hint'].hidden,false);});
+test('genuine original page and optional original coordinates follow the matching note only',async()=>{const h=harness();await h.flush();h.nodes['player-source-image'].clientHeight=2000;h.nodes['player-source'].clientHeight=400;h.subject.openPlayer({title:'原谱',notes:[{t_ms:0,duration_ms:1000,pitch:60,finger:1}],source_preview:{available:true,pages:[{page:1,width:1000,height:2000,image_url:'/api/software/source/known/1'},{page:2,width:1000,height:2000,image_url:'/api/software/source/known/2'}],note_pages:[{index:0,page:2,x:200,y:400,width:100,height:50}]}});assert.equal(h.nodes['player-source-label'].textContent,'音符进度','the timeline is the default view');assert.equal(h.nodes['player-source-toggle'].hidden,false);h.nodes['player-source-toggle'].onclick();h.subject.renderPlayer(100);assert.equal(h.nodes['player-source-label'].textContent,'原谱');assert.equal(h.nodes['player-source-image'].src,'/api/software/source/known/2');assert.equal(h.nodes['player-source-cursor'].style.left,'20%');assert.equal(h.nodes['player-source-cursor'].style.top,'20%');assert.equal(h.nodes['player-source-cursor'].hidden,false);assert.equal(h.nodes['player-source'].scrollTop,225);h.nodes['player-source-image'].onerror();assert.equal(h.nodes['player-source'].hidden,true);assert.equal(h.nodes['player-source-label'].textContent,'音符进度');assert.equal(h.nodes['player-source-hint'].hidden,false);});
 test('unassociated or arbitrary remote pictures never become an original score',async()=>{const h=harness();await h.flush();for(const source_preview of [undefined,{available:false,pages:[]},{available:true,pages:[{page:1,image_url:'https://unverified.example/score.png'}]}]){h.subject.openPlayer({notes:[],source_preview});assert.equal(h.nodes['player-source'].hidden,true);assert.equal(h.nodes['player-source-label'].textContent,'音符进度');assert.equal(h.nodes['player-source-hint'].hidden,false);}});
 test('local audio scheduler runs without any animation frame or per-note HTTP write',async()=>{const h=harness();await h.flush();await h.subject.getAudio();h.subject.setPlayback({notes:[{t_ms:100,duration_ms:300,pitch:62,finger:2}]},{active:true,elapsed_ms:0,tempo:100,clock_limit_ms:400});const count=h.sent.length;h.setNow(40);await h.intervals.find(t=>t.ms===20).f();assert.equal(h.sounds.length,2);assert.equal(h.sent.length,count);});
 test('all requests retain one controller header and pagehide beacon carries the same token',async()=>{const h=harness();await h.flush();await h.subject.train(1);const headers=h.sent.filter(x=>!x.beacon).map(x=>x.headers['X-Piano-Controller']);assert.ok(headers[0]);assert.ok(headers.every(x=>x===headers[0]));h.events.pagehide();const body=await h.sent.find(x=>x.beacon).body.text();assert.equal(new URLSearchParams(body).get('controller'),headers[0]);});
@@ -115,10 +379,247 @@ test('idle state request failure hides old values immediately and polling contin
 test('fresh packet without valid position feedback cannot enable motion after a disconnect',async()=>{const h=harness();await h.flush();h.setState({active:false,encoder_range:4095,feedback:[freshAxis(2171)]});await h.subject.sampleState();h.setNow(1101);h.subject.expireFeedback();h.setState({active:false,feedback:[{id:2,position:0,position_valid:false,sample_age_ms:0}]});await h.subject.sampleState();assert.equal(h.nodes.fingers.children[0].disabled,true);assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.equal(h.nodes['meter-status-2'].textContent,'连接中断');});
 test('axis sample age also grows locally before the connection deadline',async()=>{const h=harness();await h.flush();h.setState({active:false,encoder_range:4095,feedback:[{...freshAxis(2171),sample_age_ms:950}]});await h.subject.sampleState();h.setNow(100);h.subject.expireFeedback();assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.equal(h.nodes['meter-status-2'].textContent,'反馈过期');});
 test('connection expiry stops local playback and recovery preserves the retained plot without resuming',async()=>{const h=harness();await h.flush();await h.subject.getAudio();h.subject.setPlayback({duration_ms:3000,notes:[{t_ms:0,duration_ms:3000,pitch:60,finger:1}]},{active:true,elapsed_ms:1400,tempo:100,clock_limit_ms:3000});h.setState({active:true,elapsed_ms:1400,tempo:100,clock_limit_ms:3000,encoder_range:4095,feedback:[freshAxis(2171)]});await h.subject.sampleState();h.subject.frame();h.setNow(1101);h.subject.expireFeedback();assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);const progress=h.nodes['player-progress'].value,plot=h.nodes['player-timeline'].innerHTML;h.setState({active:false,elapsed_ms:0,encoder_range:4095,feedback:[freshAxis(2180)]});await h.subject.sampleState();await h.flush();assert.equal(h.nodes['player-progress'].value,progress);assert.equal(h.nodes['player-timeline'].innerHTML,plot);assert.equal(h.subject.active,false);assert.equal(h.nodes.fingers.children[0].disabled,false);});
-const packFixture=require('./software-pack-fixture.cjs'),Pack=require('../software-pack.js');
+const packFixture=require(path.join(ORIGINAL_TEST_DIR,'software-pack-fixture.cjs')),Pack=require(path.join(ORIGINAL_TEST_DIR,'../software-pack.js'));
 function selectPackage(h,archive=packFixture.fixture()){h.nodes.pgl.files=[{name:'原谱.pglpack',size:archive.length,arrayBuffer:async()=>archive.buffer.slice(archive.byteOffset,archive.byteOffset+archive.byteLength)}];h.nodes.slot.value='1';}
 const packedScore={version:1,hand:'right',title:'手机下载',duration_ms:200,notes:[{t_ms:0,duration_ms:200,pitch:60,finger:1,velocity:96,amplitude_pct:100}]};
-test('phone package upload unwraps identical PGL bytes and keeps genuine source outside device storage',async()=>{const h=harness({mobile:true});await h.flush();h.subject.setUploadCapabilities({upload_protocol:'chunks-v1',upload_chunk_max:384});selectPackage(h);await h.nodes.upload.onclick();const writes=h.sent.filter(x=>x.path.startsWith('/api/upload'));assert.equal(new URLSearchParams(writes[0].body).get('bytes'),String(packFixture.score.length));assert.deepEqual(Buffer.from(writes.find(x=>x.path==='/api/upload/chunk').body),packFixture.score);const hash=await Pack.sha256(packFixture.score);assert.ok(await h.subject.sourceCache.get(hash));assert.match(h.nodes.message.textContent,/原谱在本页可用/);const loaded=await h.subject.resolvePlayerSource(packedScore);assert.equal(loaded.source_preview.score_sha256,hash);h.subject.openPlayer(loaded);assert.equal(h.nodes['player-source-label'].textContent,'原谱');assert.ok(h.nodes['player-source-image'].src.startsWith('blob:'));});
+
+test('slow USB built-in hash read does not falsely disconnect before playSong',async()=>{
+ const h=harness();await h.flush();
+ const fresh={active:false,encoder_range:4095,feedback:[freshAxis(2171)]};h.setState(fresh);await h.subject.sampleState();
+ h.setLibrary({ready:true,slots:[{slot:3,title:packedScore.title,notes:1,duration_ms:200}]});await h.subject.refresh();
+ let finishRead,reads=0;const prior=h.context.fetch;
+ h.context.fetch=async(url,opts)=>{
+  if(url.startsWith('/api/score?')){h.sent.push({path:url});reads++;if(reads===1)return new Promise(resolve=>finishRead=resolve);return {ok:true,json:async()=>({...packedScore,base64:packFixture.score.toString('base64')})};}
+  if(url==='/api/play')h.setState({...fresh,active:true,mode:'score',elapsed_ms:0,tempo:100});
+  return prior(url,opts);
+ };
+ const bundle={name:'内置.pglpack',base64:packFixture.fixture().toString('base64'),score_sha256:await Pack.sha256(packFixture.score)};
+ const playing=h.context.window.GloveWorkspace.playBuiltin(bundle,new Node(),new Node()).catch(error=>error);
+ try{
+  await h.flush();assert.equal(typeof finishRead,'function');
+  h.setNow(2101);h.subject.expireFeedback();
+  assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);
+ }finally{finishRead?.({ok:true,json:async()=>({...packedScore,base64:packFixture.score.toString('base64')})});}
+ const error=await playing;assert.equal(error,undefined,error?.message);assert.equal(reads,1,'the verified PGL is reused only within this click');assert.equal(h.sent.filter(r=>r.path==='/api/play').length,1);
+ await h.subject.stop();h.setState(fresh);await h.context.window.GloveWorkspace.playBuiltin(bundle,new Node(),new Node());assert.equal(reads,2,'a later click must verify device bytes again');
+});
+
+async function usbScoreFixture(noteCount=1){
+ const source=noteCount===1?packedScore:{version:1,hand:'right',title:'3428音只读传输测试',duration_ms:noteCount*100,notes:Array.from({length:noteCount},(_,i)=>({t_ms:i*100,duration_ms:50,pitch:60+i%5,finger:i%5+1,velocity:96,amplitude_pct:100}))};
+ const h=harness({initialLibrary:{ready:true,slots:[{slot:3,title:source.title,notes:noteCount,duration_ms:source.duration_ms}]}});await h.flush();
+ const fresh={active:false,encoder_range:4095,feedback:[freshAxis(2171)]};h.setState(fresh);await h.subject.sampleState();
+ const bytes=h.subject.encodeScore(source);
+ return {h,fresh,bytes,row:h.nodes.songs.children[0],scoreReply:{ok:true,json:async()=>({...source,base64:Buffer.from(bytes).toString('base64')})}};
+}
+test('slow USB play read pauses STATE polling, invalidates old feedback and waits for a new state before PLAY',async()=>{
+ const {h,fresh,row,scoreReply,bytes}=await usbScoreFixture(3428),prior=h.context.fetch;let finishRead,finishFresh,stateReads=0;assert.equal(bytes.length,54976);
+ h.context.fetch=async(url,opts)=>{
+  if(url.startsWith('/api/score?')){h.sent.push({path:url});return new Promise(resolve=>finishRead=resolve);}
+  if(url==='/api/state'){h.sent.push({path:url});stateReads++;if(stateReads===1)return new Promise(resolve=>finishFresh=resolve);return {ok:true,json:async()=>({...fresh,active:true,mode:'score',elapsed_ms:0,tempo:100})};}
+  return prior(url,opts);
+ };
+ const playing=row.children[1].onclick();
+ try{
+  await h.flush();assert.equal(typeof finishRead,'function');assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.match(h.nodes.sync.textContent,/传输中/);
+  const poll=h.intervals.find(t=>t.ms===50);
+  for(const time of [1200,5000,10000]){h.setNow(time);await poll.f();}
+  assert.equal(stateReads,0,'STATE must not queue behind a bulk serial read');assert.equal(h.nodes.fingers.children[0].disabled,true);assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);assert.match(h.nodes['meter-status-2'].textContent,/反馈暂缓/);
+  finishRead(scoreReply);await h.flush();assert.equal(typeof finishFresh,'function');assert.equal(stateReads,1);
+  h.setNow(11000);await poll.f();assert.equal(stateReads,1,'ordinary polls must not supersede post-read confirmation');assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(row.children[1].disabled,true);
+  finishFresh({ok:true,json:async()=>fresh});await playing;
+  assert.equal(h.sent.filter(r=>r.path==='/api/play').length,1);assert.equal(h.subject.active,true);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['meter-value-2'].textContent,2171);
+  const paths=h.sent.map(r=>r.path),read=paths.findIndex(p=>p.startsWith('/api/score?')),play=paths.indexOf('/api/play');assert.ok(paths.slice(read+1,play).includes('/api/state'));
+ }finally{finishRead?.(scoreReply);finishFresh?.({ok:true,json:async()=>fresh});await playing;}
+});
+
+test('slow USB download resumes fresh feedback without false disconnect or motion',async()=>{
+ const {h,fresh,row,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;let finishRead;
+ const anchors=[],create=h.context.document.createElement;h.context.document.createElement=()=>{const node=create();anchors.push(node);return node;};
+ h.context.fetch=async(url,opts)=>url.startsWith('/api/score?')?new Promise(resolve=>finishRead=resolve):prior(url,opts);
+ const saving=row.children[3].onclick();
+ try{await h.flush();h.setNow(9000);await h.intervals.find(t=>t.ms===50).f();assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);assert.equal(h.nodes['meter-value-2'].textContent,'—');finishRead(scoreReply);await saving;assert.equal(anchors.at(-1).download,packedScore.title+'.pgl');assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>/^\/api\/(play|train|pattern|stop)$/.test(r.path)).length,0);h.setNow(10101);h.subject.expireFeedback();assert.match(h.nodes.connection.textContent,/连接中断/,'the ordinary one-second deadline resumes after reading');}finally{finishRead?.(scoreReply);await saving;}
+});
+
+test('USB read completion with invalid feedback never permits PLAY or auto-resumes after recovery',async()=>{
+ const {h,fresh,row,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;
+ h.context.fetch=async(url,opts)=>url.startsWith('/api/score?')?scoreReply:prior(url,opts);
+ h.setState({...fresh,feedback:[{...freshAxis(2171),position_valid:false}]});await row.children[1].onclick();
+ assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.match(h.nodes.message.textContent,/新鲜.*反馈/);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);
+ h.setState(fresh);h.setNow(200);await h.intervals.find(t=>t.ms===50).f();await h.flush();assert.equal(h.nodes.fingers.children[0].disabled,false);assert.match(h.nodes.connection.textContent,/已就绪/);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);
+});
+
+test('a real USB score read failure is reported and a later recovery never starts it',async()=>{
+ const {h,fresh,row}=await usbScoreFixture(),prior=h.context.fetch;let finishRead;
+ h.context.fetch=async(url,opts)=>url.startsWith('/api/score?')?new Promise((resolve,reject)=>finishRead=reject):prior(url,opts);
+ const playing=row.children[1].onclick();await h.flush();h.setNow(5000);h.subject.expireFeedback();h.setState(new Error('串口已断开'));finishRead(Error('曲谱读取失败，串口已断开'));await playing;
+ assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.match(h.nodes.connection.textContent,/连接中断/);
+ h.setState(fresh);h.setNow(7500);await h.intervals.find(t=>t.ms===50).f();await h.flush();assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.subject.active,false);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);
+});
+
+test('STOP during a slow USB read cancels the pending play but allows fresh idle controls afterwards',async()=>{
+ const {h,fresh,row,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;let finishRead;
+ h.context.fetch=async(url,opts)=>url.startsWith('/api/score?')?new Promise(resolve=>finishRead=resolve):prior(url,opts);
+ const playing=row.children[1].onclick();
+ try{await h.flush();h.setNow(4000);await h.subject.stop();finishRead(scoreReply);await playing;assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);assert.equal(h.nodes.fingers.children[0].disabled,false);h.setNow(4200);await h.intervals.find(t=>t.ms===50).f();assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);}finally{finishRead?.(scoreReply);await playing;}
+});
+
+test('USB read drains an already-running STATE poll and does not publish its older feedback',async()=>{
+ const {h,fresh,row,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;let finishPoll,finishRead,stateReads=0,scoreReads=0;
+ h.context.fetch=async(url,opts)=>{
+  if(url==='/api/state'&&++stateReads===1)return new Promise(resolve=>finishPoll=resolve);
+  if(url.startsWith('/api/score?')){scoreReads++;return new Promise(resolve=>finishRead=resolve);}
+  return prior(url,opts);
+ };
+ h.setNow(200);const polling=h.intervals.find(t=>t.ms===50).f();await h.flush();const saving=row.children[3].onclick();
+ try{await h.flush();assert.equal(scoreReads,0);h.setNow(2500);h.subject.expireFeedback();finishPoll({ok:true,json:async()=>({...fresh,feedback:[freshAxis(2000)]})});await polling;await h.flush();assert.equal(scoreReads,1);assert.equal(h.nodes['meter-value-2'].textContent,'—');finishRead(scoreReply);await saving;assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);}finally{finishPoll?.({ok:true,json:async()=>fresh});finishRead?.(scoreReply);await polling;await saving;}
+});
+
+test('a missing USB score reports its own error but restores fresh idle controls',async()=>{
+ const {h,row}=await usbScoreFixture(),prior=h.context.fetch;
+ h.context.fetch=async(url,opts)=>url.startsWith('/api/score?')?{ok:false,json:async()=>({error:'score_missing_or_corrupt'})}:prior(url,opts);
+ await row.children[3].onclick();assert.match(h.nodes.message.textContent,/曲谱不存在或损坏/);assert.match(h.nodes.connection.textContent,/已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.doesNotMatch(h.nodes.activity.textContent,/读取/);
+});
+
+test('USB download during active training is rejected without muting its feedback or heartbeat',async()=>{
+ const {h,fresh,row}=await usbScoreFixture();await h.subject.train(1);h.setState({...fresh,active:true,mask:1});
+ await row.children[3].onclick();assert.match(h.nodes.message.textContent,/先停止当前动作/);assert.equal(h.sent.filter(r=>r.path.startsWith('/api/score?')).length,0);assert.equal(h.subject.active,true);
+ h.setNow(200);await h.intervals.find(t=>t.ms===50).f();await h.intervals.find(t=>t.ms===500).f();assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>r.path==='/api/keep').length,1);assert.equal(h.sent.filter(r=>r.path==='/api/stop').length,0);
+});
+
+test('built-in score with a different device SHA uploads elsewhere then reads that new slot normally',async()=>{
+ const {h,fresh,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;
+ h.context.File=class extends Blob{constructor(parts,name){super(parts);this.name=name;}};
+ h.context.DataTransfer=class{constructor(){this.files=[];this.items={add:file=>this.files.push(file)};}};
+ const different={...packedScore,notes:[{...packedScore.notes[0],pitch:61}]},differentBytes=h.subject.encodeScore(different);
+ h.context.fetch=async(url,opts)=>{
+  if(url.startsWith('/api/score?')){h.sent.push({path:url});return url.endsWith('slot=3')?{ok:true,json:async()=>({...different,base64:Buffer.from(differentBytes).toString('base64')})}:scoreReply;}
+  if(url==='/api/upload?slot=1')h.setLibrary({ready:true,slots:[{slot:3,title:packedScore.title,notes:1},{slot:1,title:packedScore.title,notes:1}]});
+  if(url==='/api/play')h.setState({...fresh,active:true,mode:'score',elapsed_ms:0,tempo:100});
+  return prior(url,opts);
+ };
+ await h.context.window.GloveWorkspace.playBuiltin({name:'内置.pglpack',base64:packFixture.fixture().toString('base64'),score_sha256:await Pack.sha256(packFixture.score)},new Node(),new Node());
+ assert.deepEqual(h.sent.filter(r=>r.path.startsWith('/api/score?')).map(r=>r.path),['/api/score?slot=3','/api/score?slot=1']);
+ assert.equal(h.sent.filter(r=>r.path==='/api/upload?slot=1').length,1);assert.equal(new URLSearchParams(h.sent.find(r=>r.path==='/api/play').body).get('slot'),'1');
+});
+
+test('verified built-in bytes cannot be reused after the USB connection identity changes',async()=>{
+ const {h,fresh,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;let finishAssociation,reads=0;
+ h.context.fetch=async(url,opts)=>{if(url.startsWith('/api/score?')){reads++;return scoreReply;}return prior(url,opts);};
+ const put=h.subject.sourceCache.put.bind(h.subject.sourceCache);h.subject.sourceCache.put=async pack=>{await new Promise(resolve=>finishAssociation=resolve);return put(pack);};
+ const playing=h.context.window.GloveWorkspace.playBuiltin({name:'内置.pglpack',base64:packFixture.fixture().toString('base64'),score_sha256:await Pack.sha256(packFixture.score)},new Node(),new Node()).catch(error=>error);
+ await h.flush();assert.equal(typeof finishAssociation,'function');h.setStatus({bridge:1,connected:true,port:'COM9',connectedAt:12345,device_info:'model=STS3032-C001'});finishAssociation();const error=await playing;
+ assert.match(error.message,/连接已变化/);assert.equal(reads,1);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);
+ h.setNow(2200);h.setState(fresh);await h.intervals.find(t=>t.ms===50).f();await h.flush();assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);
+});
+
+test('STOP after built-in hash verification invalidates that click before the prepared score can play',async()=>{
+ const {h,scoreReply}=await usbScoreFixture(),prior=h.context.fetch;let finishAssociation,reads=0;
+ h.context.fetch=async(url,opts)=>{if(url.startsWith('/api/score?')){reads++;return scoreReply;}return prior(url,opts);};
+ const put=h.subject.sourceCache.put.bind(h.subject.sourceCache);h.subject.sourceCache.put=async pack=>{await new Promise(resolve=>finishAssociation=resolve);return put(pack);};
+ const playing=h.context.window.GloveWorkspace.playBuiltin({name:'内置.pglpack',base64:packFixture.fixture().toString('base64'),score_sha256:await Pack.sha256(packFixture.score)},new Node(),new Node()).catch(error=>error);
+ await h.flush();assert.equal(typeof finishAssociation,'function');await h.subject.stop();finishAssociation();const cancelled=await playing;assert.match(cancelled?.message||'',/已取消/);
+ assert.equal(reads,1);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);assert.doesNotMatch(h.nodes.message.textContent,/正在读取/);
+});
+
+async function usbUploadFixture({chunked=true,noteCount=3428}={}){
+ const link={bridge:1,connected:true,port:'COM9',connectedAt:101,device_info:'model=STS3032-C001',...(chunked?{upload_protocol:'chunks-v1',upload_chunk_max:384}:{})};
+ const h=harness({initialStatus:link,initialLibrary:{ready:true,slots:[{slot:1,title:'用户曲1',notes:2},{slot:2,title:'用户曲2',notes:3}]}});await h.flush();
+ const fresh={active:false,encoder_range:4095,feedback:[freshAxis(2171)]};h.setState(fresh);await h.subject.sampleState();
+ const source={version:1,hand:'right',title:'完整上传测试',duration_ms:noteCount*100,notes:Array.from({length:noteCount},(_,i)=>({t_ms:i*100,duration_ms:50,pitch:60+i%5,finger:i%5+1,velocity:96,amplitude_pct:100}))};
+ const bytes=h.subject.encodeScore(source),archive=packFixture.fixture({pgl:bytes});
+ h.context.File=class extends Blob{constructor(parts,name){super(parts);this.name=name;}};h.context.DataTransfer=class{constructor(){this.files=[];this.items={add:file=>this.files.push(file)};}};
+ const bundle={name:'完整上传.pglpack',base64:archive.toString('base64'),score_sha256:await Pack.sha256(bytes)};
+ const publish=()=>h.setLibrary({ready:true,slots:[{slot:1,title:'用户曲1',notes:2},{slot:2,title:'用户曲2',notes:3},{slot:3,title:source.title,notes:noteCount,duration_ms:source.duration_ms}]});
+ const scoreReply={ok:true,json:async()=>({...source,base64:Buffer.from(bytes).toString('base64')})};
+ return {h,link,fresh,source,bytes,archive,bundle,publish,scoreReply};
+}
+test('first built-in USB upload survives a long commit and awaits same-device identity plus fresh STATE before its one PLAY',async()=>{
+ const {h,link,fresh,bundle,publish,scoreReply,bytes}=await usbUploadFixture(),prior=h.context.fetch;assert.equal(bytes.length,54976);
+ let finishCommit,finishIdentity,finishState,identityReads=0,stateReads=0;
+ h.context.fetch=async(url,opts)=>{
+  if(url==='/api/upload/commit'){h.sent.push({path:url});return new Promise(resolve=>finishCommit=()=>{publish();resolve({ok:true,json:async()=>({ok:true})});});}
+  if(url==='/api/status'&&++identityReads===1){h.sent.push({path:url});return new Promise(resolve=>finishIdentity=()=>resolve({ok:true,json:async()=>link}));}
+  if(url==='/api/state'&&++stateReads===1){h.sent.push({path:url});return new Promise(resolve=>finishState=()=>resolve({ok:true,json:async()=>fresh}));}
+  if(url.startsWith('/api/score?')){h.sent.push({path:url});return scoreReply;}
+  if(url==='/api/play')h.setState({...fresh,active:true,mode:'score',elapsed_ms:0,tempo:100});return prior(url,opts);
+ };
+ const playing=h.context.window.GloveWorkspace.playBuiltin(bundle,new Node(),new Node()).catch(error=>error);
+ try{
+  await h.flush();assert.equal(typeof finishCommit,'function');const poll=h.intervals.find(t=>t.ms===50);
+  for(const now of [1200,5000,10000]){h.setNow(now);await poll.f();}
+  assert.equal(stateReads,0);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.match(h.nodes['meter-status-2'].textContent,/准备.*反馈暂缓/);assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);
+  finishCommit();await h.flush();assert.equal(typeof finishIdentity,'function');assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.nodes.upload.disabled,true);
+  finishIdentity();await h.flush();assert.equal(typeof finishState,'function');h.setNow(12000);await poll.f();assert.equal(stateReads,1);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);
+  finishState();const error=await playing;assert.equal(error,undefined,error?.message);assert.equal(h.sent.filter(r=>r.path==='/api/upload/commit').length,1);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,1);assert.equal(h.subject.active,true);
+  const paths=h.sent.map(r=>r.path),commit=paths.indexOf('/api/upload/commit'),play=paths.indexOf('/api/play');assert.ok(paths.slice(commit+1,play).includes('/api/status'));assert.ok(paths.slice(commit+1,play).includes('/api/state'));assert.doesNotMatch(h.nodes.message.textContent,/连接尚未恢复/);
+ }finally{finishCommit?.();finishIdentity?.();finishState?.();await playing;}
+});
+test('raw USB upload pauses idle feedback only for its transfer and never starts motion',async()=>{
+ const {h,fresh,bytes,publish}=await usbUploadFixture({chunked:false,noteCount:55}),prior=h.context.fetch;let finishWrite;
+ h.nodes.slot.value='3';h.nodes.pgl.files=[{name:'原始.pgl',arrayBuffer:async()=>bytes.buffer}];
+ h.context.fetch=async(url,opts)=>url==='/api/upload?slot=3'?new Promise(resolve=>finishWrite=()=>{publish();resolve({ok:true,json:async()=>({ok:true})});}):prior(url,opts);
+ const uploading=h.nodes.upload.onclick();
+ try{await h.flush();h.setNow(9000);await h.intervals.find(t=>t.ms===50).f();assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);assert.equal(h.nodes['meter-value-2'].textContent,'—');finishWrite();await uploading;assert.match(h.nodes.message.textContent,/已写入/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>/^\/api\/(play|train|pattern|stop)$/.test(r.path)).length,0);h.setNow(10101);h.subject.expireFeedback();assert.match(h.nodes.connection.textContent,/连接中断/,'the one-second idle deadline is unchanged');}finally{finishWrite?.();await uploading;}
+});
+for(const failure of ['cancel','reconnect','invalid-feedback','commit-error'])test(`USB built-in upload ${failure} cannot play later when idle polling recovers`,async()=>{
+ const {h,link,fresh,bundle,publish}=await usbUploadFixture({noteCount:55}),prior=h.context.fetch;let finishCommit;
+ h.context.fetch=async(url,opts)=>{if(url==='/api/upload/commit'){h.sent.push({path:url});return new Promise(resolve=>finishCommit=()=>{if(failure!=='commit-error')publish();resolve({ok:failure!=='commit-error',json:async()=>failure==='commit-error'?{error:'upload_crc_error'}:{ok:true}});});}return prior(url,opts);};
+ const playing=h.context.window.GloveWorkspace.playBuiltin(bundle,new Node(),new Node()).catch(error=>error);await h.flush();assert.equal(typeof finishCommit,'function');h.setNow(5000);await h.intervals.find(t=>t.ms===50).f();let stopping;
+ if(failure==='cancel'){stopping=h.subject.stop();await h.flush();}
+ if(failure==='reconnect')h.setStatus({...link,connectedAt:102});
+ if(failure==='invalid-feedback')h.setState({...fresh,feedback:[{...freshAxis(2171),position_valid:false}]});
+ finishCommit();const error=await playing;if(stopping)await stopping;assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);
+ assert.match(error?.message||'',failure==='cancel'?/已取消/:failure==='reconnect'?/连接已变化/:failure==='invalid-feedback'?/新鲜.*反馈/:/upload_crc_error/);
+ if(failure==='commit-error')assert.equal(h.sent.filter(r=>r.path==='/api/upload/abort').length,1);
+ if(failure==='reconnect'||failure==='invalid-feedback')assert.equal(h.nodes.fingers.children[0].disabled,true);
+ h.setState(fresh);h.setNow(7500);await h.intervals.find(t=>t.ms===50).f();await h.flush();assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);assert.equal(h.subject.active,false);
+});
+test('USB upload drains an existing poll before the first chunk and rejects its old feedback',async()=>{
+ const {h,fresh,bytes}=await usbUploadFixture({noteCount:55}),prior=h.context.fetch;let finishPoll,finishChunk,stateReads=0;
+ h.nodes.slot.value='3';h.nodes.pgl.files=[{name:'上传.pgl',arrayBuffer:async()=>bytes.buffer}];
+ h.context.fetch=async(url,opts)=>{if(url==='/api/state'&&++stateReads===1)return new Promise(resolve=>finishPoll=resolve);if(url==='/api/upload/chunk'&&!finishChunk){h.sent.push({path:url});return new Promise(resolve=>finishChunk=resolve);}return prior(url,opts);};
+ h.setNow(200);const polling=h.intervals.find(t=>t.ms===50).f();await h.flush();const uploading=h.nodes.upload.onclick();
+ try{await h.flush();assert.equal(h.sent.filter(r=>r.path==='/api/upload/begin').length,0);h.setNow(2500);h.subject.expireFeedback();finishPoll({ok:true,json:async()=>({...fresh,feedback:[freshAxis(2000)]})});await polling;await h.flush();assert.equal(typeof finishChunk,'function');assert.equal(h.nodes['meter-value-2'].textContent,'—');finishChunk({ok:true,json:async()=>({ok:true})});await uploading;assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>r.path==='/api/play').length,0);}finally{finishPoll?.({ok:true,json:async()=>fresh});finishChunk?.({ok:true,json:async()=>({ok:true})});await polling;await uploading;}
+});
+test('upload rejected during active training leaves normal feedback and heartbeat running',async()=>{
+ const {h,fresh,bytes}=await usbUploadFixture({noteCount:55});h.nodes.pgl.files=[{name:'上传.pgl',arrayBuffer:async()=>bytes.buffer}];await h.subject.train(1);h.setState({...fresh,active:true,mask:1});await h.nodes.upload.onclick();
+ assert.match(h.nodes.message.textContent,/先停止动作/);assert.equal(h.sent.filter(r=>r.path.startsWith('/api/upload')).length,0);assert.equal(h.subject.active,true);h.setNow(200);await h.intervals.find(t=>t.ms===50).f();await h.intervals.find(t=>t.ms===500).f();assert.equal(h.nodes['meter-value-2'].textContent,2171);assert.equal(h.sent.filter(r=>r.path==='/api/keep').length,1);assert.equal(h.sent.filter(r=>r.path==='/api/stop').length,0);
+});
+for(const phase of ['native-package','unpack','source-cache'])test(`USB built-in ${phase} preparation stays guarded until fresh confirmation and does not unpack twice`,async()=>{
+ const {h,fresh,bundle,publish,scoreReply}=await usbUploadFixture({noteCount:55}),prior=h.context.fetch;let release,unpacks=0;
+ const unpack=h.context.GlovePack.unpack,put=h.subject.sourceCache.put.bind(h.subject.sourceCache),wait=()=>new Promise(resolve=>release=resolve);
+ h.context.GlovePack.unpack=async bytes=>{unpacks++;if(phase==='unpack')await wait();return unpack(bytes);};
+ h.subject.sourceCache.put=async pack=>{if(phase==='source-cache')await wait();return put(pack);};
+ h.context.fetch=async(url,opts)=>{if(url==='/api/upload/commit')publish();if(url.startsWith('/api/score?'))return scoreReply;if(url==='/api/play')h.setState({...fresh,active:true,mode:'score',elapsed_ms:0,tempo:100});return prior(url,opts);};
+ const button=new Node('native-ready-play'),playing=h.context.window.GloveWorkspace.playBuiltin(async()=>{if(phase==='native-package')await wait();return bundle;},button,new Node()).catch(error=>error);
+ try{
+  await h.flush();assert.equal(typeof release,'function');const states=readCount(h,'/api/state');h.setNow(5000);await h.intervals.find(t=>t.ms===50).f();h.subject.expireFeedback();
+  assert.equal(readCount(h,'/api/state'),states);assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.equal(readCount(h,'/api/play'),0);
+  release();const error=await playing;assert.equal(error,undefined,error?.message);assert.equal(unpacks,1);assert.equal(readCount(h,'/api/play'),1);assert.equal(button.textContent,'播放');
+  h.subject.applyState({...fresh,active:true,mode:'score',elapsed_ms:100});assert.equal(button.textContent,'播放');await h.subject.stop();assert.equal(button.textContent,'播放');
+ }finally{release?.();await playing;}
+});
+test('USB manual package upload guards arrayBuffer, unpack and source-cache work before restoring normal expiry',async()=>{
+ const {h,archive}=await usbUploadFixture({noteCount:55});let readFile,unpackFile,cacheFile;const unpack=h.context.GlovePack.unpack,put=h.subject.sourceCache.put.bind(h.subject.sourceCache);
+ h.nodes.slot.value='3';h.nodes.pgl.files=[{name:'慢原谱.pglpack',arrayBuffer:async()=>{await new Promise(resolve=>readFile=resolve);return archive.buffer.slice(archive.byteOffset,archive.byteOffset+archive.byteLength);}}];
+ h.context.GlovePack.unpack=async bytes=>{await new Promise(resolve=>unpackFile=resolve);return unpack(bytes);};h.subject.sourceCache.put=async pack=>{await new Promise(resolve=>cacheFile=resolve);return put(pack);};
+ const uploading=h.nodes.upload.onclick();
+ try{
+  for(const [index,getRelease] of [()=>readFile,()=>unpackFile,()=>cacheFile].entries()){
+   await h.flush();assert.equal(typeof getRelease(),'function');h.setNow((index+1)*4000);await h.intervals.find(t=>t.ms===50).f();assert.doesNotMatch(h.nodes.connection.textContent,/连接中断/);assert.equal(h.nodes['meter-value-2'].textContent,'—');assert.equal(h.nodes.upload.disabled,true);getRelease()();
+  }
+  await uploading;assert.match(h.nodes.message.textContent,/已写入.*原谱在本页可用/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(readCount(h,'/api/play'),0);h.setNow(13101);h.subject.expireFeedback();assert.match(h.nodes.connection.textContent,/连接中断/);
+ }finally{readFile?.();unpackFile?.();cacheFile?.();await uploading;}
+});
+for(const interrupted of ['cancel','reconnect'])test(`USB built-in native-package ${interrupted} does not start on preparation completion or later reconnect`,async()=>{
+ const {h,link,fresh,bundle,publish}=await usbUploadFixture({noteCount:55}),prior=h.context.fetch;let release;
+ h.context.fetch=async(url,opts)=>{if(url==='/api/upload/commit')publish();return prior(url,opts);};
+ const playing=h.context.window.GloveWorkspace.playBuiltin(async()=>{await new Promise(resolve=>release=resolve);return bundle;},new Node(),new Node()).catch(error=>error);
+ await h.flush();h.setNow(3000);if(interrupted==='cancel')await h.subject.stop();else h.setStatus({...link,connectedAt:102});release();const error=await playing;
+ assert.match(error?.message||'',interrupted==='cancel'?/已取消/:/连接已变化/);assert.equal(readCount(h,'/api/play'),0);if(interrupted==='cancel')assert.equal(readCount(h,'/api/upload/begin'),0);
+ h.setState(fresh);h.setNow(5500);await h.intervals.find(t=>t.ms===50).f();await h.flush();assert.equal(h.subject.active,false);assert.equal(readCount(h,'/api/play'),0);assert.equal(h.nodes.fingers.children[0].disabled,false);
+});
+test('phone package upload unwraps identical PGL bytes and keeps genuine source outside device storage',async()=>{const h=harness({mobile:true});await h.flush();h.subject.setUploadCapabilities({upload_protocol:'chunks-v1',upload_chunk_max:384});selectPackage(h);await h.nodes.upload.onclick();const writes=h.sent.filter(x=>x.path.startsWith('/api/upload'));assert.equal(new URLSearchParams(writes[0].body).get('bytes'),String(packFixture.score.length));assert.deepEqual(Buffer.from(writes.find(x=>x.path==='/api/upload/chunk').body),packFixture.score);const hash=await Pack.sha256(packFixture.score);assert.ok(await h.subject.sourceCache.get(hash));assert.match(h.nodes.message.textContent,/原谱在本页可用/);const loaded=await h.subject.resolvePlayerSource(packedScore);assert.equal(loaded.source_preview.score_sha256,hash);h.subject.openPlayer(loaded);h.nodes['player-source-toggle'].onclick();assert.equal(h.nodes['player-source-label'].textContent,'原谱');assert.ok(h.nodes['player-source-image'].src.startsWith('blob:'));});
 test('invalid package never begins an upload or attaches source metadata',async()=>{const h=harness();await h.flush();h.subject.setUploadCapabilities({upload_protocol:'chunks-v1',upload_chunk_max:384});const archive=packFixture.fixture();archive[39]^=1;selectPackage(h,archive);await h.nodes.upload.onclick();assert.equal(h.sent.filter(x=>x.path.startsWith('/api/upload')).length,0);assert.equal(await h.subject.sourceCache.get(await Pack.sha256(packFixture.score)),null);assert.match(h.nodes.message.textContent,/校验/);});
 test('failed package transfer never attaches its local source association',async()=>{const h=harness();await h.flush();h.subject.setUploadCapabilities({upload_protocol:'chunks-v1',upload_chunk_max:384});selectPackage(h);const previous=h.context.fetch;h.context.fetch=async(url,opts)=>url==='/api/upload/chunk'?{ok:false,json:async()=>({error:'upload_timeout'})}:previous(url,opts);await h.nodes.upload.onclick();assert.equal(await h.subject.sourceCache.get(await Pack.sha256(packFixture.score)),null);assert.equal(h.sent.filter(x=>x.path==='/api/upload/commit').length,0);});
 test('raw PGL compatibility survives package support and a changed score cannot inherit a cached page',async()=>{const h=harness();await h.flush();selectPackage(h);await h.nodes.upload.onclick();const oldHash=await Pack.sha256(packFixture.score);assert.ok(await h.subject.sourceCache.get(oldHash));h.nodes.pgl.files=[{name:'原曲.pgl',arrayBuffer:async()=>packFixture.score.buffer.slice(packFixture.score.byteOffset,packFixture.score.byteOffset+packFixture.score.byteLength)}];await h.nodes.upload.onclick();assert.ok(h.sent.filter(x=>x.path==='/api/upload?slot=1').length===2);const changed={...packedScore,notes:[{...packedScore.notes[0],pitch:62}]};const loaded=await h.subject.resolvePlayerSource(changed);assert.equal(loaded.source_preview,undefined);});
@@ -133,9 +634,9 @@ test('continuous clock advertised by status is carried into state transport with
 test('positions outside encoder hardware range retain a distinct red feedback fault',async()=>{const h=harness();await h.flush();h.subject.applyState({encoder_range:4095,feedback:[freshAxis(4096)]});assert.equal(h.nodes['meter-2'].classes.has('outside'),true);assert.equal(h.nodes['meter-2'].classes.has('calibration-warning'),false);assert.equal(h.nodes['meter-status-2'].textContent,'位置反馈异常');});
 
 // Visual review runs alongside the unchanged player in the same document.
-test('visual reviewer edits the actual export project and invalidates previous approval',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.loadReview({name:'可视校对',notes:[{id:'n1',page:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:false}],selection:{bpm:120,range_reviewed:true}});assert.equal(h.nodes['review-pitch'].value,'C4');assert.equal(h.nodes['review-notes'].children.length,0);h.nodes['review-confirm'].onclick();assert.equal(h.subject.selection().notes[0].confirmed,true);h.nodes['review-filter'].value='all';h.nodes['review-filter'].onchange();h.nodes['review-pitch'].value='D4';h.nodes['review-pitch'].onchange();assert.equal(h.subject.selection().notes[0].pitch,'D4');assert.equal(h.subject.selection().notes[0].confirmed,false);assert.equal(h.subject.selection().selection.range_reviewed,false);assert.equal(h.sent.filter(x=>x.path==='/api/train'||x.path==='/api/play').length,0);});
+test('visual reviewer edits the export project immediately and records fields without confirmation',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.loadReview({name:'可视校对',notes:[{id:'n1',page:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:false}],selection:{bpm:120,range_reviewed:true}});h.nodes['review-filter'].value='all';h.nodes['review-filter'].onchange();assert.equal(h.nodes['review-pitch'].value,'C4');assert.equal(h.nodes['review-notes'].children.length,0);assert.equal(h.nodes['review-confirm'],undefined);h.nodes['review-pitch'].value='D4';h.nodes['review-pitch'].onchange();assert.equal(h.subject.selection().notes[0].pitch,'D4');assert.equal(h.subject.selection().notes[0].confirmed,false);assert.ok(h.subject.selection().notes[0].manual_fields.includes('pitch'));assert.equal(h.subject.selection().selection.range_reviewed,false);assert.equal(h.sent.filter(x=>x.path==='/api/train'||x.path==='/api/play').length,0);});
 test('full score table is lazy and bounded to 100 notes while every saved note remains intact',async()=>{const h=harness({visualReview:true});await h.flush();const notes=Array.from({length:302},(_,i)=>({id:'n'+i,page:1,hand:'right',pitch:'C4',finger:1,beat:i,duration_beats:1,confirmed:false}));h.subject.loadReview({name:'长谱',notes,selection:{bpm:120}});assert.equal(h.nodes['review-notes'].children.length,0);h.nodes['review-full-list'].open=true;h.nodes['review-full-list'].ontoggle();assert.equal(h.nodes['review-notes'].children.length,101);h.nodes['review-table-next'].onclick();assert.equal(h.nodes['review-table-page'].textContent,'2 / 4');assert.equal(h.subject.selection().notes.length,302);h.nodes['review-notes'].children[1].children[2].value='4';h.nodes['review-notes'].children[1].children[2].onchange();assert.equal(h.subject.selection().notes[100].finger,4);h.nodes['review-table-next'].onclick();h.nodes['review-table-next'].onclick();assert.equal(h.nodes['review-notes'].children.length,3);});
-test('visual reviewer missing-source state survives saved review import and manual note addition',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.loadReview({name:'复核',source_sha256:'different',notes:[{id:'n1',page:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:false,bbox:[10,10,20,20]}],pages:[{page:1,width:600,height:800}],page_previews:[{page:1,data:'data:image/png;base64,AAAA'}],selection:{}});assert.match(h.nodes['review-crop'].innerHTML,/对应 PDF/);h.subject.addNote();assert.equal(h.nodes['review-pitch'].value,'');assert.equal(h.nodes['review-confirm'].disabled,true);assert.equal(h.subject.selection().notes.length,2);assert.equal(h.subject.selection().notes[1].confirmed,false);});
+test('visual reviewer missing-source state and manual note addition remain explicit without a confirmation UI',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.loadReview({name:'复核',source_sha256:'different',notes:[{id:'n1',page:1,system:1,hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,confirmed:false,bbox:[10,10,20,20]}],pages:[{page:1,width:600,height:800}],page_previews:[{page:1,data:'data:image/png;base64,AAAA'}],selection:{}});assert.match(h.nodes['review-row-image'].innerHTML,/对应 PDF/);h.subject.addNote();assert.equal(h.nodes['review-pitch'].value,'');assert.equal(h.nodes['review-confirm'],undefined);assert.equal(h.subject.selection().notes.length,2);assert.equal(h.subject.selection().notes[1].confirmed,false);assert.match(h.nodes['review-note-warning'].textContent,/还缺/);});
 
 test('conversion mode hides only its own device chrome and leaving restores ordinary views',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.showTab('convert');assert.equal(h.context.document.body.classes.has('review-view'),true);h.subject.showTab('train');assert.equal(h.context.document.body.classes.has('review-view'),false);h.subject.showTab('convert');h.subject.openPlayer({title:'曲谱',notes:[]});assert.equal(h.context.document.body.classes.has('review-view'),false);});
 
@@ -148,7 +649,7 @@ test('conversion keeps its own errors visible while hardware disconnect notices 
 test('loading saved review clears stale export errors and makes the preserved export interval visible',async()=>{const h=harness({visualReview:true});await h.flush();h.subject.loadReview({name:'选段',notes:[],selection:{bpm:120}});const previous=h.context.fetch;h.context.fetch=async(url,opts)=>url==='/api/software/export'?{ok:false,json:async()=>({error:'请对照原谱确认所选范围内没有漏音'})}:previous(url,opts);await h.nodes.export.onclick();assert.match(h.nodes.message.textContent,/没有漏音/);h.subject.loadReview({name:'已核对选段',source_sha256:'verified',notes:[],selection:{bpm:120,start_beat:0,end_beat:12,start_page:1,end_page:1,range_reviewed:true}});assert.match(h.nodes.message.textContent,/已载入复核进度/);assert.match(h.nodes.message.textContent,/对应 PDF/);assert.doesNotMatch(h.nodes.message.textContent,/没有漏音/);assert.equal(h.nodes['range-reviewed'].checked,true);assert.match(h.nodes['review-export-summary'].textContent,/0–12 拍.*第 1 页/);h.nodes['end-beat'].value='16';h.nodes['end-beat'].oninput();assert.equal(h.nodes['range-reviewed'].checked,false);assert.equal(h.subject.selection().selection.range_reviewed,false);assert.match(h.nodes['review-export-summary'].textContent,/0–16 拍/);});
 test('saved review chooser resets so the same file can restore edited progress again',async()=>{const h=harness({visualReview:true});await h.flush();const input=h.nodes['review-file'],saved={name:'已存进度',notes:[],selection:{bpm:120,start_beat:0,end_beat:12,range_reviewed:true}};const file={name:'相同进度.json',text:async()=>JSON.stringify(saved)};for(let attempt=0;attempt<2;attempt++){input.files=[file];input.value='相同进度.json';await input.onchange();assert.equal(input.value,'');assert.equal(h.nodes['end-beat'].value,12);assert.equal(h.nodes['range-reviewed'].checked,true);h.nodes['end-beat'].value='10';h.nodes['end-beat'].oninput();}input.files=[{name:'损坏.json',text:async()=>'{'}];input.value='损坏.json';await input.onchange();assert.equal(input.value,'');assert.equal(h.subject.selection().name,'已存进度');});
 
-test('original page buttons keep the row and current-note inspector on the visible PDF page',async()=>{const h=harness({visualReview:true});await h.flush();const p={name:'两页',source_sha256:'page-sync',notes:[{id:'p1',page:1,system:1,staff:'p1-s1',hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,bbox:[100,100,110,110]},{id:'p2',page:2,system:1,staff:'p2-s1',hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1,bbox:[100,100,110,110]}],pages:[{page:1,width:600,height:800},{page:2,width:600,height:800}],page_previews:[{page:1,data:'data:image/png;base64,AAAA'},{page:2,data:'data:image/png;base64,BBBB'}],selection:{}};h.subject.setOriginal(p);h.subject.loadReview(p);assert.equal(h.nodes['review-pitch'].value,'C4');h.nodes['original-next'].onclick();assert.equal(h.nodes['review-pitch'].value,'D4');assert.equal(h.nodes['original-image'].src,'data:image/png;base64,BBBB');h.nodes['original-prev'].onclick();assert.equal(h.nodes['review-pitch'].value,'C4');assert.equal(h.nodes['original-image'].src,'data:image/png;base64,AAAA');});
+test('original page buttons keep the row and current-note inspector on the visible PDF page',async()=>{const h=harness({visualReview:true});await h.flush();const p={name:'两页',source_sha256:'page-sync',notes:[{id:'p1',page:1,system:1,staff:'p1-s1',hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1,bbox:[100,100,110,110]},{id:'p2',page:2,system:1,staff:'p2-s1',hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1,bbox:[100,100,110,110]}],pages:[{page:1,width:600,height:800},{page:2,width:600,height:800}],page_previews:[{page:1,data:'data:image/png;base64,AAAA'},{page:2,data:'data:image/png;base64,BBBB'}],selection:{}};h.subject.setOriginal(p);h.subject.loadReview(p);h.nodes['review-filter'].value='right';h.nodes['review-filter'].onchange();h.nodes['review-overlay'].children.find(n=>n.dataset.noteId==='p1').onclick();assert.equal(h.nodes['review-pitch'].value,'C4');h.nodes['original-next'].onclick();await assertOriginalPngBytes(h.nodes['original-image'].src,'data:image/png;base64,BBBB');h.nodes['review-overlay'].children.find(n=>n.dataset.noteId==='p2').onclick();assert.equal(h.nodes['review-pitch'].value,'D4');h.nodes['original-prev'].onclick();await assertOriginalPngBytes(h.nodes['original-image'].src,'data:image/png;base64,AAAA');h.nodes['review-overlay'].children.find(n=>n.dataset.noteId==='p1').onclick();assert.equal(h.nodes['review-pitch'].value,'C4');});
 
 const recoveredStatus={bridge:1,connected:true,port:'COM7',device_info:'model=SC09',upload_protocol:'chunks-v1',upload_chunk_max:2};
 const recoveredLibrary={ready:true,count:1,max:100,free:8192,slots:[{slot:4,title:'重连后的曲谱',notes:2,duration_ms:1000,stored:160}]};
@@ -162,7 +663,7 @@ for(const [startup,initialStatus] of [['disconnected',{bridge:1,connected:false,
   const h=harness({initialStatus,initialLibrary:{ready:false}});await h.flush();
   assert.equal(h.nodes.upload.disabled,true);assert.equal(h.nodes.fingers.children[0].disabled,true);
   h.setStatus(recoveredStatus);h.setLibrary(recoveredLibrary);await freshRecovery(h);
-  assert.match(h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.doesNotMatch(h.nodes.connection.textContent,/未连接|手套热点|连接中断/);
+  assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.doesNotMatch(h.nodes.connection.textContent,/未连接|手套热点|连接中断/);
   assert.equal(h.nodes['convert-tab'].hidden,false);assert.equal(h.link.hidden,false);assert.equal(h.nodes.hold.step,'100');
   assert.equal(h.nodes.activity.textContent,'待机');assert.match(h.nodes.capacity.textContent,/已存 1 \/ 100 首/);
   assert.match(h.nodes.songs.children[0].children[0].textContent,/重连后的曲谱/);assert.equal(h.nodes.upload.disabled,false);assert.equal(h.nodes.fingers.children[0].disabled,false);
@@ -176,13 +677,13 @@ test('previously ready reconnect rereads status and library before re-enabling b
  const h=harness();await h.flush();await expireConnection(h);const statuses=readCount(h,'/api/software/status'),libraries=readCount(h,'/api/library');
  h.setStatus(recoveredStatus);h.setLibrary(recoveredLibrary);await freshRecovery(h);
  assert.equal(readCount(h,'/api/software/status'),statuses+1);assert.equal(readCount(h,'/api/library'),libraries+1);
- assert.match(h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.activity.textContent,'待机');
+ assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.activity.textContent,'待机');
  assert.match(h.nodes.songs.children[0].children[0].textContent,/重连后的曲谱/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
 });
 test('fresh feedback cannot mark a disconnected status snapshot ready',async()=>{
  const h=harness();await h.flush();await expireConnection(h);h.setStatus({bridge:1,connected:false,port:null});h.setLibrary(recoveredLibrary);
  await freshRecovery(h);assert.equal(h.nodes.fingers.children[0].disabled,true);assert.equal(h.nodes.upload.disabled,true);assert.doesNotMatch(h.nodes.connection.textContent,/已就绪/);
- h.setStatus(recoveredStatus);await freshRecovery(h,4200);assert.match(h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
+ h.setStatus(recoveredStatus);await freshRecovery(h,4200);assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
 });
 test('reconnect verifies new position feedback again after metadata before enabling controls',async()=>{
  const h=harness();await h.flush();await expireConnection(h);let completeStatus;h.setStatus(()=>new Promise(resolve=>completeStatus=resolve));h.setLibrary(recoveredLibrary);
@@ -212,7 +713,7 @@ for(const pendingEndpoint of ['status','library']){
   assert.equal(h.nodes.connection.textContent,connection);assert.equal(h.nodes.capacity.textContent,capacity);assert.equal(h.nodes.fingers.children[0].disabled,true);
   assert.equal(h.nodes.upload.disabled,true);assert.equal(h.subject.active,false);
   h.context.fetch=previous;h.setStatus(recoveredStatus);h.setLibrary(recoveredLibrary);await freshRecovery(h,5500);
-  assert.match(h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
+  assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*SC09.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
  });
 }
 test('metadata recovery retains reviewed PDF, stopped player image and progress without restarting motion',async()=>{
@@ -229,8 +730,8 @@ test('metadata recovery retains reviewed PDF, stopped player image and progress 
 });
 test('new library buttons and retained replay stay disabled until final recovery feedback, with a command guard',async()=>{
  const h=harness({initialLibrary:recoveredLibrary});await h.flush();const originalFetch=h.context.fetch;
- h.context.fetch=async(url,opts)=>url.startsWith('/api/score')?{ok:true,json:async()=>({title:'既有播放器',duration_ms:3000,notes:[{t_ms:0,duration_ms:3000,pitch:60,finger:1}]})}:originalFetch(url,opts);
- h.setState({active:true,elapsed_ms:0,tempo:100,encoder_range:4095,feedback:[freshAxis(2171)]});await h.nodes.songs.children[0].children[1].onclick();assert.equal(h.subject.active,true);
+ h.context.fetch=async(url,opts)=>{if(url==='/api/play')h.setState({active:true,elapsed_ms:0,tempo:100,encoder_range:4095,feedback:[freshAxis(2171)]});return url.startsWith('/api/score')?{ok:true,json:async()=>({title:'既有播放器',duration_ms:3000,notes:[{t_ms:0,duration_ms:3000,pitch:60,finger:1}]})}:originalFetch(url,opts);};
+ h.setState({active:false,elapsed_ms:0,tempo:100,encoder_range:4095,feedback:[freshAxis(2171)]});await h.nodes.songs.children[0].children[1].onclick();assert.equal(h.subject.active,true);
  await expireConnection(h);const before=h.sent.length;h.setStatus(recoveredStatus);h.setLibrary(recoveredLibrary);
  const fresh={active:false,model:'SC09',encoder_range:1023,feedback:[freshAxis(500)]};let stateReads=0,finishFinal;
  h.setState(()=>++stateReads===1?fresh:new Promise(resolve=>finishFinal=resolve));h.setNow(2101);await h.subject.sampleState();await h.flush();
@@ -242,7 +743,7 @@ test('new library buttons and retained replay stay disabled until final recovery
   await row.children[1].onclick();await h.nodes['player-replay'].onclick();
   assert.equal(h.sent.slice(before).filter(x=>/^\/api\/(stop|play|train|pattern)(?:$|\?)/.test(x.path)).length,0);assert.equal(h.subject.active,false);
  }finally{finishFinal?.(fresh);h.setState(fresh);await h.flush();}
- assert.match(h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['player-replay'].disabled,false);assert.equal(h.subject.active,false);
+ assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(h.nodes['player-replay'].disabled,false);assert.equal(h.subject.active,false);
 });
 test('slow final recovery state remains single-flight across ordinary polling ticks',async()=>{
  const h=harness();await h.flush();await expireConnection(h);h.setStatus(recoveredStatus);h.setLibrary(recoveredLibrary);
@@ -253,7 +754,7 @@ test('slow final recovery state remains single-flight across ordinary polling ti
   for(const now of [2350,2600,2900]){h.setNow(now);ticks.push(poll.f());await h.flush();}
   assert.equal(stateReads,2,'a slow final confirmation must not be invalidated by newer polling revisions');assert.equal(pending.length,1);assert.equal(h.nodes.fingers.children[0].disabled,true);
  }finally{for(const resolve of pending)resolve(fresh);h.setState(fresh);await Promise.all(ticks);await h.flush();}
- assert.match(h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
+ assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
  h.setNow(3150);const before=readCount(h,'/api/state');await h.intervals.find(x=>x.ms===50).f();assert.equal(readCount(h,'/api/state'),before+1);
 });
 test('recovery waits for an existing slow poll before its final independent confirmation',async()=>{
@@ -266,7 +767,7 @@ test('recovery waits for an existing slow poll before its final independent conf
   h.setNow(2550);ticks.push(poll.f());await h.flush();assert.equal(pending.length,1);pending[0](fresh);await existingPoll;await h.flush();assert.equal(pending.length,2);
   h.setNow(2850);ticks.push(poll.f());await h.flush();assert.equal(pending.length,2,'the final confirmation owns the next state read');assert.equal(h.nodes.fingers.children[0].disabled,true);
  }finally{for(const resolve of pending)resolve(fresh);h.setState(fresh);await Promise.all([existingPoll,...ticks]);await h.flush();}
- assert.match(h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
+ assert.match(h.nodes.connection.title+' '+h.nodes.connection.textContent,/USB COM7.*已就绪/);assert.equal(h.nodes.fingers.children[0].disabled,false);assert.equal(automaticMotionWrites(h).length,0);
 });
 
 
@@ -298,4 +799,152 @@ test('unfiltered phone file selection validates PGL before any board write',asyn
 });
 test('transient WiFi tempo response loss does not terminate the playing score',async()=>{
  const h=await wirelessPlaying(),prior=h.context.fetch;h.context.fetch=async(url,opts)=>{if(url==='/api/tempo')throw Error('Failed to fetch');return prior(url,opts);};h.nodes.tempo.value='101';await h.nodes.tempo.onchange();assert.equal(h.subject.active,true);assert.equal(h.sent.filter(x=>x.path==='/api/stop').length,0);assert.match(h.nodes.message.textContent,/调速结果未确认/);
+});
+
+function nativeCloseScript(){const source=fs.readFileSync(path.join(ORIGINAL_TEST_DIR,'../native_window.py'),'utf8');return source.slice(source.indexOf('    def _flush_before_close')).match(/script = """([\s\S]*?)"""/)[1];}
+
+test('native close silences and stops owned training before a stalled save while header Stop stays reachable',async()=>{
+ const h=harness();await h.flush();await h.subject.getAudio();await h.subject.train(1);
+ assert.equal(h.subject.active,true);assert.ok(h.subject.voiceCount>0);
+ const main=new Node('main'),nav=new Node('nav'),query=h.context.document.querySelectorAll;
+ h.context.document.querySelectorAll=s=>s==='main, nav'?[main,nav]:query(s);
+ let finishSave,saveCalls=0;h.context.window.GloveWorkspace.flush=()=>{saveCalls++;return new Promise(resolve=>finishSave=resolve);};
+ const before=h.sent.length,closing=vm.runInContext(nativeCloseScript(),h.context);
+ assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);
+ await h.flush();assert.equal(saveCalls,1);assert.equal(main.inert,true);assert.equal(nav.inert,true);
+ assert.notEqual(h.context.document.body.inert,true);assert.equal(h.nodes.stop.disabled,false);
+ h.subject.capability(true);assert.equal(h.nodes.fingers.children[0].disabled,true);
+ await h.intervals.find(x=>x.ms===500).f();
+ const writes=h.sent.slice(before);assert.equal(writes.filter(x=>x.path==='/api/keep').length,0);
+ const stopping=writes.filter(x=>x.path==='/api/stop');assert.equal(stopping.length,1);
+ assert.equal(new URLSearchParams(stopping[0].body).get('scope'),'owned');
+ finishSave(false);const result=await closing;assert.equal(result.saved,false);
+ assert.notEqual(main.inert,true);assert.notEqual(nav.inert,true);
+ assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);
+ await h.intervals.find(x=>x.ms===500).f();assert.equal(h.sent.slice(before).filter(x=>x.path==='/api/keep').length,0);
+});
+
+test('native close cancels queued starts and orders owned STOP after an already dispatched start before saving',async()=>{
+ const h=harness();await h.flush();let finishTrain;const previous=h.context.fetch;
+ h.context.fetch=(url,options)=>{if(url==='/api/train'){h.sent.push({path:url,body:options.body});return new Promise(resolve=>finishTrain=()=>resolve({ok:true,json:async()=>({ok:true})}));}return previous(url,options);};
+ const before=h.sent.length,first=h.subject.train(1);await h.flush();assert.equal(typeof finishTrain,'function');
+ const second=h.subject.train(2);let saveCalls=0;h.context.window.GloveWorkspace.flush=async()=>{saveCalls++;assert.equal(h.sent.at(-1).path,'/api/stop');return true;};
+ const closing=vm.runInContext(nativeCloseScript(),h.context);await h.flush();
+ assert.equal(saveCalls,0);assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);
+ await h.intervals.find(x=>x.ms===500).f();finishTrain();
+ await Promise.all([first,second]);const result=await closing;assert.equal(result.saved,true);assert.equal(saveCalls,1);
+ const writes=h.sent.slice(before).filter(x=>/^\/api\/(train|stop|keep)$/.test(x.path));
+ assert.deepEqual(writes.map(x=>x.path),['/api/train','/api/stop']);
+ assert.equal(new URLSearchParams(writes[1].body).get('scope'),'owned');
+ assert.equal(h.subject.active,false);assert.equal(h.subject.voiceCount,0);
+});
+
+test('close scoped-stop rejection never becomes global STOP or proceeds to save',async()=>{
+ const h=harness();await h.flush();await h.subject.train(1);let saved=false;h.context.window.GloveWorkspace.flush=async()=>{saved=true;return true;};
+ const previous=h.context.fetch;h.context.fetch=async(url,options)=>{if(url==='/api/stop'){h.sent.push({path:url,body:options.body});return {ok:false,json:async()=>({error:'controller_mismatch'})};}return previous(url,options);};
+ const before=h.sent.length,result=await vm.runInContext(nativeCloseScript(),h.context);
+ assert.equal(result.saved,false);assert.equal(saved,false);assert.equal(h.subject.active,false);
+ for(const request of h.sent.slice(before).filter(x=>x.path==='/api/stop')){
+  const body=request.beacon?await request.body.text():request.body;
+  assert.equal(new URLSearchParams(body).get('scope'),'owned');
+ }
+ await h.intervals.find(x=>x.ms===500).f();assert.equal(h.sent.slice(before).some(x=>x.path==='/api/keep'),false);
+});
+
+test('offline native close saves without a device write',async()=>{
+ const h=harness({initialStatus:{bridge:1,connected:false}});await h.flush();const before=h.sent.length;
+ h.context.window.GloveWorkspace.flush=async()=>true;
+ const result=await vm.runInContext(nativeCloseScript(),h.context);assert.equal(result.saved,true);
+ assert.equal(h.sent.slice(before).some(x=>/^\/api\/(train|pattern|play|keep|stop)$/.test(x.path)),false);
+});
+
+
+test('validation returns current unmarked state without replacing note fields or leaving stale gray metadata after a manual finger',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const original=h.context.fetch;let unmarked=true;
+ h.context.fetch=async(url,options)=>url!=='/api/software/check'?original(url,options):{ok:true,json:async()=>({ok:true,automatic:{ready:!unmarked,recognition_ready:true,unfingered_notes:unmarked?1:0,action_notes:unmarked?0:1},report:{ready:!unmarked},scope:{},notes:[{id:'a',automatic_ready:true,automatic_reasons:[],in_export_scope:true,unfingered:unmarked,source_fingering_state:'unmarked',finger:5,pitch:'D9'}]})};
+ h.subject.loadReview({name:'合成无号校验',notes:[{id:'a',hand:'right',pitch:'C4',finger:null,source_fingering_state:'unmarked',unfingered:false,beat:2,duration_beats:.5}],selection:{}});
+ await h.subject.checkCurrentReview();let p=h.subject.selection();assert.equal(p.notes[0].unfingered,true);assert.equal(p.notes[0].source_fingering_state,'unmarked');assert.equal(p.notes[0].finger,null);assert.equal(p.notes[0].pitch,'C4');assert.equal(p.notes[0].beat,2);
+ p.notes[0].finger=3;p.notes[0].manual_fields=['finger'];unmarked=false;h.subject.reviewChanged();await h.subject.checkCurrentReview();p=h.subject.selection();assert.equal(p.notes[0].unfingered,false);assert.equal(p.notes[0].finger,3);assert.equal(p.notes[0].source_fingering_state,'unmarked');assert.equal(p.automatic.action_notes,1);assert.equal(h.sent.some(x=>x.path==='/api/train'||x.path==='/api/play'),false);
+});
+
+
+test('chunked base64 keeps exact arbitrary bytes at chunk boundaries without changing input',async()=>{
+ const h=harness();await h.flush();
+ for(const length of [0,1,16383,16384,16385,32769,4*1024*1024+3]){
+  const bytes=Uint8Array.from({length},(_,i)=>(i*73+19)&255),before=Buffer.from(bytes),expected=before.toString('base64');
+  assert.equal(h.subject.as64(bytes.buffer),expected,'length '+length);assert.deepEqual(Buffer.from(bytes),before);
+ }
+ const backing=new Uint8Array([99,0,128,255,27,88]),view=backing.subarray(1,5);assert.equal(h.subject.as64(view),Buffer.from(view).toString('base64'));
+});
+
+test('same-source merge never serializes original preview payloads and preserves manual fields and canonical original',async()=>{
+ const h=harness();await h.flush();const sha='a'.repeat(64),preview={page:1,data:'data:image/png;base64,'+'A'.repeat(2*1024*1024),toJSON(){throw Error('original previews must not enter model JSON clone')}};
+ const note={id:'n1',page:1,system:1,measure:1,hand:'right',pitch:'C4',finger:1,beat:0,measure_start_beat:0,measure_beat:0,duration_beats:1,bbox:[10,10,20,20]};
+ const fresh={name:'fresh source',source_sha256:sha,notes:[{...note}],pages:[{page:1,width:600,height:800}],selection:{bpm:120},page_previews:[preview]},review={name:'my review',source_sha256:sha,notes:[{...note,finger:4,beat:.25,measure_beat:.25,timing_anchor_scope:'measure',manual_fields:['finger','beat'],excluded:true,excluded_manual:true}],selection:{bpm:110}};
+ h.subject.acceptRecognized({project:fresh,review});const result=h.subject.selection();
+ assert.equal(result.page_previews,undefined);assert.equal(fresh.page_previews[0],preview);await assertOriginalPngBytes(h.nodes['original-image'].src,preview.data);
+ assert.equal(result.notes[0].finger,4);assert.equal(result.notes[0].beat,.25);assert.equal(result.notes[0].measure_beat,.25);assert.equal(result.notes[0].timing_anchor_scope,'measure');assert.equal(result.notes[0].excluded,true);assert.equal(result.name,'my review');assert.equal(result.selection.bpm,110);
+});
+
+test('saved large projects are not traversed again by pure tab saves or unchanged repeated flushes',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({name:'large synthetic project',source_sha256:'b'.repeat(64),notes:Array.from({length:5000},(_,i)=>({id:'n'+i,hand:'right',pitch:'C4',finger:2,beat:i/3,duration_beats:.25})),selection:{}});
+ const writes=[];h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);return {saved:true}}})};assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.ok(writes[0].project);
+ const p=h.subject.selection();p.toJSON=()=>{throw Error('pure UI must not serialize the music model')};
+ for(const tab of ['train','convert','library','convert']){h.subject.showTab(tab);assert.equal(await h.context.window.GloveWorkspace.flush(),true);}
+ assert.ok(writes.slice(1).every(value=>value.project===null));const count=writes.length;assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.equal(writes.length,count);
+ delete p.toJSON;p.notes[0].finger=4;h.subject.reviewChanged();assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.equal(writes.at(-1).project.notes[0].finger,4);
+});
+
+test('an in-flight same-revision flush is awaited without cloning another model',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({source_sha256:'c'.repeat(64),notes:[{id:'n',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});let finish;const writes=[];
+ h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);await new Promise(resolve=>finish=resolve);return {saved:true}}})};
+ const first=h.context.window.GloveWorkspace.flush();await h.flush();const p=h.subject.selection();p.toJSON=()=>{throw Error('duplicate snapshot')};const second=h.context.window.GloveWorkspace.flush(),third=h.context.window.GloveWorkspace.flush();await h.flush();assert.equal(writes.length,1);finish();assert.equal(await first,true);assert.equal(await second,true);assert.equal(await third,true);assert.equal(writes.length,1);
+});
+
+test('UI-only persistence cannot conceal a failed project save and a later retry still saves music',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({source_sha256:'d'.repeat(64),notes:[{id:'n',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});let fail;const writes=[];
+ h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);await new Promise((_,reject)=>fail=reject);}})};
+ const projectSave=h.context.window.GloveWorkspace.flush();await h.flush();h.subject.showTab('train');const uiSave=h.context.window.GloveWorkspace.flush();await h.flush();assert.equal(writes.length,1);fail(Error('disk full'));assert.equal(await projectSave,false);assert.equal(await uiSave,false);assert.equal(writes.length,1,'UI-only last.json write must not run after its project failed');
+ h.context.NativeApp.ready=Promise.resolve({save_workspace:async value=>{writes.push(value);return {saved:true}}});assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.ok(writes.at(-1).project);assert.equal(writes.at(-1).project.source_sha256,'d'.repeat(64));
+});
+
+test('new-source model and tiny UI saves keep ordered source identity and late validation changes remain dirty',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({name:'A',source_sha256:'e'.repeat(64),notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});let finish,lastSource='old';const writes=[];
+ h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);if(writes.length===1)await new Promise(resolve=>finish=resolve);if(value.project)lastSource=value.project.source_sha256;else assert.equal(lastSource,'f'.repeat(64));return {saved:true}}})};
+ const first=h.context.window.GloveWorkspace.flush();await h.flush();h.subject.loadReview({name:'B',source_sha256:'f'.repeat(64),notes:[{id:'b',hand:'right',pitch:'E4',finger:3,beat:1,duration_beats:1}],selection:{}});const second=h.context.window.GloveWorkspace.flush();h.subject.showTab('library');const ui=h.context.window.GloveWorkspace.flush();finish();assert.equal(await first,true);assert.equal(await second,true);assert.equal(await ui,true);assert.deepEqual(writes.map(v=>v.project?.source_sha256||null),['e'.repeat(64),'f'.repeat(64),null]);
+ const originalFetch=h.context.fetch;h.context.fetch=async(url,options)=>url==='/api/software/check'?{ok:true,json:async()=>({right_hand_timing:{version:1},automatic:{ready:true},report:{ready:true},notes:[{id:'b',automatic_ready:true,automatic_reasons:[],beat:1.333333,measure_start_beat:1,measure_beat:.333333}]})}:originalFetch(url,options);
+ await h.subject.checkCurrentReview();assert.equal(await h.context.window.GloveWorkspace.flush(),true);assert.equal(writes.at(-1).project.notes[0].beat,1.333333);
+});
+
+test('pure UI queueing does not cancel an outstanding music-save timer',async()=>{
+ const h=harness({manualTimers:true});await h.flush();h.subject.loadReview({source_sha256:'1'.repeat(64),notes:[{id:'a',hand:'right',pitch:'C4',finger:2,beat:0,duration_beats:1}],selection:{}});const writes=[];h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async value=>{writes.push(value);return {saved:true}}})};
+ h.context.clearTimeout=id=>{if(h.timers[id-1])h.timers[id-1].cancelled=true;};h.subject.selection().notes[0].finger=3;h.subject.reviewChanged();const musicTimer=h.timers.filter(t=>t.ms===250).at(-1);h.subject.showTab('train');h.context.window.GloveWorkspace.queueSave(false);assert.notEqual(musicTimer.cancelled,true);musicTimer.f();await h.flush();assert.equal(writes[0].project.notes[0].finger,3);
+});
+
+test('library packaging merges saved edits into the complete score before automatic export',async()=>{
+ const h=harness({manualTimers:true});await h.flush();let payload;
+ const sha='a'.repeat(64),notes=[
+  {id:'a',page:1,origin:[10,10],hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1},
+  {id:'b',page:1,origin:[30,10],hand:'right',pitch:'D4',finger:2,beat:1,duration_beats:1},
+  {id:'c',page:1,origin:[50,10],hand:'right',pitch:'E4',finger:3,beat:2,duration_beats:1}];
+ const fresh={name:'测试曲',source_sha256:sha,recognizer:'r1',automatic_mode:true,notes,selection:{bpm:120},page_previews:[{page:1,data:'preview'}]};
+ const review={source_sha256:sha,recognizer:'r1',selection:{bpm:95,range_reviewed:false},notes:[
+  {...notes[1],finger:5,manual_fields:['finger'],performance_override:{mode:'auto',reviewed:true}},
+  {id:'manual-1',page:1,hand:'right',pitch:'F4',finger:4,beat:3,duration_beats:1,manual_fields:['pitch','finger','beat','duration_beats','hand']}]};
+ let opened=null;h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async()=>{},catalog_open:async(id,bpm,force)=>{opened=[id,bpm,force];return {project:structuredClone(fresh),review:structuredClone(review)};}})};
+ const old=h.context.fetch;h.context.fetch=async(url,options)=>url==='/api/software/export'?(payload=JSON.parse(options.body),{ok:true,json:async()=>({ok:true,package_base64:'pack',package_extension:'pglpack',skipped_pending_count:1})}):old(url,options);
+ const output=await h.context.window.GloveWorkspace.packageCatalogScore('id-1','测试曲');
+ assert.deepEqual(opened,['id-1',120,false]);assert.equal(payload.project.notes.length,4);assert.equal(payload.project.automatic_mode,true);
+ assert.equal(payload.project.notes[1].finger,5);assert.equal(payload.project.notes[1].performance_override.reviewed,true);assert.equal(payload.project.notes[3].id,'manual-1');
+ assert.equal(payload.project.selection.bpm,95);assert.equal(payload.project.selection.range_reviewed,false);assert.equal(payload.skip_pending,true);
+ assert.equal(payload.page_previews[0].data,'preview');assert.equal(payload.project.page_previews,undefined);assert.equal(output.name,'测试曲.pglpack');assert.equal(output.base64,'pack');assert.equal(output.skipped,1);
+ assert.equal(h.sent.some(x=>x.path==='/api/train'||x.path==='/api/play'||x.path==='/api/upload'),false);
+});
+
+test('library packaging refuses unmatched saved changes rather than silently omitting them',async()=>{
+ const h=harness({manualTimers:true});await h.flush();const sha='b'.repeat(64),fresh={source_sha256:sha,recognizer:'r1',automatic_mode:true,selection:{},notes:[{id:'a',page:1,origin:[10,10],hand:'right',pitch:'C4',finger:1,beat:0,duration_beats:1}]};
+ const review={source_sha256:sha,recognizer:'r1',notes:[{id:'old',page:1,origin:[90,90],finger:5,manual_fields:['finger']}]};
+ h.context.NativeApp=h.context.window.NativeApp={ready:Promise.resolve({save_workspace:async()=>{},catalog_open:async()=>({project:structuredClone(fresh),review:structuredClone(review)})})};
+ await assert.rejects(h.context.window.GloveWorkspace.packageCatalogScore('id-2','测试曲'),/旧修改未能对应/);
+ assert.equal(h.sent.some(x=>x.path==='/api/software/export'),false);
 });

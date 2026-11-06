@@ -14,6 +14,8 @@ import re
 import threading
 import zipfile
 from PIL import Image
+from performance_schema import clean_performance
+from score_codec import decode as decode_motion
 
 
 class ScoreSources:
@@ -75,14 +77,29 @@ class ScoreSources:
             self._write(folder / 'manifest.json', json.dumps([entry for entry, _ in validated], ensure_ascii=False).encode('utf-8'))
 
     def associate(self, blob, project, score):
+        performance = clean_performance(score.get('performance'), score.get('duration_ms'))
         source = project.get('source_sha256')
+        if performance is not None:
+            wire = decode_motion(blob)
+            suffix = '（练习·'+performance['arrangement_id'][:16]+'）'
+            if wire['duration_ms'] != performance['duration_ms'] or (performance['mode'] == 'practice' and not wire['title'].endswith(suffix)):
+                raise ValueError('手套动作文件与练习琴声的编排标识不一致')
+            if isinstance(source, str) and re.fullmatch(r'[0-9a-f]{64}', source) and performance['source_identity'] != source:
+                raise ValueError('练习编排与原谱标识不一致')
         if not isinstance(source, str) or not re.fullmatch(r'[0-9a-f]{64}', source):
-            return False
+            if performance is None:
+                return False
+            # A manual score can carry a full sounding timeline without
+            # claiming that a PDF or an original image exists.
+            source = performance['source_identity']
         with self.lock:
             document = self.root / 'documents' / source / 'manifest.json'
             if not document.is_file():
-                return False
-            pages = json.loads(document.read_text('utf-8'))
+                if performance is None:
+                    return False
+                pages = []
+            else:
+                pages = json.loads(document.read_text('utf-8'))
             page_set = {entry['page'] for entry in pages}
             note_pages = []
             origins = score.get('source_notes', [])
@@ -106,10 +123,52 @@ class ScoreSources:
                                          width=(x1-x0)/page['pdf_width']*page['width'],height=(y1-y0)/page['pdf_height']*page['height'])
                     note_pages.append(entry)
             selected = {entry['page'] for entry in note_pages}
+            if score.get('partial_export'):
+                selected.update(entry['page'] for entry in score['partial_export'].get('skipped_pending',[])
+                                if entry.get('page') in page_set)
             if not selected:
                 selected = page_set
             digest = hashlib.sha256(blob).hexdigest()
             value = dict(source_sha256=source, score_sha256=digest, pages=[p for p in pages if p['page'] in selected], note_pages=note_pages)
+            if score.get('partial_export'):
+                value['partial_export']=score['partial_export']
+            if score.get('performance_notice'):
+                value['performance_notice']=score['performance_notice']
+            if performance is not None:
+                # Audio and motion no longer have a one-to-one index. Locate
+                # every original head, including gray audio-only heads.
+                by_id = {str(n.get('id')):n for n in project.get('notes', [])}
+                for ident, origin in performance.get('source_map', {}).items():
+                    note = by_id.get(str(ident), {})
+                    page = next((p for p in pages if p['page'] == note.get('page')), None)
+                    box = note.get('bbox')
+                    if (page is None or not isinstance(origin, dict) or not isinstance(box, list)
+                            or len(box) != 4 or not all(type(v) in (int, float) and math.isfinite(v) for v in box)
+                            or not page.get('pdf_width') or not page.get('pdf_height')):
+                        continue
+                    x0, y0 = max(0, box[0]-6), max(0, box[1]-30)
+                    x1, y1 = min(page['pdf_width'], box[2]+6), min(page['pdf_height'], box[3]+16)
+                    if x1 > x0 and y1 > y0:
+                        origin['location'] = dict(page=page['page'], system=note.get('system'),
+                            measure=note.get('measure'), x=x0/page['pdf_width']*page['width'],
+                            y=y0/page['pdf_height']*page['height'],
+                            width=(x1-x0)/page['pdf_width']*page['width'],
+                            height=(y1-y0)/page['pdf_height']*page['height'])
+                audio_pages = {origin.get('location', {}).get('page', origin.get('page'))
+                               for origin in performance.get('source_map', {}).values() if isinstance(origin, dict)}
+                if audio_pages:
+                    selected.update(audio_pages.intersection(page_set))
+                    value['pages'] = [p for p in pages if p['page'] in selected]
+                value['performance'] = performance
+                value['source_kind'] = 'pdf' if pages else 'score-model'
+                value['display_title'] = performance.get('display_title', score.get('title'))
+                value['motion_title'] = wire['title']
+                value['motion_duration_ms'] = wire['duration_ms']
+                existing = self.root / 'scores' / (digest + '.json')
+                if existing.is_file():
+                    old = json.loads(existing.read_text('utf8')).get('performance')
+                    if old is None or old.get('arrangement_id') != performance.get('arrangement_id'):
+                        raise ValueError('练习编排标识与已有琴声不一致，不能覆盖原谱关联')
             self._write(self.root / 'scores' / (digest + '.json'), json.dumps(value, ensure_ascii=False).encode('utf-8'))
             return True
 
@@ -124,6 +183,10 @@ class ScoreSources:
             if not path.is_file():
                 return dict(available=False)
             value = json.loads(path.read_text('utf-8'))
+            if value.get('performance') is not None:
+                p = clean_performance(value['performance'], value.get('motion_duration_ms'), clone=False)
+                if p['source_identity'] != value.get('source_sha256') or not str(value.get('motion_title', '')).endswith('（练习·'+p['arrangement_id'][:16]+'）'):
+                    raise ValueError('保存的练习琴声与动作谱标识不一致')
             value['available'] = True
             for entry in value['pages']:
                 entry['image_url'] = '/api/software/source/%s/%d' % (digest, entry['page'])
@@ -146,9 +209,21 @@ class ScoreSources:
             value = self.lookup(blob)
             if not value['available']:
                 return None
-            manifest = dict(version=1, source_sha256=self.key(value['source_sha256']),
+            if value.get('performance') is not None:
+                wire = decode_motion(blob)
+                if wire['title'] != value.get('motion_title') or wire['duration_ms'] != value.get('motion_duration_ms'):
+                    raise ValueError('随谱包的动作文件与琴声不一致')
+            manifest = dict(version=2 if value.get('performance') is not None else 1, source_sha256=self.key(value['source_sha256']),
                             score_sha256=self.key(value['score_sha256']),
                             pages=[], note_pages=value['note_pages'])
+            if value.get('partial_export'):
+                manifest['partial_export']=value['partial_export']
+            if value.get('performance_notice'):
+                manifest['performance_notice']=value['performance_notice']
+            if value.get('performance') is not None:
+                manifest['performance'] = value['performance']
+                manifest['source_kind'] = value.get('source_kind', 'pdf')
+                manifest['display_title'] = value.get('display_title')
             pictures = []
             for page in sorted(value['pages'], key=lambda entry: entry['page']):
                 name = 'pages/%d.png' % page['page']
@@ -159,8 +234,9 @@ class ScoreSources:
                                               height=page['height'], image_file=name))
                 pictures.append((name, picture))
             encoded_manifest = json.dumps(manifest, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-            if len(encoded_manifest) > 2 * 1024 * 1024:
-                raise ValueError('原谱索引超过2MB，无法生成随谱包')
+            metadata_limit = (8 if manifest.get('performance') is not None else 2) * 1024 * 1024
+            if len(encoded_manifest) > metadata_limit:
+                raise ValueError('原谱与练习编排索引过大，请分段导出')
             output = io.BytesIO()
             with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
                 for name, data in [('score.pgl', blob), ('source.json', encoded_manifest)] + pictures:

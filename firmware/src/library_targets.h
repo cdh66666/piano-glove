@@ -8,29 +8,18 @@ namespace librarytargets {
 inline bool pressMaximum(int slot,bool scs){(void)slot;(void)scs;return false;}
 inline int target(int slot,bool scs,int calibratedLo,int calibratedHi,int hardwareLo,int hardwareHi,bool pressed,int amplitude){
  if(slot<0||slot>5||calibratedLo>=calibratedHi||hardwareLo>hardwareHi||amplitude<0||amplitude>100)return -1;
- const int span=calibratedHi-calibratedLo;
- const int inset=scs?(span/4<6?span/4:6):span*5/100;
- const int low=calibratedLo+inset>hardwareLo?calibratedLo+inset:hardwareLo;
- const int high=calibratedHi-inset<hardwareHi?calibratedHi-inset:hardwareHi;
+ const int low=calibratedLo>hardwareLo?calibratedLo:hardwareLo;
+ const int high=calibratedHi<hardwareHi?calibratedHi:hardwareHi;
  if(low>high)return -1;
  const int released=pressMaximum(slot,scs)?low:high;
  const int down=pressMaximum(slot,scs)?high:low;
  return pressed?released+(down-released)*amplitude/100:released;
 }
-// Software training/score goals keep at least 5% inside each calibrated end.
-// Legacy/debug/benchmark target arithmetic above remains unchanged.
+// Use the saved calibrated endpoints directly; no additional software inset.
 inline int softwareTarget(int slot,bool scs,int calibratedLo,int calibratedHi,int hardwareLo,int hardwareHi,bool pressed,int amplitude){
- if(slot<0||slot>5||calibratedLo>=calibratedHi||hardwareLo>hardwareHi||amplitude<0||amplitude>100)return -1;
- const int span=calibratedHi-calibratedLo;
- int inset=(span+19)/20;const int legacyScs=scs?(span/4<6?span/4:6):0;if(legacyScs>inset)inset=legacyScs;
- const int low=calibratedLo+inset>hardwareLo?calibratedLo+inset:hardwareLo;
- const int high=calibratedHi-inset<hardwareHi?calibratedHi-inset:hardwareHi;
- if(low>high)return -1;
- const int released=pressMaximum(slot,scs)?low:high,down=pressMaximum(slot,scs)?high:low;
- return pressed?released+(down-released)*amplitude/100:released;
+ return target(slot,scs,calibratedLo,calibratedHi,hardwareLo,hardwareHi,pressed,amplitude);
 }
-// A repeated piano finger may use its recorded lift endpoint, never beyond
-// calibration or hardware travel. The pose axis and normal goals stay inset.
+// Repeated and ordinary notes share the same full recorded release endpoint.
 inline int repeatedReleaseTarget(int slot,bool scs,int calibratedLo,int calibratedHi,int hardwareLo,int hardwareHi){
  const int normal=softwareTarget(slot,scs,calibratedLo,calibratedHi,hardwareLo,hardwareHi,false,100);
  if(normal<0||slot==0)return normal;

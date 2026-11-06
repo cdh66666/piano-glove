@@ -165,12 +165,12 @@ class InstallerTests(unittest.TestCase):
         response.__enter__ = Mock(return_value=response)
         response.__exit__ = Mock(return_value=False)
         response.geturl.return_value = 'https://untrusted.invalid/package.zip'
-        with tempfile.TemporaryDirectory() as directory, patch.object(install, 'urlopen', return_value=response):
+        with tempfile.TemporaryDirectory() as directory, patch.object(install, '_bundled_package', return_value=None), patch.object(install, 'urlopen', return_value=response):
             with self.assertRaises(ValueError):install._download_package(Path(directory))
         response.read.assert_not_called()
 
     def test_vendor_download_failure_uses_only_fixed_official_microsoft_fallback(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(install,'_native_architecture',return_value='AMD64'),patch.object(install, '_download_from', side_effect=[OSError('403'),Path(directory)/'driver.cab']) as download:
+        with tempfile.TemporaryDirectory() as directory, patch.object(install, '_bundled_package', return_value=None), patch.object(install,'_native_architecture',return_value='AMD64'),patch.object(install, '_download_from', side_effect=[OSError('403'),Path(directory)/'driver.cab']) as download:
             result=install._download_package(Path(directory))
         self.assertEqual(result.suffix,'.cab')
         self.assertEqual(download.call_args_list[0].args[0],install.DRIVER_DOWNLOAD_URL)
@@ -191,6 +191,27 @@ class InstallerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'hash_mismatch'):
                 install._extract_package(archive,Path(directory))
             expand.assert_not_called()
+
+    def test_packaged_driver_installs_without_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'source.cab'
+            source.write_bytes(b'packaged-signed-driver-fixture')
+            output = Path(directory) / 'output'
+            output.mkdir()
+            with patch.object(install, '_bundled_package', return_value=source), \
+                 patch.object(install, '_native_architecture', return_value='AMD64'), \
+                 patch.object(install, 'MICROSOFT_DRIVER_SHA256', hashlib.sha256(source.read_bytes()).hexdigest()), \
+                 patch.object(install, '_download_from', side_effect=AssertionError('offline installation used network')):
+                self.assertEqual(install._download_package(output).read_bytes(), source.read_bytes())
+
+    def test_changed_packaged_driver_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'source.cab'
+            source.write_bytes(b'altered')
+            with patch.object(install, '_bundled_package', return_value=source), \
+                 patch.object(install, '_native_architecture', return_value='AMD64'):
+                with self.assertRaisesRegex(ValueError, 'bundled_driver_hash_mismatch'):
+                    install._download_package(Path(directory))
 
     def test_verified_cab_uses_system_expansion_and_same_inf_checks(self):
         with tempfile.TemporaryDirectory() as directory:

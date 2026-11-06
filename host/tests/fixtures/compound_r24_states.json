@@ -1,0 +1,2010 @@
+[
+  {
+    "label": "automatic",
+    "project": {
+      "name": "Independent combination",
+      "source_kind": "manual",
+      "recognition_performed": false,
+      "notes": [
+        {
+          "id": "a",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            100,
+            55
+          ],
+          "pitch": "C5",
+          "finger": 3,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 0,
+          "performance_marks": [
+            {
+              "kind": "trill",
+              "group_id": "tr",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "tr",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "body",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            },
+            {
+              "kind": "mordent_lower",
+              "group_id": "low",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "lower",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "termination",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            }
+          ]
+        },
+        {
+          "id": "next",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            150,
+            55
+          ],
+          "pitch": "D5",
+          "finger": 4,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 1,
+          "performance_marks": []
+        }
+      ],
+      "performance_policy": {
+        "mode": "practice"
+      },
+      "selection": {
+        "bpm": 120,
+        "start_beat": 0,
+        "repeat_mode": "written"
+      }
+    },
+    "check_project": {
+      "automatic": {
+        "version": 5,
+        "mode": "practice",
+        "ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "practice_ready": true,
+        "strict_ready": false,
+        "legacy_strict_ready": true,
+        "source_fields_ready": true,
+        "notes": 2,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "ignored_notes": 0,
+        "attention_notes": 0,
+        "attention_note_ids": [],
+        "written_attention_notes": 0,
+        "estimated_performance_groups": 2,
+        "estimated_groups": 2,
+        "timing_warning_notes": 0,
+        "timing_warning_note_ids": [],
+        "timing_estimated_notes": 0,
+        "unsupported": false,
+        "printed_fingers": 2,
+        "messages": []
+      },
+      "report": {
+        "auto_ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "attention_notes": 0,
+        "requires_review": false,
+        "ready": true,
+        "unsupported": false
+      },
+      "scope": {
+        "start_beat": 0,
+        "end_beat": null,
+        "source_fields": [],
+        "selected_note_ids": [
+          "a",
+          "next"
+        ]
+      },
+      "notes": [
+        {
+          "id": "a",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "low",
+            "kind": "mordent_lower",
+            "label": "下波音",
+            "estimated": true,
+            "warning_root": true,
+            "reviewed": false,
+            "realized": true,
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination",
+              "performance_finger": 3,
+              "finger_origin": "source"
+            },
+            "editable_fields": [
+              "aux_finger",
+              "borrow_ratio",
+              "kind",
+              "lower_aux_finger",
+              "rate_hz"
+            ],
+            "items": [
+              {
+                "group_id": "tr",
+                "kind": "trill",
+                "label": "颤音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+                "parameters": {
+                  "kind": "trill_with_lower_mordent",
+                  "combination_id": "a:trill_with_lower_mordent",
+                  "component_group_ids": [
+                    "tr",
+                    "low"
+                  ],
+                  "rate_hz": 8.0,
+                  "borrow_ratio": 0.3333333333333333,
+                  "aux_finger": null,
+                  "lower_aux_finger": null,
+                  "upper_performance_finger": 4,
+                  "lower_performance_finger": 2,
+                  "upper_finger_origin": "estimated",
+                  "lower_finger_origin": "estimated",
+                  "sequence": [
+                    "trill",
+                    "mordent_lower"
+                  ],
+                  "candidates": [
+                    "trill",
+                    "mordent_lower",
+                    "trill_with_lower_mordent"
+                  ],
+                  "phase": "body",
+                  "performance_finger": 3,
+                  "finger_origin": "source"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "borrow_ratio",
+                  "kind",
+                  "lower_aux_finger",
+                  "rate_hz"
+                ]
+              },
+              {
+                "group_id": "low",
+                "kind": "mordent_lower",
+                "label": "下波音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+                "parameters": {
+                  "kind": "trill_with_lower_mordent",
+                  "combination_id": "a:trill_with_lower_mordent",
+                  "component_group_ids": [
+                    "tr",
+                    "low"
+                  ],
+                  "rate_hz": 8.0,
+                  "borrow_ratio": 0.3333333333333333,
+                  "aux_finger": null,
+                  "lower_aux_finger": null,
+                  "upper_performance_finger": 4,
+                  "lower_performance_finger": 2,
+                  "upper_finger_origin": "estimated",
+                  "lower_finger_origin": "estimated",
+                  "sequence": [
+                    "trill",
+                    "mordent_lower"
+                  ],
+                  "candidates": [
+                    "trill",
+                    "mordent_lower",
+                    "trill_with_lower_mordent"
+                  ],
+                  "phase": "termination",
+                  "performance_finger": 3,
+                  "finger_origin": "source"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "borrow_ratio",
+                  "kind",
+                  "lower_aux_finger",
+                  "rate_hz"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "next",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "note:next",
+            "kind": "written",
+            "label": "基础音符",
+            "estimated": false,
+            "warning_root": false,
+            "reviewed": false,
+            "realized": true,
+            "message": "已按原谱基础节奏编入",
+            "parameters": {
+              "performance_finger": 4,
+              "finger_origin": "source"
+            },
+            "items": [
+              {
+                "group_id": "note:next",
+                "kind": "written",
+                "label": "基础音符",
+                "estimated": false,
+                "warning_root": false,
+                "reviewed": false,
+                "realized": true,
+                "message": "已按原谱基础节奏编入",
+                "parameters": {
+                  "performance_finger": 4,
+                  "finger_origin": "source"
+                },
+                "editable_fields": []
+              }
+            ],
+            "editable_fields": []
+          }
+        }
+      ],
+      "performance": {
+        "version": 1,
+        "mode": "practice",
+        "policy": {
+          "mode": "practice",
+          "estimate_unresolved_fingering": true,
+          "grace_ms": 80.0,
+          "ornament_rate_hz": 8.0,
+          "arpeggio_step_ms": 30.0,
+          "fermata_factor": 1.5,
+          "legato_overlap_ms": 20.0
+        },
+        "estimates": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "body"
+            }
+          },
+          {
+            "kind": "mordent_lower",
+            "group_id": "low",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination"
+            }
+          }
+        ],
+        "features": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "body"
+            },
+            "realized": true
+          },
+          {
+            "kind": "mordent_lower",
+            "group_id": "low",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination"
+            },
+            "realized": true
+          }
+        ],
+        "coverage": {
+          "selected_sources": 2,
+          "sounded_sources": 2,
+          "motion_sources": 2,
+          "audio_attacks": 6,
+          "motion_events": 6,
+          "unmarked_audio_only": 0,
+          "estimated_source_fingers": 0,
+          "selected_source_ids": [
+            "a",
+            "next"
+          ],
+          "sounded_source_ids": [
+            "a",
+            "next"
+          ],
+          "motion_source_ids": [
+            "a",
+            "next"
+          ],
+          "missing_source_ids": [],
+          "motion_expected_attacks": 6,
+          "motion_actual_attacks": 6,
+          "missing_motion_onsets": []
+        },
+        "arrangement_id": "7629017525d10a1803d42c0dcbd8599796594b2cece2fcf12111ec80bad073cb"
+      }
+    },
+    "audio_events": [
+      {
+        "t_ms": 0,
+        "duration_ms": 167,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 167,
+        "duration_ms": 166,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 333,
+        "duration_ms": 56,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 389,
+        "duration_ms": 55,
+        "pitch": 71,
+        "finger": 2,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 444,
+        "duration_ms": 56,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 500,
+        "duration_ms": 500,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "next"
+        ],
+        "group_id": "plain:next",
+        "occurrence": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "label": "trill-only",
+    "project": {
+      "name": "Independent combination",
+      "source_kind": "manual",
+      "recognition_performed": false,
+      "notes": [
+        {
+          "id": "a",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            100,
+            55
+          ],
+          "pitch": "C5",
+          "finger": 3,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 0,
+          "performance_marks": [
+            {
+              "kind": "trill",
+              "group_id": "tr",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "tr",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "body",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            },
+            {
+              "kind": "mordent_lower",
+              "group_id": "low",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "lower",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "termination",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            }
+          ],
+          "performance_override": {
+            "kind": "trill",
+            "reviewed": false
+          }
+        },
+        {
+          "id": "next",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            150,
+            55
+          ],
+          "pitch": "D5",
+          "finger": 4,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 1,
+          "performance_marks": []
+        }
+      ],
+      "performance_policy": {
+        "mode": "practice"
+      },
+      "selection": {
+        "bpm": 120,
+        "start_beat": 0,
+        "repeat_mode": "written"
+      }
+    },
+    "check_project": {
+      "automatic": {
+        "version": 5,
+        "mode": "practice",
+        "ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "practice_ready": true,
+        "strict_ready": false,
+        "legacy_strict_ready": true,
+        "source_fields_ready": true,
+        "notes": 2,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "ignored_notes": 0,
+        "attention_notes": 0,
+        "attention_note_ids": [],
+        "written_attention_notes": 0,
+        "estimated_performance_groups": 1,
+        "estimated_groups": 1,
+        "timing_warning_notes": 0,
+        "timing_warning_note_ids": [],
+        "timing_estimated_notes": 0,
+        "unsupported": false,
+        "printed_fingers": 2,
+        "messages": []
+      },
+      "report": {
+        "auto_ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "attention_notes": 0,
+        "requires_review": false,
+        "ready": true,
+        "unsupported": false
+      },
+      "scope": {
+        "start_beat": 0,
+        "end_beat": null,
+        "source_fields": [],
+        "selected_note_ids": [
+          "a",
+          "next"
+        ]
+      },
+      "notes": [
+        {
+          "id": "a",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "tr",
+            "kind": "trill",
+            "label": "颤音",
+            "estimated": true,
+            "warning_root": true,
+            "reviewed": false,
+            "realized": true,
+            "message": "颤音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ],
+              "kind": "trill"
+            },
+            "editable_fields": [
+              "aux_finger",
+              "kind",
+              "rate_hz"
+            ],
+            "items": [
+              {
+                "group_id": "tr",
+                "kind": "trill",
+                "label": "颤音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "颤音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+                "parameters": {
+                  "rate_hz": 8.0,
+                  "aux_finger": null,
+                  "performance_finger": 3,
+                  "finger_origin": "source",
+                  "candidates": [
+                    "mordent_lower",
+                    "trill",
+                    "trill_with_lower_mordent"
+                  ],
+                  "kind": "trill"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "kind",
+                  "rate_hz"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "next",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "note:next",
+            "kind": "written",
+            "label": "基础音符",
+            "estimated": false,
+            "warning_root": false,
+            "reviewed": false,
+            "realized": true,
+            "message": "已按原谱基础节奏编入",
+            "parameters": {
+              "performance_finger": 4,
+              "finger_origin": "source"
+            },
+            "items": [
+              {
+                "group_id": "note:next",
+                "kind": "written",
+                "label": "基础音符",
+                "estimated": false,
+                "warning_root": false,
+                "reviewed": false,
+                "realized": true,
+                "message": "已按原谱基础节奏编入",
+                "parameters": {
+                  "performance_finger": 4,
+                  "finger_origin": "source"
+                },
+                "editable_fields": []
+              }
+            ],
+            "editable_fields": []
+          }
+        }
+      ],
+      "performance": {
+        "version": 1,
+        "mode": "practice",
+        "policy": {
+          "mode": "practice",
+          "estimate_unresolved_fingering": true,
+          "grace_ms": 80.0,
+          "ornament_rate_hz": 8.0,
+          "arpeggio_step_ms": 30.0,
+          "fermata_factor": 1.5,
+          "legato_overlap_ms": 20.0
+        },
+        "estimates": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "颤音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ]
+            }
+          }
+        ],
+        "features": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ]
+            },
+            "realized": true
+          }
+        ],
+        "coverage": {
+          "selected_sources": 2,
+          "sounded_sources": 2,
+          "motion_sources": 2,
+          "audio_attacks": 5,
+          "motion_events": 5,
+          "unmarked_audio_only": 0,
+          "estimated_source_fingers": 0,
+          "selected_source_ids": [
+            "a",
+            "next"
+          ],
+          "sounded_source_ids": [
+            "a",
+            "next"
+          ],
+          "motion_source_ids": [
+            "a",
+            "next"
+          ],
+          "missing_source_ids": [],
+          "motion_expected_attacks": 5,
+          "motion_actual_attacks": 5,
+          "missing_motion_onsets": []
+        },
+        "arrangement_id": "a0bf0f2cd2c1666b9460b92056decea9ea3b35e1674c878943d07d940a4d8cab"
+      }
+    },
+    "audio_events": [
+      {
+        "t_ms": 0,
+        "duration_ms": 125,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 125,
+        "duration_ms": 125,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 250,
+        "duration_ms": 125,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 375,
+        "duration_ms": 125,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 500,
+        "duration_ms": 500,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "next"
+        ],
+        "group_id": "plain:next",
+        "occurrence": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "label": "lower-only",
+    "project": {
+      "name": "Independent combination",
+      "source_kind": "manual",
+      "recognition_performed": false,
+      "notes": [
+        {
+          "id": "a",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            100,
+            55
+          ],
+          "pitch": "C5",
+          "finger": 3,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 0,
+          "performance_marks": [
+            {
+              "kind": "trill",
+              "group_id": "tr",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "tr",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "body",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            },
+            {
+              "kind": "mordent_lower",
+              "group_id": "low",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "lower",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "termination",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            }
+          ],
+          "performance_override": {
+            "kind": "mordent_lower",
+            "reviewed": false
+          }
+        },
+        {
+          "id": "next",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            150,
+            55
+          ],
+          "pitch": "D5",
+          "finger": 4,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 1,
+          "performance_marks": []
+        }
+      ],
+      "performance_policy": {
+        "mode": "practice"
+      },
+      "selection": {
+        "bpm": 120,
+        "start_beat": 0,
+        "repeat_mode": "written"
+      }
+    },
+    "check_project": {
+      "automatic": {
+        "version": 5,
+        "mode": "practice",
+        "ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "practice_ready": true,
+        "strict_ready": false,
+        "legacy_strict_ready": true,
+        "source_fields_ready": true,
+        "notes": 2,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "ignored_notes": 0,
+        "attention_notes": 0,
+        "attention_note_ids": [],
+        "written_attention_notes": 0,
+        "estimated_performance_groups": 1,
+        "estimated_groups": 1,
+        "timing_warning_notes": 0,
+        "timing_warning_note_ids": [],
+        "timing_estimated_notes": 0,
+        "unsupported": false,
+        "printed_fingers": 2,
+        "messages": []
+      },
+      "report": {
+        "auto_ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "attention_notes": 0,
+        "requires_review": false,
+        "ready": true,
+        "unsupported": false
+      },
+      "scope": {
+        "start_beat": 0,
+        "end_beat": null,
+        "source_fields": [],
+        "selected_note_ids": [
+          "a",
+          "next"
+        ]
+      },
+      "notes": [
+        {
+          "id": "a",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "tr",
+            "kind": "mordent_lower",
+            "label": "下波音",
+            "estimated": true,
+            "warning_root": true,
+            "reviewed": false,
+            "realized": true,
+            "message": "下波音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ],
+              "kind": "mordent_lower"
+            },
+            "editable_fields": [
+              "aux_finger",
+              "kind",
+              "rate_hz"
+            ],
+            "items": [
+              {
+                "group_id": "tr",
+                "kind": "mordent_lower",
+                "label": "下波音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "下波音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+                "parameters": {
+                  "rate_hz": 8.0,
+                  "aux_finger": null,
+                  "performance_finger": 3,
+                  "finger_origin": "source",
+                  "candidates": [
+                    "mordent_lower",
+                    "trill",
+                    "trill_with_lower_mordent"
+                  ],
+                  "kind": "mordent_lower"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "kind",
+                  "rate_hz"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "next",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "note:next",
+            "kind": "written",
+            "label": "基础音符",
+            "estimated": false,
+            "warning_root": false,
+            "reviewed": false,
+            "realized": true,
+            "message": "已按原谱基础节奏编入",
+            "parameters": {
+              "performance_finger": 4,
+              "finger_origin": "source"
+            },
+            "items": [
+              {
+                "group_id": "note:next",
+                "kind": "written",
+                "label": "基础音符",
+                "estimated": false,
+                "warning_root": false,
+                "reviewed": false,
+                "realized": true,
+                "message": "已按原谱基础节奏编入",
+                "parameters": {
+                  "performance_finger": 4,
+                  "finger_origin": "source"
+                },
+                "editable_fields": []
+              }
+            ],
+            "editable_fields": []
+          }
+        }
+      ],
+      "performance": {
+        "version": 1,
+        "mode": "practice",
+        "policy": {
+          "mode": "practice",
+          "estimate_unresolved_fingering": true,
+          "grace_ms": 80.0,
+          "ornament_rate_hz": 8.0,
+          "arpeggio_step_ms": 30.0,
+          "fermata_factor": 1.5,
+          "legato_overlap_ms": 20.0
+        },
+        "estimates": [
+          {
+            "kind": "mordent_lower",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "下波音已生成实际声音事件；速度及辅助指法为可修改的练习估计",
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ]
+            }
+          }
+        ],
+        "features": [
+          {
+            "kind": "mordent_lower",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "rate_hz": 8.0,
+              "aux_finger": null,
+              "performance_finger": 3,
+              "finger_origin": "source",
+              "candidates": [
+                "mordent_lower",
+                "trill",
+                "trill_with_lower_mordent"
+              ]
+            },
+            "realized": true
+          }
+        ],
+        "coverage": {
+          "selected_sources": 2,
+          "sounded_sources": 2,
+          "motion_sources": 2,
+          "audio_attacks": 4,
+          "motion_events": 4,
+          "unmarked_audio_only": 0,
+          "estimated_source_fingers": 0,
+          "selected_source_ids": [
+            "a",
+            "next"
+          ],
+          "sounded_source_ids": [
+            "a",
+            "next"
+          ],
+          "motion_source_ids": [
+            "a",
+            "next"
+          ],
+          "missing_source_ids": [],
+          "motion_expected_attacks": 4,
+          "motion_actual_attacks": 4,
+          "missing_motion_onsets": []
+        },
+        "arrangement_id": "c644b162745604ffae4a34f7c9a6c7d1e9cf38135897039fd5da5601f7e1d785"
+      }
+    },
+    "audio_events": [
+      {
+        "t_ms": 0,
+        "duration_ms": 125,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 125,
+        "duration_ms": 125,
+        "pitch": 71,
+        "finger": 2,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 250,
+        "duration_ms": 250,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 500,
+        "duration_ms": 500,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "next"
+        ],
+        "group_id": "plain:next",
+        "occurrence": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "label": "explicit-combination",
+    "project": {
+      "name": "Independent combination",
+      "source_kind": "manual",
+      "recognition_performed": false,
+      "notes": [
+        {
+          "id": "a",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            100,
+            55
+          ],
+          "pitch": "C5",
+          "finger": 3,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 0,
+          "performance_marks": [
+            {
+              "kind": "trill",
+              "group_id": "tr",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "tr",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "body",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            },
+            {
+              "kind": "mordent_lower",
+              "group_id": "low",
+              "position": "on",
+              "source": {
+                "method": "printed_music_glyph",
+                "font": "Aloisen",
+                "char": "lower",
+                "bbox": [
+                  97,
+                  12,
+                  115,
+                  24
+                ]
+              },
+              "options": {
+                "combination_id": "a:trill_with_lower_mordent",
+                "combination_kind": "trill_with_lower_mordent",
+                "combination_role": "termination",
+                "component_group_ids": [
+                  "tr",
+                  "low"
+                ],
+                "combination_evidence": "same_font_overlapping_inks_unique_single_head_anchor"
+              }
+            }
+          ],
+          "performance_override": {
+            "kind": "trill_with_lower_mordent",
+            "reviewed": false
+          }
+        },
+        {
+          "id": "next",
+          "hand": "right",
+          "page": 1,
+          "system": 1,
+          "measure": 1,
+          "staff": "rh",
+          "origin": [
+            150,
+            55
+          ],
+          "pitch": "D5",
+          "finger": 4,
+          "source_fingering_state": "printed",
+          "duration_beats": 1,
+          "beat": 1,
+          "performance_marks": []
+        }
+      ],
+      "performance_policy": {
+        "mode": "practice"
+      },
+      "selection": {
+        "bpm": 120,
+        "start_beat": 0,
+        "repeat_mode": "written"
+      }
+    },
+    "check_project": {
+      "automatic": {
+        "version": 5,
+        "mode": "practice",
+        "ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "practice_ready": true,
+        "strict_ready": false,
+        "legacy_strict_ready": true,
+        "source_fields_ready": true,
+        "notes": 2,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "ignored_notes": 0,
+        "attention_notes": 0,
+        "attention_note_ids": [],
+        "written_attention_notes": 0,
+        "estimated_performance_groups": 2,
+        "estimated_groups": 2,
+        "timing_warning_notes": 0,
+        "timing_warning_note_ids": [],
+        "timing_estimated_notes": 0,
+        "unsupported": false,
+        "printed_fingers": 2,
+        "messages": []
+      },
+      "report": {
+        "auto_ready": true,
+        "recognition_ready": true,
+        "performance_ready": true,
+        "unfingered_notes": 0,
+        "action_notes": 2,
+        "attention_notes": 0,
+        "requires_review": false,
+        "ready": true,
+        "unsupported": false
+      },
+      "scope": {
+        "start_beat": 0,
+        "end_beat": null,
+        "source_fields": [],
+        "selected_note_ids": [
+          "a",
+          "next"
+        ]
+      },
+      "notes": [
+        {
+          "id": "a",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "low",
+            "kind": "mordent_lower",
+            "label": "下波音",
+            "estimated": true,
+            "warning_root": true,
+            "reviewed": false,
+            "realized": true,
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination",
+              "performance_finger": 3,
+              "finger_origin": "source"
+            },
+            "editable_fields": [
+              "aux_finger",
+              "borrow_ratio",
+              "kind",
+              "lower_aux_finger",
+              "rate_hz"
+            ],
+            "items": [
+              {
+                "group_id": "tr",
+                "kind": "trill",
+                "label": "颤音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+                "parameters": {
+                  "kind": "trill_with_lower_mordent",
+                  "combination_id": "a:trill_with_lower_mordent",
+                  "component_group_ids": [
+                    "tr",
+                    "low"
+                  ],
+                  "rate_hz": 8.0,
+                  "borrow_ratio": 0.3333333333333333,
+                  "aux_finger": null,
+                  "lower_aux_finger": null,
+                  "upper_performance_finger": 4,
+                  "lower_performance_finger": 2,
+                  "upper_finger_origin": "estimated",
+                  "lower_finger_origin": "estimated",
+                  "sequence": [
+                    "trill",
+                    "mordent_lower"
+                  ],
+                  "candidates": [
+                    "trill",
+                    "mordent_lower",
+                    "trill_with_lower_mordent"
+                  ],
+                  "phase": "body",
+                  "performance_finger": 3,
+                  "finger_origin": "source"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "borrow_ratio",
+                  "kind",
+                  "lower_aux_finger",
+                  "rate_hz"
+                ]
+              },
+              {
+                "group_id": "low",
+                "kind": "mordent_lower",
+                "label": "下波音",
+                "estimated": true,
+                "warning_root": true,
+                "reviewed": false,
+                "realized": true,
+                "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+                "parameters": {
+                  "kind": "trill_with_lower_mordent",
+                  "combination_id": "a:trill_with_lower_mordent",
+                  "component_group_ids": [
+                    "tr",
+                    "low"
+                  ],
+                  "rate_hz": 8.0,
+                  "borrow_ratio": 0.3333333333333333,
+                  "aux_finger": null,
+                  "lower_aux_finger": null,
+                  "upper_performance_finger": 4,
+                  "lower_performance_finger": 2,
+                  "upper_finger_origin": "estimated",
+                  "lower_finger_origin": "estimated",
+                  "sequence": [
+                    "trill",
+                    "mordent_lower"
+                  ],
+                  "candidates": [
+                    "trill",
+                    "mordent_lower",
+                    "trill_with_lower_mordent"
+                  ],
+                  "phase": "termination",
+                  "performance_finger": 3,
+                  "finger_origin": "source"
+                },
+                "editable_fields": [
+                  "aux_finger",
+                  "borrow_ratio",
+                  "kind",
+                  "lower_aux_finger",
+                  "rate_hz"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "next",
+          "automatic_ready": true,
+          "automatic_reasons": [],
+          "in_export_scope": true,
+          "unfingered": false,
+          "source_fingering_state": "printed",
+          "performance_state": {
+            "group_id": "note:next",
+            "kind": "written",
+            "label": "基础音符",
+            "estimated": false,
+            "warning_root": false,
+            "reviewed": false,
+            "realized": true,
+            "message": "已按原谱基础节奏编入",
+            "parameters": {
+              "performance_finger": 4,
+              "finger_origin": "source"
+            },
+            "items": [
+              {
+                "group_id": "note:next",
+                "kind": "written",
+                "label": "基础音符",
+                "estimated": false,
+                "warning_root": false,
+                "reviewed": false,
+                "realized": true,
+                "message": "已按原谱基础节奏编入",
+                "parameters": {
+                  "performance_finger": 4,
+                  "finger_origin": "source"
+                },
+                "editable_fields": []
+              }
+            ],
+            "editable_fields": []
+          }
+        }
+      ],
+      "performance": {
+        "version": 1,
+        "mode": "practice",
+        "policy": {
+          "mode": "practice",
+          "estimate_unresolved_fingering": true,
+          "grace_ms": 80.0,
+          "ornament_rate_hz": 8.0,
+          "arpeggio_step_ms": 30.0,
+          "fermata_factor": 1.5,
+          "legato_overlap_ms": 20.0
+        },
+        "estimates": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "body"
+            }
+          },
+          {
+            "kind": "mordent_lower",
+            "group_id": "low",
+            "source_note_ids": [
+              "a"
+            ],
+            "message": "按练习估计先颤音、再主音—下邻音—主音收尾，速度和尾段可改，后续起拍不变",
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination"
+            }
+          }
+        ],
+        "features": [
+          {
+            "kind": "trill",
+            "group_id": "tr",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "body"
+            },
+            "realized": true
+          },
+          {
+            "kind": "mordent_lower",
+            "group_id": "low",
+            "source_note_ids": [
+              "a"
+            ],
+            "estimated": true,
+            "parameters": {
+              "kind": "trill_with_lower_mordent",
+              "combination_id": "a:trill_with_lower_mordent",
+              "component_group_ids": [
+                "tr",
+                "low"
+              ],
+              "rate_hz": 8.0,
+              "borrow_ratio": 0.3333333333333333,
+              "aux_finger": null,
+              "lower_aux_finger": null,
+              "upper_performance_finger": 4,
+              "lower_performance_finger": 2,
+              "upper_finger_origin": "estimated",
+              "lower_finger_origin": "estimated",
+              "sequence": [
+                "trill",
+                "mordent_lower"
+              ],
+              "candidates": [
+                "trill",
+                "mordent_lower",
+                "trill_with_lower_mordent"
+              ],
+              "phase": "termination"
+            },
+            "realized": true
+          }
+        ],
+        "coverage": {
+          "selected_sources": 2,
+          "sounded_sources": 2,
+          "motion_sources": 2,
+          "audio_attacks": 6,
+          "motion_events": 6,
+          "unmarked_audio_only": 0,
+          "estimated_source_fingers": 0,
+          "selected_source_ids": [
+            "a",
+            "next"
+          ],
+          "sounded_source_ids": [
+            "a",
+            "next"
+          ],
+          "motion_source_ids": [
+            "a",
+            "next"
+          ],
+          "missing_source_ids": [],
+          "motion_expected_attacks": 6,
+          "motion_actual_attacks": 6,
+          "missing_motion_onsets": []
+        },
+        "arrangement_id": "7629017525d10a1803d42c0dcbd8599796594b2cece2fcf12111ec80bad073cb"
+      }
+    },
+    "audio_events": [
+      {
+        "t_ms": 0,
+        "duration_ms": 167,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 167,
+        "duration_ms": 166,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "tr",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 333,
+        "duration_ms": 56,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 389,
+        "duration_ms": 55,
+        "pitch": 71,
+        "finger": 2,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 444,
+        "duration_ms": 56,
+        "pitch": 72,
+        "finger": 3,
+        "velocity": 96,
+        "source_note_ids": [
+          "a"
+        ],
+        "group_id": "low",
+        "occurrence": 0
+      },
+      {
+        "t_ms": 500,
+        "duration_ms": 500,
+        "pitch": 74,
+        "finger": 4,
+        "velocity": 96,
+        "source_note_ids": [
+          "next"
+        ],
+        "group_id": "plain:next",
+        "occurrence": 0
+      }
+    ],
+    "errors": []
+  }
+]

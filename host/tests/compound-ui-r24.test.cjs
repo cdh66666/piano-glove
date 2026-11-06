@@ -1,0 +1,19 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module');
+const HOST=path.resolve(__dirname,'..'),SAMPLES=path.join(__dirname,'fixtures/compound_r24_states.json'),CANDIDATE=path.join(HOST,'software-review.js');
+function harness(project){const file=path.join(HOST,'tests/software-review.test.cjs'),source=fs.readFileSync(file,'utf8'),prefix=source.slice(0,source.indexOf('\ntest(')),body=source.slice(source.indexOf('class Node{'),source.indexOf('\nconst project=notes=>')),original=createRequire(file),localFs={...fs,readFileSync:(p,...args)=>fs.readFileSync(path.resolve(p)===path.join(HOST,'software-review.js')?CANDIDATE:p,...args)},module={exports:{}},context={module,require:id=>id==='node:fs'?localFs:id==='../software-review.js'?require(CANDIDATE):original(id),__dirname:path.dirname(file),console,setTimeout,clearTimeout};vm.runInNewContext(prefix+body+'\nmodule.exports={harness};',context);return module.exports.harness(project);}
+function find(root,id){if(root?.id===id)return root;for(const n of root?.children||[]){const r=find(n,id);if(r)return r;}return null;}
+function fixture(label){const row=JSON.parse(fs.readFileSync(SAMPLES,'utf8')).find(r=>r.label===label),p=row.project;Object.assign(p,{automatic_mode:true,automatic:row.check_project.automatic,performance:row.check_project.performance,pages:[{page:1,width:600,height:300}]});for(const n of p.notes){Object.assign(n,row.check_project.notes.find(x=>x.id===n.id),{bbox:[100,100,110,110]});}return p;}
+for(const label of ['automatic','trill-only','lower-only','explicit-combination'])test('same backend '+label+' sample exposes only effective compact controls',()=>{
+ const p=fixture(label),n=p.notes[0],written=JSON.stringify(n.performance_marks),h=harness(p),root=h.nodes['review-duration-section'],kind=find(root,'review-performance-interpretation');
+ assert.equal(kind.hidden,false);assert.ok(kind.children.some(o=>o.value==='trill_with_lower_mordent'&&o.textContent==='颤音接下波音'));
+ const combined=['automatic','explicit-combination'].includes(label);assert.equal(find(root,'review-performance-lower-aux-field').hidden,!combined);assert.equal(find(root,'review-performance-borrow-field').hidden,!combined);
+ assert.equal(find(root,'review-performance-rate-field').hidden,false);assert.equal(find(root,'review-performance-aux-field').hidden,false);
+ if(combined){const lower=find(root,'review-performance-lower-aux');lower.value='5';lower.onchange();assert.equal(n.performance_override.lower_aux_finger,5);assert.equal(n.performance_override.reviewed,false);}
+ assert.equal(JSON.stringify(n.performance_marks),written);assert.equal(n.pitch,'C5');assert.equal(n.finger,3);assert.equal(n.duration_beats,1);
+});
+test('single interpretation can return to the declared combination without changing raw marks',()=>{
+ const p=fixture('trill-only'),n=p.notes[0],raw=JSON.stringify(n.performance_marks),h=harness(p),select=find(h.nodes['review-duration-section'],'review-performance-interpretation');select.value='trill_with_lower_mordent';select.onchange();assert.equal(n.performance_override.kind,'trill_with_lower_mordent');assert.equal(JSON.stringify(n.performance_marks),raw);
+});
+test('restore automatic removes previous combination-only parameters while preserving unrelated articulation',()=>{
+ const p=fixture('lower-only'),n=p.notes[0];n.performance_override={kind:'mordent_lower',lower_aux_finger:5,borrow_ratio:.5,velocity:112,reviewed:true};const h=harness(p);find(h.nodes['review-duration-section'],'review-performance-reset').onclick();assert.equal(n.performance_override.kind,undefined);assert.equal(n.performance_override.lower_aux_finger,undefined);assert.equal(n.performance_override.borrow_ratio,undefined);assert.equal(n.performance_override.velocity,112);assert.equal(n.performance_override.reviewed,false);
+});

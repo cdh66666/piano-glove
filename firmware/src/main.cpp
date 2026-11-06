@@ -20,7 +20,7 @@
 #include "device_library.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.2.4"
+#define FW_VER "2.2.5-r29.8"
 // 2.2.0: 型号 / 位置量程改成**从舵机读回来**（STS3032 + SC09 双适配）；
 //        新增 POSALL 一帧读回全部槽位位置（演奏闭环的心跳）。
 // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
@@ -381,12 +381,12 @@ static void cmdInfo() {
   const scs::Profile &pf = scs::profile();
   sayf("OK INFO fw=%s profile=%s range=%u probed=%d ap=%s ip=%s ap_ready=%d software_protocol=1 "
        "calibrated=%d armed=%d auto_active=%d enroll_active=%d enroll_next=%d enroll_temp=20 "
-       "enroll_phase=%s enroll_flow=3 enroll_resume=1 enroll_fix=20261021 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1 bench_sts=1 bench_keep=1 bench_fullstroke=1 cal_origin=1 bench_acc=0 motion_speed_unit=counts_per_s bench_speed_min=50 bench_speed_max=%d bench_default_speed=%d motion_speed_default=%d motion_speed_max=%d motion_tolerance=%d motion_inset=%d mount_target=%d mount_speed=%d origin_epoch=%lu",
+       "enroll_phase=%s enroll_flow=3 enroll_resume=1 enroll_fix=20261021 online=%d sweep=%d ver=%s bench_group=1 bench_feedback=1 bench_sts=1 bench_keep=1 bench_fullstroke=1 cal_origin=1 bench_acc=0 motion_speed_unit=counts_per_s bench_speed_min=%d bench_speed_max=%d bench_default_speed=%d motion_speed_default=%d motion_speed_max=%d motion_tolerance=%d motion_inset=%d mount_target=%d mount_speed=%d origin_epoch=%lu software_perf=r29 software_speed=native_max software_inset=0 score_arrival_wait=0 fastest_feedback_turn=1 fastest_turn=native_motion_end",
        FW_ID, scs::familyName(pf.family), (unsigned)pf.range, pf.probed ? 1 : 0,
        library::ssid(),library::ip().c_str(),library::apReady()?1:0,
        glove::calibrated() ? 1 : 0, glove::armed() ? 1 : 0, glove::autoActive() ? 1 : 0,
        g_enroll ? 1 : 0, (unsigned)g_enrollNext, g_enrollPhase,
-       bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?200:8000,pf.family==scs::Family::SCS?1000:8000,pf.family==scs::Family::SCS?35:114,pf.family==scs::Family::SCS?6:24,glove::mountTarget(),glove::mountSpeed(),(unsigned long)glove::originEpoch());
+       bitcount(glove::onlineMask()), glove::sweepActive() ? 1 : 0, FW_VER,pf.family==scs::Family::SCS?50:0,pf.family==scs::Family::SCS?1000:32767,pf.family==scs::Family::SCS?1000:0,pf.family==scs::Family::SCS?200:0,pf.family==scs::Family::SCS?1000:0,pf.family==scs::Family::SCS?35:114,0,glove::mountTarget(),glove::mountSpeed(),(unsigned long)glove::originEpoch());
 }
 
 static void cmdStatusAll() {
@@ -750,7 +750,16 @@ static void cmdLine(char *raw) {
 
   if(!strcmp(v,"SAFE")||!strcmp(v,"DISARM"))library::stop("external_stop");
   if(!strcmp(v,"LIB")){
-    if(g_enroll){errf("LIB enrollment_active");return;}
+    // Boot-time discovery waits indefinitely while servo power is off. Score
+    // files live in SPIFFS, so listing/reading/uploading/deleting stays
+    // available then; anything that moves or changes servo state does not,
+    // and a user-started enrollment still owns the device exclusively.
+    if(g_enroll){
+      const char*a=n>=2?t[1]:"INFO";bool files=false;
+      static const char*const kBootWaitFiles[]={"INFO","LIST","PORTAL","KEEP","ABORT","BEGIN","CHUNK","COMMIT","DELETE","READ"};
+      if(g_enrollAutomaticBoot)for(const char*k:kBootWaitFiles)if(!strcmp(a,k)){files=true;break;}
+      if(!files){errf("LIB enrollment_active");return;}
+    }
     library::command(n,t);return;
   }
   if(library::active()&&strcmp(v,"INFO")&&strcmp(v,"STATUS")&&strcmp(v,"STATUS_ALL")&&strcmp(v,"POSALL")&&strcmp(v,"SAFE")&&strcmp(v,"DISARM")&&strcmp(v,"BUSINFO")){errf("LIB active_STOP_first");return;}
@@ -787,7 +796,7 @@ static void cmdLine(char *raw) {
       char *end=nullptr;const unsigned long mask=strtoul(t[2],&end,0);
       if(!end||*end||!mask||mask>0x3F){glove::safe();errf("BENCH GROUP mask_outside1to63");return;}
       uint16_t positions[6];for(int id=0;id<6;++id){const long pos=strtol(t[id+3],&end,10);if(!end||*end||pos<0||pos>scs::profile().range){glove::safe();errf("BENCH GROUP target_outside_bounds id=%d",id+1);return;}positions[id]=uint16_t(pos);}
-      const long speed=strtol(t[9],&end,10);if(!end||*end||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){glove::safe();errf("BENCH GROUP speed_outside_profile_bounds");return;}
+      const long speed=strtol(t[9],&end,10);if(!end||*end||speed<0||(scs::profile().family==scs::Family::SCS?(speed<50||speed>1000):speed>32767)){glove::safe();errf("BENCH GROUP speed_outside_profile_bounds");return;}
       if(!glove::benchGroup(uint8_t(mask),positions,uint16_t(speed))){errf("BENCH GROUP %s",glove::benchFailure());return;}
       glove::benchTick();
       if(!glove::armed()||!glove::benchActive()){errf("BENCH GROUP deadline");return;}
@@ -795,7 +804,7 @@ static void cmdLine(char *raw) {
     }
     if(n!=5||strcasecmp(t[1],"MOVE")){errf("BENCH usage_MOVE_id_position_speed");return;}
     const int id=atoi(t[2]),pos=atoi(t[3]),speed=atoi(t[4]);
-    if(id<1||id>6||pos<0||pos>scs::profile().range||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){errf("BENCH input_outside_bounds");return;}
+    if(id<1||id>6||pos<0||pos>scs::profile().range||speed<0||(scs::profile().family==scs::Family::SCS?(speed<50||speed>1000):speed>32767)){errf("BENCH input_outside_bounds");return;}
     if(!glove::benchMove(id,pos,speed)){errf("BENCH %s",glove::benchFailure());return;}
     okf("BENCH MOVE id=%d pos=%d speed=%d readback=1 cutoff_ms=1200 actual_speed=%u",id,pos,speed,glove::benchActualSpeed());return;
   }

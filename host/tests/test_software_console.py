@@ -45,6 +45,86 @@ class Tests(unittest.TestCase):
     def test_list_capacity_titles(self):
         r=self.console.library();self.assertEqual(r['slots'][0]['title'],'测试曲');self.assertEqual(r['capacity']['max'],100)
     def test_state(self): self.assertEqual(self.console.state()['hold'],50)
+    def test_enrollment_reply_is_live_transport_waiting_for_servos(self):
+        self.bridge.connected=True
+        self.bridge.port='COM9'
+        self.bridge.send=lambda *a,**kw: {'ok':True,'lines':['ERR LIB enrollment_active']}
+        state=self.console.state()
+        self.assertTrue(state['connected'])
+        self.assertFalse(state['active'])
+        self.assertFalse(state['device_ready'])
+        self.assertEqual(state['connection_state'],'waiting_servos')
+        self.assertEqual(state['feedback'],[])
+
+    def test_software_status_tolerates_locked_library_during_enrollment(self):
+        self.bridge.status=lambda:dict(bridge=1,connected=True,port='COM9')
+        self.bridge.send=lambda cmd,**kw: {'ok':True,'lines':['OK INFO software_protocol=1 enroll_active=1 calibrated=1 online=0']} if cmd=='INFO' else {'ok':True,'lines':['ERR LIB enrollment_active']}
+        state=self.console.status()
+        self.assertTrue(state['connected'])
+        self.assertTrue(state['enrollment_active'])
+        self.assertFalse(state['motion_ready'])
+        self.assertFalse(state['library_during_wait'])
+    def test_software_status_reports_files_readable_during_boot_servo_wait(self):
+        self.bridge.status=lambda:dict(bridge=1,connected=True,port='COM9')
+        info='OK LIB INFO ready=1 count=1 max=100 boot_wait_files=1 chunk_max=384'
+        self.bridge.send=lambda cmd,**kw: {'ok':True,'lines':['OK INFO software_protocol=1 enroll_active=1 calibrated=1 online=0' if cmd=='INFO' else info]}
+        state=self.console.status()
+        self.assertTrue(state['enrollment_active'])
+        self.assertTrue(state['library_during_wait'])
+        self.assertFalse(state['motion_ready'])
+    def test_first_status_chunk_capability_precedes_library_and_upload(self):
+        self.bridge.status=lambda:dict(bridge=1,connected=True,port='COM9')
+        original=self.bridge.send
+        def response(cmd,**kwargs):
+            if cmd=='INFO':
+                self.bridge.commands.append(cmd)
+                return dict(ok=True,lines=['OK INFO software_protocol=1 calibrated=1 online=6 enroll_active=0'])
+            result=original(cmd,**kwargs)
+            if cmd=='LIB INFO':result['lines'][0]+=' chunk_max=384'
+            return result
+        self.bridge.send=response
+        self.assertEqual(self.console.chunk_max,96)
+        first_status=self.console.status()
+        self.assertEqual(self.bridge.commands,['INFO','LIB INFO'])
+        self.assertEqual(first_status['upload_chunk_max'],384)
+        self.assertEqual(self.console.chunk_max,384)
+        self.console.library()
+        self.assertEqual(self.bridge.commands,['INFO','LIB INFO','LIB INFO','LIB LIST'])
+        score=dict(version=1,hand='right',title='首次连接上传',duration_ms=2000,
+                   notes=[dict(t_ms=i*10,duration_ms=10,pitch=60,finger=1) for i in range(200)])
+        blob=encode(score)
+        self.console.begin_upload(3,len(blob))
+        # The UI retains the first status response, even after library refresh.
+        chunk_size=first_status['upload_chunk_max']
+        for offset in range(0,len(blob),chunk_size):
+            self.console.upload_chunk(blob[offset:offset+chunk_size])
+        self.console.commit_upload()
+        chunks=[bytes.fromhex(cmd.split()[-1]) for cmd in self.bridge.commands if cmd.startswith('LIB CHUNK')]
+        self.assertEqual(len(chunks[0]),384)
+        self.assertEqual(len(chunks),(len(blob)+383)//384)
+        self.assertEqual(b''.join(chunks),blob)
+        self.assertEqual(self.bridge.commands[-1],'LIB COMMIT')
+    def test_status_chunk_capability_range_and_legacy_fallback(self):
+        self.bridge.status=lambda:dict(bridge=1,connected=True,port='COM9')
+        original=self.bridge.send
+        for capability,expected in ((None,96),('1',1),('96',96),('384',384),
+                                    ('0',96),('385',96),('-10',96),('abc',96),('384.0',96)):
+            with self.subTest(capability=capability):
+                def response(cmd,**kwargs):
+                    if cmd=='INFO':
+                        self.bridge.commands.append(cmd)
+                        return dict(ok=True,lines=['OK INFO software_protocol=1 calibrated=1 online=6 enroll_active=0'])
+                    result=original(cmd,**kwargs)
+                    if cmd=='LIB INFO' and capability is not None:
+                        result['lines'][0]+=' chunk_max='+capability
+                    return result
+                self.bridge.send=response
+                self.bridge.commands.clear()
+                self.console.chunk_max=384
+                status=self.console.status()
+                self.assertEqual(self.bridge.commands,['INFO','LIB INFO'])
+                self.assertEqual(status['upload_chunk_max'],expected)
+                self.assertEqual(self.console.chunk_max,expected)
     def test_state_json_firmware(self):
         self.bridge.send=lambda *a,**kw: {'ok':True,'lines':['LIB_STATE {"active":true,"tempo":125,"elapsed_ms":240,"mask":2}','OK LIB STATE']}
         self.assertEqual(self.console.state()['elapsed_ms'],240)
@@ -293,6 +373,15 @@ class Tests(unittest.TestCase):
         self.bridge.fail='CHUNK'
         with self.assertRaises(RuntimeError):self.console.upload(1,encode(SCORE))
         self.assertEqual(self.bridge.commands[-1],'LIB ABORT')
+    def test_score_read_is_cached_until_listing_connection_or_library_changes(self):
+        reads=lambda:sum(c.startswith('LIB READ') for c in self.bridge.commands)
+        self.bridge.port,self.bridge.connected_at='COM9',1.0
+        first=self.console.score(1);self.assertEqual(self.console.score(1)['base64'],first['base64']);self.assertEqual(reads(),1)
+        self.bridge.connected_at=2.0;self.console.score(1);self.assertEqual(reads(),2,'reconnect re-reads')
+        self.console.action('delete',{'slot':1});self.console.score(1);self.assertEqual(reads(),3,'library change re-reads')
+        send=self.bridge.send
+        self.bridge.send=lambda cmd,**kw:{'ok':True,'lines':[l.replace('bytes=144','bytes=999') for l in send(cmd,**kw)['lines']]}
+        self.console.score_cache.clear();self.console.score(1);self.console.score(1);self.assertEqual(reads(),5,'size mismatch is never cached')
     def test_read_roundtrip(self):
         r=self.console.score(1);self.assertEqual(r['notes'][0]['finger'],1);self.assertEqual(base64.b64decode(r['base64']),self.bridge.blob)
     def test_no_maintenance_access(self):
@@ -322,7 +411,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(self.bridge.commands,['LIB PATTERN 2 20 0 60 50'])
         for tempo in (50,1000):
             self.console.action('pattern',{'pattern':0,'repeats':1,'tempo':tempo})
-            self.assertEqual(self.bridge.commands[-1],'LIB PATTERN 0 1 %d 100 50'%tempo)
+            self.assertEqual(self.bridge.commands[-1],'LIB PATTERN 0 1 %d 100 100'%tempo)
     def test_invalid_pattern_never_reaches_bridge(self):
         valid={'pattern':1,'repeats':3,'tempo':100,'amplitude':100,'hold':50}
         for field,invalid in [('pattern',-1),('pattern',3),('pattern',True),('repeats',0),('repeats',21),

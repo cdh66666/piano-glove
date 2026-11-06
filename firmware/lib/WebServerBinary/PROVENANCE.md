@@ -23,7 +23,8 @@ Local changes:
   PROGMEM assets. Upstream `WiFiClient::write` has its own select/retry delays
   independent of `setTimeout`; this path therefore does not call it. Stop a
   stalled send after 500 ms with no progress, and cap one whole response at
-  2500 ms even if a client trickles progress.
+  10000 ms even if a client trickles progress (r29.6: was 2500 ms, too short
+  for a long score sent to a phone).
 * Call a guarded wait handler on the same Arduino loop at least 20 ms after
   the previous handler returns. The piano firmware services its existing
   feedback/lease/motion state there; it does not recurse into HTTP or parse

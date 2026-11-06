@@ -1,0 +1,3242 @@
+[
+  {
+    "kind": "grace_short",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 487.8125,
+        "right": 431.65625,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 487.8125,
+        "right": 617,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 153.140625,
+        "right": 91.78125,
+        "bottom": 171.703125,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "grace_unspecified",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 528.8125,
+        "client": 128,
+        "scroll": 128
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 496.8125,
+        "right": 431.65625,
+        "bottom": 523.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 496.8125,
+        "right": 617,
+        "bottom": 523.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 153.140625,
+        "right": 91.78125,
+        "bottom": 171.703125,
+        "title": "编辑无斜线小音符"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "trill",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 487.8125,
+        "right": 431.65625,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 487.8125,
+        "right": 617,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 153.140625,
+        "right": 91.78125,
+        "bottom": 171.703125,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "compound",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 527.8125,
+        "client": 127,
+        "scroll": 127
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 495.8125,
+        "right": 431.65625,
+        "bottom": 522.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 495.8125,
+        "right": 617,
+        "bottom": 522.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 153.140625,
+        "right": 91.78125,
+        "bottom": 171.703125,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "fermata",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 487.8125,
+        "right": 431.65625,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 487.8125,
+        "right": 617,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 153.140625,
+        "right": 91.78125,
+        "bottom": 171.703125,
+        "title": "编辑延长记号"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "staccato",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 327.8125,
+        "client": 195,
+        "scroll": 195
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 333.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 509.8125,
+        "client": 111,
+        "scroll": 111
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 338,
+        "top": 482.8125,
+        "right": 430,
+        "bottom": 509.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 530,
+        "top": 482.8125,
+        "right": 622,
+        "bottom": 509.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 71.65625,
+        "top": 154.140625,
+        "right": 91.78125,
+        "bottom": 172.703125,
+        "title": "编辑跳音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "realImage": false
+    }
+  },
+  {
+    "kind": "pedal",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 505.8125,
+        "client": 105,
+        "scroll": 105
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 343,
+        "top": 473.8125,
+        "right": 431.65625,
+        "bottom": 500.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 528.328125,
+        "top": 473.8125,
+        "right": 617,
+        "bottom": 500.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 529,
+      "top": 423.8125,
+      "right": 617,
+      "bottom": 465.8125,
+      "sourceBox": "[70,326,53,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "ottava",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 9.289002557544757,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 327.8125,
+        "client": 195,
+        "scroll": 195
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 333.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 398.8125,
+        "right": 622,
+        "bottom": 495.8125,
+        "client": 97,
+        "scroll": 97
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 338,
+        "top": 468.8125,
+        "right": 430,
+        "bottom": 495.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 530,
+        "top": 468.8125,
+        "right": 622,
+        "bottom": 495.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 86.59375,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 483.8125,
+        "right": 927,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 534,
+      "top": 418.8125,
+      "right": 622,
+      "bottom": 460.8125,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "strict",
+    "viewport": {
+      "width": 960,
+      "height": 680
+    },
+    "width": 960,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 7.03125,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 944,
+        "bottom": 289.8125,
+        "client": 157,
+        "scroll": 157
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 295.8125,
+        "right": 944,
+        "bottom": 610,
+        "client": 312,
+        "scroll": 312
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 338,
+        "top": 360.8125,
+        "right": 622,
+        "bottom": 429.8125,
+        "client": 69,
+        "scroll": 69
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 338,
+        "top": 402.8125,
+        "right": 430,
+        "bottom": 429.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 530,
+        "top": 402.8125,
+        "right": 622,
+        "bottom": 429.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 381.8125,
+        "right": 86.59375,
+        "bottom": 416.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 869,
+        "top": 445.8125,
+        "right": 927,
+        "bottom": 474.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 727.984375,
+        "top": 572.40625,
+        "right": 814,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 822,
+        "top": 571.8125,
+        "right": 934,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 875.984375,
+        "top": 622,
+        "right": 944,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 170.90625,
+        "top": 149.9375,
+        "right": 186.125,
+        "bottom": 164,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "grace_short",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.40625,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 487.8125,
+        "right": 573.875,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 487.8125,
+        "right": 830.328125,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 182.546875,
+        "top": 153.3125,
+        "right": 205.078125,
+        "bottom": 174.125,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "grace_unspecified",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.40625,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 528.8125,
+        "client": 128,
+        "scroll": 128
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 496.8125,
+        "right": 573.875,
+        "bottom": 523.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 496.8125,
+        "right": 830.328125,
+        "bottom": 523.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 182.546875,
+        "top": 153.3125,
+        "right": 205.078125,
+        "bottom": 174.125,
+        "title": "编辑无斜线小音符"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "trill",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.40625,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 487.8125,
+        "right": 573.875,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 487.8125,
+        "right": 830.328125,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 182.546875,
+        "top": 153.3125,
+        "right": 205.078125,
+        "bottom": 174.125,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "compound",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.40625,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 527.8125,
+        "client": 127,
+        "scroll": 127
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 495.8125,
+        "right": 573.875,
+        "bottom": 522.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 495.8125,
+        "right": 830.328125,
+        "bottom": 522.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 182.546875,
+        "top": 153.3125,
+        "right": 205.078125,
+        "bottom": 174.125,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "fermata",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.40625,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 519.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 487.8125,
+        "right": 573.875,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 487.8125,
+        "right": 830.328125,
+        "bottom": 514.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 182.546875,
+        "top": 153.3125,
+        "right": 205.078125,
+        "bottom": 174.125,
+        "title": "编辑延长记号"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "staccato",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 10.59375,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 327.8125,
+        "client": 195,
+        "scroll": 195
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 333.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 509.8125,
+        "client": 111,
+        "scroll": 111
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 482.8125,
+        "right": 572.203125,
+        "bottom": 509.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 482.8125,
+        "right": 835.328125,
+        "bottom": 509.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 174.3125,
+        "top": 153.5,
+        "right": 197.25,
+        "bottom": 174.6875,
+        "title": "编辑跳音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "pedal",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 325.8125,
+        "client": 193,
+        "scroll": 193
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 331.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 505.8125,
+        "client": 105,
+        "scroll": 105
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 473.8125,
+        "right": 573.875,
+        "bottom": 500.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 473.8125,
+        "right": 830.328125,
+        "bottom": 500.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 742.328125,
+      "top": 423.8125,
+      "right": 830.328125,
+      "bottom": 465.8125,
+      "sourceBox": "[70,326,53,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "ottava",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 327.8125,
+        "client": 195,
+        "scroll": 195
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 333.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 398.8125,
+        "right": 835.328125,
+        "bottom": 495.8125,
+        "client": 97,
+        "scroll": 97
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 468.8125,
+        "right": 572.203125,
+        "bottom": 495.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 468.8125,
+        "right": 835.328125,
+        "bottom": 495.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 419.8125,
+        "right": 107.921875,
+        "bottom": 454.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 483.8125,
+        "right": 1246.984375,
+        "bottom": 512.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 747.328125,
+      "top": 418.8125,
+      "right": 835.328125,
+      "bottom": 460.8125,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "strict",
+    "viewport": {
+      "width": 1280,
+      "height": 680
+    },
+    "width": 1280,
+    "height": 680,
+    "scroll": 680,
+    "client": 680,
+    "staffGap": 7.03125,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 289.8125,
+        "client": 157,
+        "scroll": 157
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 295.8125,
+        "right": 1264,
+        "bottom": 610,
+        "client": 312,
+        "scroll": 312
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 360.8125,
+        "right": 835.328125,
+        "bottom": 429.8125,
+        "client": 69,
+        "scroll": 69
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 402.8125,
+        "right": 572.203125,
+        "bottom": 429.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 402.8125,
+        "right": 835.328125,
+        "bottom": 429.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 381.8125,
+        "right": 107.921875,
+        "bottom": 416.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 445.8125,
+        "right": 1246.984375,
+        "bottom": 474.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 572.40625,
+        "right": 1134,
+        "bottom": 601.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 571.8125,
+        "right": 1254,
+        "bottom": 602,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 622,
+        "right": 1264,
+        "bottom": 652,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 330.90625,
+        "top": 149.9375,
+        "right": 346.125,
+        "bottom": 164,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "grace_short",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 639.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 607.8125,
+        "right": 573.875,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 607.8125,
+        "right": 830.328125,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 198.96875,
+        "right": 114.984375,
+        "bottom": 224.09375,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "grace_unspecified",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 648.8125,
+        "client": 128,
+        "scroll": 128
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 616.8125,
+        "right": 573.875,
+        "bottom": 643.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 616.8125,
+        "right": 830.328125,
+        "bottom": 643.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 198.96875,
+        "right": 114.984375,
+        "bottom": 224.09375,
+        "title": "编辑无斜线小音符"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "trill",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 639.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 607.8125,
+        "right": 573.875,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 607.8125,
+        "right": 830.328125,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 198.96875,
+        "right": 114.984375,
+        "bottom": 224.09375,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "compound",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 647.8125,
+        "client": 127,
+        "scroll": 127
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 615.8125,
+        "right": 573.875,
+        "bottom": 642.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 615.8125,
+        "right": 830.328125,
+        "bottom": 642.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 198.96875,
+        "right": 114.984375,
+        "bottom": 224.09375,
+        "title": "编辑颤音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "fermata",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 639.8125,
+        "client": 119,
+        "scroll": 119
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 607.8125,
+        "right": 573.875,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 607.8125,
+        "right": 830.328125,
+        "bottom": 634.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 198.96875,
+        "right": 114.984375,
+        "bottom": 224.09375,
+        "title": "编辑延长记号"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "staccato",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 447.8125,
+        "client": 315,
+        "scroll": 315
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 453.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 629.8125,
+        "client": 111,
+        "scroll": 111
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 602.8125,
+        "right": 572.203125,
+        "bottom": 629.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 602.8125,
+        "right": 835.328125,
+        "bottom": 629.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 199.96875,
+        "right": 114.984375,
+        "bottom": 225.09375,
+        "title": "编辑跳音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  },
+  {
+    "kind": "pedal",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 445.8125,
+        "client": 313,
+        "scroll": 313
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 451.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 276,
+        "scroll": 276
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 625.8125,
+        "client": 105,
+        "scroll": 105
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 449.65625,
+        "top": 593.8125,
+        "right": 573.875,
+        "bottom": 620.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 706.109375,
+        "top": 593.8125,
+        "right": 830.328125,
+        "bottom": 620.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 742.328125,
+      "top": 543.8125,
+      "right": 830.328125,
+      "bottom": 585.8125,
+      "sourceBox": "[70,326,53,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "ottava",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 447.8125,
+        "client": 315,
+        "scroll": 315
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 453.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 274,
+        "scroll": 274
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 518.8125,
+        "right": 835.328125,
+        "bottom": 615.8125,
+        "client": 97,
+        "scroll": 97
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 588.8125,
+        "right": 572.203125,
+        "bottom": 615.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 588.8125,
+        "right": 835.328125,
+        "bottom": 615.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 539.8125,
+        "right": 107.921875,
+        "bottom": 574.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 603.8125,
+        "right": 1246.984375,
+        "bottom": 632.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [],
+    "inset": {
+      "visible": true,
+      "left": 747.328125,
+      "top": 538.8125,
+      "right": 835.328125,
+      "bottom": 580.8125,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": true
+    }
+  },
+  {
+    "kind": "strict",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "width": 1280,
+    "height": 800,
+    "scroll": 800,
+    "client": 800,
+    "staffGap": 12.562659846547316,
+    "fields": {
+      "review-score-region": {
+        "visible": true,
+        "left": 16,
+        "top": 133,
+        "right": 1264,
+        "bottom": 409.8125,
+        "client": 277,
+        "scroll": 277
+      },
+      "review-inspector": {
+        "visible": true,
+        "left": 16,
+        "top": 415.8125,
+        "right": 1264,
+        "bottom": 730,
+        "client": 312,
+        "scroll": 312
+      },
+      "review-performance-controls": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 480.8125,
+        "right": 835.328125,
+        "bottom": 549.8125,
+        "client": 69,
+        "scroll": 69
+      },
+      "review-performance-auto": {
+        "visible": true,
+        "left": 444.65625,
+        "top": 522.8125,
+        "right": 572.203125,
+        "bottom": 549.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-performance-written": {
+        "visible": true,
+        "left": 707.765625,
+        "top": 522.8125,
+        "right": 835.328125,
+        "bottom": 549.8125,
+        "client": 25,
+        "scroll": 25
+      },
+      "review-finger-1": {
+        "visible": true,
+        "left": 33,
+        "top": 501.8125,
+        "right": 107.921875,
+        "bottom": 536.8125,
+        "client": 33,
+        "scroll": 33
+      },
+      "review-local-confirm": {
+        "visible": true,
+        "left": 1188.984375,
+        "top": 565.8125,
+        "right": 1246.984375,
+        "bottom": 594.8125,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-exclude-note": {
+        "visible": true,
+        "left": 1047.984375,
+        "top": 692.40625,
+        "right": 1134,
+        "bottom": 721.40625,
+        "client": 27,
+        "scroll": 27
+      },
+      "review-next-problem": {
+        "visible": true,
+        "left": 1142,
+        "top": 691.8125,
+        "right": 1254,
+        "bottom": 722,
+        "client": 28,
+        "scroll": 28
+      },
+      "export": {
+        "visible": true,
+        "left": 1195.984375,
+        "top": 742,
+        "right": 1264,
+        "bottom": 772,
+        "client": 28,
+        "scroll": 28
+      }
+    },
+    "symbolBoxes": [
+      {
+        "left": 87.765625,
+        "top": 180.96875,
+        "right": 114.984375,
+        "bottom": 206.09375,
+        "title": "编辑短倚音"
+      }
+    ],
+    "inset": {
+      "visible": false,
+      "left": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "sourceBox": "[70,15,45,17]",
+      "realImage": false
+    }
+  }
+]

@@ -18,3 +18,7 @@
 #player-source-paper{position:relative;width:100%}
 .pack-hint{display:block;margin-top:12px;color:var(--muted);font-size:12px}
 .position-meter.calibration-warning .meter-scale{border-color:#e4bc77}.position-meter.calibration-warning .meter-status{color:#e4bc77}.position-meter.calibration-warning .meter-value{color:#ffe2ad}
+.song-delete-dialog{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:16px;background:#10161dcc}.song-delete-card{width:min(440px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:24px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 60px #0008}.song-delete-card h2{font-size:21px;margin:0}.song-delete-card p{overflow-wrap:anywhere}.song-delete-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:20px}#song-delete-status{color:#ffc1b3}#song-delete-status:empty{display:none}
+
+/* Automatic review has no per-note approval column. */
+#review-notes .review-auto-table{grid-template-columns:55px 90px 60px 70px 70px 75px 25px}

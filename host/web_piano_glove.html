@@ -233,7 +233,7 @@ pre#log .sys{color:#c9a5ff}
 <section class="page" id="p-assign">
   <div class="card">
     <h2><span class="stepno">2</span>给 6 个舵机编号</h2>
-    <p class="desc">出厂时 6 个舵机全都是 1 号。必须<b>一次只插一个</b>，把它改成 1~6 号，改完贴标签再换下一个。</p>
+    <p class="desc">为什么是 6 个？5 根手指里<b>拇指有两个小马达</b>（一个往下按、一个往旁边摆），所以一共 6 个。出厂时 6 个舵机全都是 1 号。必须<b>一次只插一个</b>，把它改成 1~6 号，改完贴标签再换下一个。</p>
 
     <div class="gate" id="assignGate"><b>先完成第 1 步</b>请先在上一个页面连接设备。</div>
 
@@ -898,7 +898,7 @@ class MockFirmware{
     const a = parts.slice(1);
     if(v === "HELP") return ["OK HELP INFO PROFILE POSALL AUTO ENROLL SCAN PING STATUS STATUS_ALL MAP SETDIR SETID CAL TORQUE ARM DISARM SAFE STANDBY PRESS RELEASE MOVE DEMO SWEEP RATE PRESET ECHO BUSINFO"];
     if(v === "INFO") return ["OK INFO fw=PIANO_GLOVE_2 profile=" + this.profile + " range=" + this.rng() +
-      " pos_tol=" + this.tol() + " probed=1 ap=PIANO_GLOVE_A50528 ip=192.168.4.1 calibrated=" + this.calibrated +
+      " pos_tol=" + this.tol() + " probed=1 ap=PIANO_GLOVE_TEST ip=192.168.4.1 calibrated=" + this.calibrated +
       " armed=" + this.armed + " auto_active=" + this.autoActive +
       " enroll_active=0 enroll_next=1 enroll_temp=10 enroll_phase=OFF"];
     if(v === "PROFILE"){
@@ -4512,17 +4512,22 @@ function parseActionFile(input) {
 
 // Strict, single-hand action execution. No device access until run() is called.
 function actionKV(line){return Object.fromEntries(String(line).split(/\s+/).filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i),x.slice(i+1)];}));}
+// Speed 0 on r29 STS is the servo's native maximum; firmware echoes actual_speed=0.
+// Size deadlines with a conservative native rate (the real servo is faster).
+const NATIVE_STS_CPS=2000;
 function motionProfile(info,{requireBench=false}={}){
   const family=info.profile,range=+info.range;if(!((family==='SCS'&&range===1023)||(family==='STS'&&range===4095)))throw Error('舵机型号与量程未确认');
-  const sts=family==='STS',speedMax=Number(info.bench_speed_max??(sts?8000:1000)),defaultBenchSpeed=Number(info.bench_default_speed??1000),inset=Number(info.motion_inset??(sts?24:6)),tolerance=Number(info.motion_tolerance??(sts?114:35));
-  if(!Number.isInteger(speedMax)||speedMax<50||speedMax>(sts?8000:1000)||!Number.isInteger(defaultBenchSpeed)||defaultBenchSpeed<50||defaultBenchSpeed>speedMax||!Number.isInteger(inset)||inset<1||inset>=range/4||!Number.isInteger(tolerance)||tolerance<1||tolerance>=range/4)throw Error('舵机运动参数未确认');
+  // r29 STS firmware reports speed 0 = native maximum (bench 0..32767) and no fixed inset;
+  // STS bounds still keep a 5% stroke margin in motionBounds.
+  const sts=family==='STS',native=sts&&info.software_speed==='native_max',speedMin=native?Number(info.bench_speed_min??0):50,speedMax=Number(info.bench_speed_max??(sts?8000:1000)),defaultBenchSpeed=Number(info.bench_default_speed??1000),inset=Number(info.motion_inset??(sts?24:6)),tolerance=Number(info.motion_tolerance??(sts?114:35));
+  if(!Number.isInteger(speedMin)||speedMin<0||speedMin>50||!Number.isInteger(speedMax)||speedMax<50||speedMax>(native?32767:sts?8000:1000)||!Number.isInteger(defaultBenchSpeed)||defaultBenchSpeed<speedMin||defaultBenchSpeed>speedMax||!Number.isInteger(inset)||inset<(native?0:1)||inset>=range/4||!Number.isInteger(tolerance)||tolerance<1||tolerance>=range/4)throw Error('舵机运动参数未确认');
   if(requireBench&&sts&&(info.bench_sts!=='1'||info.bench_fullstroke!=='1'||info.motion_speed_unit!=='counts_per_s'||info.bench_keep!=='1'||info.bench_feedback!=='1'))throw Error('请更新支持STS归一化同步控制的固件');
-  return {family,range,model:info.model??info.servo_model??null,unit:'counts_per_s',speedMin:50,speedMax,defaultBenchSpeed,inset,tolerance,feedbackTolerance:sts?24:6,mountTarget:sts?2048:512,mountTolerance:sts?24:6,requiresMount:!sts,normalRawSpeed:sts?1200:200,stages:(sts?[200,400,600,800,1000,2000,4000,8000]:[200,400,600,800,1000]).filter(speed=>speed<=speedMax),keep:info.bench_keep==='1',normalized:!sts||info.motion_speed_unit==='counts_per_s'};
+  return {family,range,model:info.model??info.servo_model??null,unit:'counts_per_s',speedMin,speedMax,defaultBenchSpeed,inset,tolerance,feedbackTolerance:sts?24:6,mountTarget:sts?2048:512,mountTolerance:sts?24:6,requiresMount:!sts,normalRawSpeed:sts?1200:200,stages:(sts?[200,400,600,800,1000,2000,4000,8000]:[200,400,600,800,1000]).filter(speed=>speed<=speedMax),keep:info.bench_keep==='1',normalized:!sts||info.motion_speed_unit==='counts_per_s'};
 }
 
 function actionGate(info, rows, roles){
   const range=+info.range;
-  if(info.fw!=='PIANO_GLOVE_2'||info.ver!=='2.2.4'||!((info.profile==='STS'&&range===4095)||(info.profile==='SCS'&&range===1023))) throw Error('仅允许经核对的 PIANO_GLOVE_2 / 2.2.4：STS 4095 或 SCS 1023');
+  if(info.fw!=='PIANO_GLOVE_2'||!/^2\.2\.[45](?:-[\w.]+)?$/.test(String(info.ver))||!((info.profile==='STS'&&range===4095)||(info.profile==='SCS'&&range===1023))) throw Error('仅允许经核对的 PIANO_GLOVE_2 / 2.2.4、2.2.5：STS 4095 或 SCS 1023');
   if(info.calibrated!=='1'||info.armed!=='0'||+info.online!==6||['auto_active','enroll_active','sweep'].some(k=>info[k]!=='0')) throw Error('先停止当前动作，并确认六路在线、已校准且未使能');
   if(roles.join(',')!=='latch,press,press,press,press,press') throw Error('拇指角色与动作文件映射不符');
   if(rows.length!==6||new Set(rows.map(r=>+r.slot)).size!==6||new Set(rows.map(r=>+r.id)).size!==6) throw Error('需要六路唯一槽位与舵机 ID');
@@ -4759,7 +4764,7 @@ class StrictActionExecutor{
       if(state.armed==='0'&&this.feedbackArmedExpected)throw Error('位置反馈显示已释放，执行已停止');
       const complete=positions.length===6&&positions.every(p=>Number.isInteger(p)&&p>=0&&p<=range);
       if(complete)break;
-      if(attempt===1||state.armed==='0')throw Error('位置反馈丢失，已停止');
+      if(attempt===1||state.armed==='0'){const lost=positions.map((p,i)=>Number.isInteger(p)&&p>=0?null:(slots[i]?.id??i+1)).filter(v=>v!=null);throw Error(lost.length>1?'位置反馈丢失：'+lost.join('、')+' 号舵机同时掉线，多半是电源一下顶不住（几根手指同时全速换方向），已停止。等几秒再试，或换更大的舵机电源':lost.length?'位置反馈丢失：'+lost[0]+' 号舵机没回应，已停止。检查它的线有没有松':'位置反馈丢失，已停止');} // 11-04 用户：动半下就“反馈丢失”，要说清是哪个、为什么
       this.feedbackRetries=(this.feedbackRetries??0)+1;retries++;this.check();
     }
     positions.forEach((p,s)=>{if(p<(slots[s].hardwareLow??0)||p>(slots[s].hardwareHigh??range))throw Error('ID '+slots[s].id+' 反馈越出硬件范围，已停止');if(p<slots[s].low-slots[s].tolerance||p>slots[s].high+slots[s].tolerance)throw Error('ID '+slots[s].id+' 反馈越出校准范围，已停止');});
@@ -4786,8 +4791,8 @@ class StrictActionExecutor{
       const at=this.now();issuedAt=at;legDeadline=at+Math.max(...[...goals.values()].map(g=>g.timeout));for(const g of goals.values())g.at=at;
       const lines=await this.command('BENCH GROUP 0x'+mask.toString(16)+' '+targets.join(' ')+' '+speed),ack=actionKV(lines.find(l=>l.startsWith('OK BENCH GROUP ')));
       if(modern&&(ack.armed!=='1'||ack.bench_active!=='1'))throw Error('组合控制状态未确认');
-      if(ack.readback!=='1'||+ack.count!==group.length||parseInt(ack.mask)!==mask||+ack.speed!==speed)throw Error('组合目标写入未完整确认');if(profile.family==='STS'){const actual=+ack.actual_speed;if(!Number.isInteger(actual)||actual<50||actual>speed)throw Error('实际速度未确认');for(const g of goals.values())g.timeout=Math.min(20000,Math.max(1200,g.travel/actual*1000+1000));legDeadline=at+Math.max(...[...goals.values()].map(g=>g.timeout));}
-    }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+g.timeout);const reply=await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');if(bench&&profile.family==='STS'){const ack=actionKV(reply.find(l=>l.startsWith('OK BENCH MOVE ')));const actual=+ack.actual_speed;if(!Number.isInteger(actual)||actual<50||actual>speed)throw Error('实际速度未确认');g.timeout=Math.min(20000,Math.max(1200,g.travel/actual*1000+1000));legDeadline=at+g.timeout;}}
+      if(ack.readback!=='1'||+ack.count!==group.length||parseInt(ack.mask)!==mask||+ack.speed!==speed)throw Error('组合目标写入未完整确认');if(profile.family==='STS'){const actual=+ack.actual_speed;if(!Number.isInteger(actual)||(speed===0?actual!==0:actual<50||actual>speed))throw Error('实际速度未确认');for(const g of goals.values())g.timeout=Math.min(20000,Math.max(1200,g.travel/(actual||NATIVE_STS_CPS)*1000+1000));legDeadline=at+Math.max(...[...goals.values()].map(g=>g.timeout));}
+    }else for(const [s,g]of goals){const at=this.now();if(issuedAt===null)issuedAt=at;g.at=at;if(bench)legDeadline=Math.min(legDeadline,at+g.timeout);const reply=await this.command(bench?'BENCH MOVE '+slots[s].id+' '+g.pos+' '+speed:'MOVE '+slots[s].id+' '+g.pos+' '+speed+' 30');if(bench&&profile.family==='STS'){const ack=actionKV(reply.find(l=>l.startsWith('OK BENCH MOVE ')));const actual=+ack.actual_speed;if(!Number.isInteger(actual)||(speed===0?actual!==0:actual<50||actual>speed))throw Error('实际速度未确认');g.timeout=Math.min(20000,Math.max(1200,g.travel/(actual||NATIVE_STS_CPS)*1000+1000));legDeadline=at+g.timeout;}}
     const feedbackStarted=this.now();lastKeepAt=issuedAt;
     while(goals.size){POSALL_calls++;this.check();const positions=await this.positions(slots,+info.range),now=this.now();POSALL_calls+=positions.retries??0;if(modern&&(positions.armed!=='1'||positions.bench_active!=='1'))throw Error('台架截止已释放，不能判定到位');for(const [s,g]of goals){if(now-g.at>=g.timeout)throw Error('ID '+slots[s].id+' 未到位：目标 '+g.pos+'，实际 '+positions[s]+'，允许误差 '+g.tolerance+'，已停止');const error=Math.abs(positions[s]-g.pos);if(error<=g.tolerance&&!arrivals.has(s))arrivals.set(s,{id:slots[s].id,slot:s,target:g.pos,current:positions[s],error,tolerance:profile.tolerance,completionTolerance:g.tolerance,elapsed_ms:now-g.at,issued_ms:g.at,observed_ms:now});if(error<=g.tolerance)goals.delete(s);}
       if(goals.size&&bench&&profile.keep&&now-lastKeepAt>=400){this.check();if(now>=legDeadline)throw Error('台架到位确认超时，已停止');const keep=actionKV((await this.command('BENCH KEEP')).find(l=>l.startsWith('OK BENCH KEEP ')));if(keep.active!=='1'||keep.armed!=='1')throw Error('台架保持未确认，已停止');lastKeepAt=this.now();KEEP_calls++;}
@@ -5015,5 +5020,6 @@ window.pianoFirmwareBusy=locked;setInterval(()=>{render();refresh();},1500);refr
 
 <link rel="stylesheet" href="/delivery-shell.css"><script src="/delivery-shell.js"></script>
 <link rel="stylesheet" href="/usb-driver.css?v=20261021"><script src="/usb-driver.js?v=20261021"></script><link rel="stylesheet" href="/delivery-speed-chart.css"><script src="/delivery-speed-chart.js"></script><script src="/delivery-demo.js"></script><link rel="stylesheet" href="/delivery-mount.css"><script src="/delivery-mount.js"></script><link rel="stylesheet" href="/delivery-validation.css"><script src="/delivery-validation.js"></script>
+<link rel="stylesheet" href="/desktop-debug.css?v=native-debug-20261024"><script src="/desktop-debug.js?v=native-debug-20261024"></script>
 </body>
 </html>

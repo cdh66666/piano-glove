@@ -26,6 +26,12 @@ function attach(input){
  actions.appendChild(copy);actions.appendChild(open);details.appendChild(actions);
  const helpStatus=doc.createElement('p');helpStatus.className='score-browser-copy-status';helpStatus.setAttribute('role','status');helpStatus.textContent='如果仍在热点登录小窗中，请复制地址到手机浏览器。';details.appendChild(helpStatus);
  area.appendChild(status);area.appendChild(details);host.appendChild(area);
+ // The desktop program has a real file dialog; the hotspot advice only applies to phones.
+ details.addEventListener('toggle',()=>{
+  if(!details.open||!(win.NativeApp||doc.body?.classList.contains('native-app')))return;
+  explanation.textContent='点【选择文件】后会弹出一个找文件的窗口（可能藏在软件窗口后面，看一下任务栏）。曲谱文件一般在“下载”文件夹或你导出时选的位置，名字以 .pglpack 或 .pgl 结尾。识谱完的曲子不用导出：在【PDF 识谱】页直接点【送到手套，开始弹】更省事。';
+  address.hidden=true;actions.hidden=true;helpStatus.hidden=true;
+ });
  let pending=false,selection='empty';
  input.addEventListener('click',()=>{
   // A cancelled second selection must not leave the previous file ready to upload.

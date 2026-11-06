@@ -39,6 +39,12 @@ class DriverDiagnosticsTests(unittest.TestCase):
         self.assertFalse(value['port_available'])
         self.assertIn('等待 COM', value['message'])
 
+    def test_unassigned_driver_after_real_uninstall_is_missing_even_without_problem_28(self):
+        value = self.state(0, driver_assigned=False)
+        self.assertEqual(value['state'], 'missing_driver')
+        self.assertEqual(value['problem_code'], 0)
+        self.assertFalse(value['port_available'])
+
     def test_unknown_device_status_stays_unknown(self):
         self.assertEqual(self.state(None)['state'], 'unavailable')
 

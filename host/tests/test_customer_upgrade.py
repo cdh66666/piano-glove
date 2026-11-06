@@ -31,6 +31,34 @@ class UpgradeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '不同'):
             upgrade.validate_partitions(bad)
 
+    def test_default_ota_layout_accepted_only_when_booting_ota0(self):
+        ota = bytearray(b'\xff' * 4096)
+        for index, (name, kind, subtype, address, size) in enumerate([
+            ('nvs', 1, 2, 0x9000, 0x5000), ('otadata', 1, 0, 0xe000, 0x2000),
+            ('app0', 0, 0x10, 0x10000, 0x140000), ('app1', 0, 0x11, 0x150000, 0x140000),
+            ('spiffs', 1, 0x82, 0x290000, 0x160000)]):
+            struct.pack_into('<HBBII16sI', ota, index * 32, 0x50aa, kind, subtype, address, size, name.encode(), 0)
+        self.assertEqual(upgrade.validate_partitions(ota)['app0'][1], 0x10)
+        def otadata(seq):
+            blob = bytearray(b'\xff' * 0x2000)
+            struct.pack_into('<I', blob, 0, seq)
+            struct.pack_into('<I', blob, 28, __import__('zlib').crc32(struct.pack('<I', seq), 0xffffffff))
+            return bytes(blob)
+        self.assertIsNone(upgrade.ota_boot_slot(b'\xff' * 0x2000))
+        self.assertEqual(upgrade.ota_boot_slot(otadata(1)), 0)  # boot_app0.bin as written by the Arduino upload
+        self.assertEqual(upgrade.ota_boot_slot(otadata(2)), 1)
+
+    def test_gui_progress_and_plain_errors(self):
+        events = []
+        progress = upgrade.Progress(events.append, [])
+        progress.span = (10, 70)
+        progress.write('Writing at 0x0004a000 [=====>     ] 50.0% 491520/978592 bytes...')
+        self.assertEqual(events[-1], ('progress', 40.0))
+        self.assertIn('关掉「钢琴手套」软件', upgrade.friendly_error(Exception('could not open port COM9: PermissionError(13)')))
+        self.assertIn('拔下来', upgrade.friendly_error(Exception('Failed to connect to ESP32: No serial data received.')))
+        for text in [upgrade.friendly_error(Exception('x')), upgrade.friendly_error(ValueError('未找到CP210x主控'))]:
+            self.assertNotIn('YES', text)
+
     def test_corrupted_image_refused_before_esptool(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -486,13 +486,10 @@ static bool armFeedbackAllowed(const Slot &sl,int pos,int range){
 static int armCurrentGoal(const Slot &sl,int pos,int hardwareLo,int hardwareHi){
  if(g_librarySoftware){
   const int s=int(sl.id)-1;
-  return librarytargets::softwareTarget(s,scs::profile().family==scs::Family::SCS,sl.lo,sl.hi,hardwareLo,hardwareHi,
-                               s>0&&bool(g_librarySoftwareSelected&(1<<(s-1))),s==0?100:g_librarySoftwareAmplitude);
+  if(librarytargets::softwareTarget(s,scs::profile().family==scs::Family::SCS,sl.lo,sl.hi,hardwareLo,hardwareHi,s>0&&bool(g_librarySoftwareSelected&(1<<(s-1))),s==0?100:g_librarySoftwareAmplitude)<0)return -1;
+  return pos; // Enable at the measured pose; first musical goals use one broadcast.
  }
- const int span=int(sl.hi)-sl.lo;
- const int scsInset=span/4<6?span/4:6;
- const int inset=g_libraryArm?(scs::profile().family==scs::Family::SCS?scsInset:span*5/100):0;
- const int workingLo=int(sl.lo)+inset,workingHi=int(sl.hi)-inset;
+ const int workingLo=int(sl.lo),workingHi=int(sl.hi);
  const int lo=workingLo>hardwareLo?workingLo:hardwareLo,hi=workingHi<hardwareHi?workingHi:hardwareHi;
  if(lo>hi)return -1;
  return pos<lo?lo:(pos>hi?hi:pos);
@@ -500,6 +497,12 @@ static int armCurrentGoal(const Slot &sl,int pos,int hardwareLo,int hardwareHi){
 static bool readArmFeedback(int s,scs::Feedback &fb,const char *stage){
  const auto &sl=g_slot[s];
  if(!g_libraryArm)return scs::readFeedback(sl.id,fb)&&!scs::lastError()&&fb.ok?true:armFail(stage,s);
+ if(g_librarySoftware){
+  if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail(stage,s);
+  if(fb.pos<0||fb.pos>scs::profile().range||fb.pos<g_libraryHardwareLo[s]||fb.pos>g_libraryHardwareHi[s])return armFail("software_feedback_hardware_outside",s,fb.pos);
+  if(fb.temp>=65||fb.voltage<40||fb.voltage>65)return armFail("software_temperature_or_voltage",s,fb.voltage,fb.temp);
+  g_libraryPosition[s]=fb.pos;return true;
+ }
  int samples[3];for(int j=0;j<3;++j){
   if(!scs::readFeedback(sl.id,fb)||scs::lastError()||!fb.ok)return armFail(stage,s);
   if(g_librarySoftware){
@@ -546,7 +549,7 @@ static bool prepareArm(uint8_t mask,bool enable){
  if(g_librarySoftware)for(int s=0;s<SLOT_COUNT;++s)if(g_slot[s].id!=s+1)return armFail("software_requires_ids_1_to_6",s);
  if(!g_calibrated||calInvalidSlot()>=0)return armFail("calibration",calInvalidSlot());
  if(!motionCalibrationSupported())return armFail("wrapped_motion");
- uint16_t goals[SLOT_COUNT]={},hardwareLo[SLOT_COUNT]={},hardwareHi[SLOT_COUNT]={};
+ uint16_t goals[SLOT_COUNT]={},hardwareLo[SLOT_COUNT]={},hardwareHi[SLOT_COUNT]={},nativeSpeed[SLOT_COUNT]={};
  // Check every selected axis before any position write can auto-enable a servo.
  for(int s=0;s<SLOT_COUNT;++s){if(!(mask&(1<<s)))continue;const Slot &sl=g_slot[s];uint8_t off=0xFF;scs::Feedback fb;
   if(!scs::readRegs(sl.id,scs::REG_TORQUE_EN,1,&off)||scs::lastError())return armFail("torque_off_read",s,off,0);
@@ -556,6 +559,7 @@ static bool prepareArm(uint8_t mask,bool enable){
   hardwareLo[s]=big?(limits[0]<<8)|limits[1]:limits[0]|(limits[1]<<8);
   hardwareHi[s]=big?(limits[2]<<8)|limits[3]:limits[2]|(limits[3]<<8);
   if(hardwareLo[s]>=hardwareHi[s]||hardwareHi[s]>pf.range)return armFail("hardware_limits_invalid",s,hardwareLo[s],hardwareHi[s]);
+  if(g_librarySoftware&&!big&&!scs::checkedNativePositionSpeed(sl.id,nativeSpeed[s]))return armFail("native_speed_configuration",s);
   if(g_libraryArm){g_libraryHardwareLo[s]=hardwareLo[s];g_libraryHardwareHi[s]=hardwareHi[s];}
   if(!readArmFeedback(s,fb,"feedback_read"))return false;
   if(!armFeedbackAllowed(sl,fb.pos,pf.range))return armFail("feedback_outside",s,fb.pos);
@@ -577,7 +581,8 @@ static bool prepareArm(uint8_t mask,bool enable){
   if(boundedGoal<0)return armFail("target_intersection_empty",s);
   goals[s]=boundedGoal;
   if(g_libraryArm)g_libraryInitial[s]=fb.pos;
-  const bool writeOk=scs::moveTo(sl.id,goals[s],g_speed,g_acc)&&!scs::lastError();const int writeError=scs::lastError();
+  const bool native=g_librarySoftware&&!big;
+  const bool writeOk=scs::moveTo(sl.id,goals[s],native?nativeSpeed[s]:g_speed,native?0:g_acc)&&!scs::lastError();const int writeError=scs::lastError();
   // Both SCS and STS position writes have been observed to auto-enable. PREPARE requests off
  // immediately, then proves off/goal/current readback; it is not a never-enabled command.
   if(!enable&&(!scs::setTorque(sl.id,false)||scs::lastError()))return armFail("prepare_off_write",s);
@@ -665,7 +670,7 @@ static bool benchValidate(uint8_t id,uint16_t pos,uint16_t speed,uint16_t *rawSp
  g_benchFailure="none";
  const bool big=scs::profile().family==scs::Family::SCS;const int range=big?1023:4095;
  if((!big&&scs::profile().family!=scs::Family::STS)||!scs::profile().probed||scs::profile().range!=range){g_benchFailure="verified_profile_required";return false;}
- if(id<1||id>6||speed<50||speed>(big?1000:8000)){g_benchFailure="id_or_speed_outside_bounds";return false;}
+ if(id<1||id>6||(big?(speed<50||speed>1000):speed>32767)){g_benchFailure="id_or_speed_outside_bounds";return false;}
  if(!g_armed||!g_calibrated||calInvalidSlot()>=0||g_sweep||g_rate||g_auto||g_demo){g_benchFailure="not_armed_or_busy";return false;}
  const int s=slotOfId(id);ArmCheck row;
  if(s<0||!g_slot[s].valid||!motionCalibrationSupported()||!inspectArmSlot(s,row)||!row.registersOk||!row.feedbackOk||!row.limitsOk||row.torque!=1){g_benchFailure="feedback_or_torque_invalid";return false;}
@@ -688,7 +693,7 @@ bool benchMove(uint8_t id,uint16_t pos,uint16_t speed){
 }
 bool benchGroup(uint8_t mask,const uint16_t positions[6],uint16_t speed){
  g_benchFailure="none";benchTick();
- if(!positions||!mask||(mask&~0x3Fu)||speed<50||speed>(scs::profile().family==scs::Family::SCS?1000:8000)){g_benchFailure="group_input_outside_bounds";safe();return false;}
+ if(!positions||!mask||(mask&~0x3Fu)||(scs::profile().family==scs::Family::SCS?(speed<50||speed>1000):speed>32767)){g_benchFailure="group_input_outside_bounds";safe();return false;}
  for(int id=1;id<=6;++id)if(positions[id-1]>scs::profile().range){g_benchFailure="group_input_outside_bounds";safe();return false;}
  scs::SyncItem items[6];int n=0;uint16_t minimumActual=65535;
  for(int id=1;id<=6;++id)if(mask&(1u<<(id-1))){uint16_t raw,actualSpeed;if(!benchValidate(id,positions[id-1],speed,&raw,&actualSpeed)){safe();return false;}benchTick();if(!g_armed){g_benchFailure="deadline";return false;}items[n++]={uint8_t(id),positions[id-1],raw,0};if(actualSpeed<minimumActual)minimumActual=actualSpeed;}

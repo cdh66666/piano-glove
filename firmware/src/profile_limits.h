@@ -17,8 +17,15 @@ inline int identifyMarkedLimits(const uint8_t*lo,const uint8_t*hi,uint8_t endian
  return endian==0?1:2;
 }
 inline bool normalizedStsSpeed(uint8_t endian,uint8_t phase,uint8_t resolution,uint8_t mode,uint16_t speed,uint16_t &raw){
- if(endian!=0||resolution!=1||mode!=0||speed<50||speed>8000)return false;
+ if(endian!=0||resolution!=1||mode!=0||speed>32767)return false;
+ if(speed==0){if(!(phase&8))return false;raw=0;return true;}
  raw=(phase&4)?speed:speed/50;return raw>0;
+}
+// STS position mode: phase BIT3 defines speed zero as the native maximum.
+// This does not rewrite the servo's phase, PID, deadband or EEPROM settings.
+inline bool nativeStsPositionSpeed(uint8_t endian,uint8_t phase,uint8_t resolution,uint8_t mode,uint16_t &raw){
+ if(endian!=0||resolution!=1||mode!=0||!(phase&8))return false;
+ raw=0;return true;
 }
 inline uint8_t benchMotionPayload(bool scs,uint16_t pos,uint16_t raw,uint8_t acc,uint8_t*p){
  uint8_t k=0;p[k++]=scs?42:41;if(!scs)p[k++]=acc;
