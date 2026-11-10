@@ -11,7 +11,7 @@ import argparse, base64, json, sys, time, urllib.request
 from pathlib import Path
 import websocket
 
-SKIP = ('删除', '移除', '上传', '选择文件', '选择 PDF', '添加 PDF', '下载', '烧录', '升级', '更新固件', '重新编号', '全部重新校准', '开始调', '再调一遍')
+SKIP = ('调手套', '返回主界面', '删除', '移除', '上传', '选择文件', '选择 PDF', '添加 PDF', '下载', '烧录', '升级', '更新固件', '重新编号', '全部重新校准', '开始调', '再调一遍')
 PAGES = ('开始', '手指训练', '曲库', 'PDF 识谱')
 
 PROBE = r"""(async(skip)=>{
@@ -23,7 +23,7 @@ PROBE = r"""(async(skip)=>{
  const out=[];const seen=new Set();
  for(const e of nodes){
   const name=label(e);const key=name+'|'+e.id;if(seen.has(key))continue;seen.add(key);
-  if(e.closest('nav')&&e.tagName==='BUTTON'){out.push({name,kind:'导航',result:'另测'});continue;}
+  if(e.closest('header')&&['开始','手指训练','曲库','PDF 识谱','调手套'].includes(name)){out.push({name,kind:'导航',result:'逐页测'});continue;}
   if(skip.some(w=>name.includes(w))){out.push({name,kind:'跳过',result:'会开系统窗口/删数据/改设备，另测'});continue;}
   if(e.disabled){out.push({name,kind:'灰',result:e.title?('灰：'+e.title.slice(0,40)):'灰'});continue;}
   const before=document.body.innerHTML.length,errs=__sweepErr.length;let changed=0;
@@ -52,6 +52,7 @@ class Cdp:
 
     def connect(self):
         pages = [p for p in json.load(urllib.request.urlopen(f'http://127.0.0.1:{self.port}/json')) if p.get('type') == 'page']
+        pages.sort(key=lambda p: not any(k in p.get('url', '') for k in ('software', 'debug', 'web_piano_glove')))
         self.ws = websocket.create_connection(pages[0]['webSocketDebuggerUrl'], timeout=300)
 
     def call(self, method, params=None):
@@ -81,14 +82,19 @@ def main():
         cdp.eval("(()=>{document.getElementById('comic-coach-close')?.click();const b=[...document.querySelectorAll('nav button, header button, button')].find(b=>b.textContent.trim()===%s);b&&b.click();return !!b})()" % json.dumps(page))
         time.sleep(1.5)
         cdp.shot(out / f'{n:02d}_{page}.png')
-        rows = cdp.eval(PROBE + '(%s)' % json.dumps(SKIP, ensure_ascii=False)) or []
+        try:
+            rows = cdp.eval(PROBE + '(%s)' % json.dumps(SKIP, ensure_ascii=False))
+        except Exception as e:
+            rows = None
+        if rows is None:   # 页面被某个按钮带走了：记下来，重连回来
+            time.sleep(3); cdp.connect(); rows = [dict(name='(本页扫描中途页面跳走)', kind='?', result='没反应')]
         report[page] = rows
         cdp.shot(out / f'{n:02d}_{page}_点完.png')
     # 调手套是另一个页面
     cdp.eval("(()=>{const b=[...document.querySelectorAll('button,a')].find(b=>b.textContent.trim()==='调手套');b&&b.click();return 1})()")
     time.sleep(8); cdp.connect()
     cdp.shot(out / '05_调手套.png')
-    rows = cdp.eval(PROBE.replace("main button, main [role=button], main input[type=checkbox], main input[type=range], main select, main summary, header button, nav button", "#demoRoot button, #demoRoot input[type=range], #demoRoot select, #demoTabs button") + '(%s)' % json.dumps(SKIP, ensure_ascii=False)) or []
+    rows = cdp.eval(PROBE.replace("if(e.closest('header')","if(false&&e.closest('header')").replace("main button, main [role=button], main input[type=checkbox], main input[type=range], main select, main summary, header button, nav button", "#demoRoot button, #demoRoot input[type=range], #demoRoot select, #demoTabs button") + '(%s)' % json.dumps(SKIP, ensure_ascii=False)) or []
     report['调手套'] = rows
     cdp.shot(out / '05_调手套_点完.png')
     (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
