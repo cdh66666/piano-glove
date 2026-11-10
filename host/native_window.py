@@ -191,6 +191,10 @@ def _review_edits_only(review):
     keep['notes'] = [n for n in review.get('notes') or [] if isinstance(n, dict) and edited(n)]
     return keep
 
+
+# 11-10 用户：程序名后面要带版本号（文件名 钢琴手套_V1.0.exe、窗口标题都显示），每次发新版加一
+APP_VERSION = 'V1.0'
+
 class DesktopAPI(NativeAPI):
     def __init__(self, session):
         super().__init__(session)
@@ -1180,7 +1184,7 @@ def main(argv=None):
     session.paused = bool(args.no_auto)
     api = DesktopAPI(session)
     install_pdf_navigation_guard(api)
-    window = webview.create_window('钢琴手套', url=page_path('debug' if args.debug else 'software'),
+    window = webview.create_window('钢琴手套 ' + APP_VERSION, url=page_path('debug' if args.debug else 'software'),
                                    js_api=api, width=1280, height=840, min_size=(960,680),
                                    background_color='#F7F9FC', text_select=True, hidden=args.no_open)
     api._window = window

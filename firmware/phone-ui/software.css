@@ -57,3 +57,7 @@ progress{accent-color:var(--accent)}.audio-status{color:var(--ink)}.review-head{
 .tempo-steps button.on{background:#F2B33D}
 input[type=range]{height:36px}
 input[type=range]::-webkit-slider-thumb{width:30px;height:30px}
+
+/* 11-10：上传单独一页 */
+#upload-page .upload-hint{margin:6px 0 14px;font-size:14px;opacity:.8}
+#upload-page .upload{display:flex;flex-direction:column;gap:12px;align-items:stretch}

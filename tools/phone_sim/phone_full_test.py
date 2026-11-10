@@ -133,7 +133,7 @@ def run_round(name, out, device, stall_every, stall, port, results):
             shot('全按钮之后')
             browser.close()
     finally:
-        server.terminate()
+        subprocess.run(['taskkill', '/F', '/T', '/PID', str(server.pid)], capture_output=True)  # 连同桥和手机页服务一起关
     results[name] = dict(stall_every=stall_every, stall=stall, steps=steps, page_errors=errors, shots=shots,
                          passed=sum(s['ok'] for s in steps), total=len(steps))
 

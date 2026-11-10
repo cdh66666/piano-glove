@@ -132,6 +132,19 @@ def make_handler(sim):
             self._send(code, ctype, data)
 
         def do_GET(self):
+            if self.path.startswith('/api/download'):
+                # 手套固件的 /api/download：直接回 .pgl 文件（带文件名）。USB 桥没有这个接口，这里用 /api/score 的数据照样回一份
+                import base64 as b64, urllib.parse as up
+                slot = up.parse_qs(up.urlparse(self.path).query).get('slot', ['0'])[0]
+                try:
+                    with urllib.request.urlopen(sim.bridge + '/api/score?slot=' + slot, timeout=30) as r:
+                        blob = b64.b64decode(json.loads(r.read())['base64'])
+                    self.send_response(200); self.send_header('Content-Type', 'application/octet-stream')
+                    self.send_header('Content-Disposition', 'attachment')
+                    self.send_header('Content-Length', str(len(blob))); self.end_headers(); self.wfile.write(blob)
+                except Exception as e:
+                    self._send(502, 'application/json', json.dumps({'ok': False, 'error': str(e)}).encode())
+                return
             if self.path.startswith('/api/'):
                 return self._api('GET')
             if self.path == '/sim/log':

@@ -11,7 +11,7 @@ import argparse, base64, json, sys, time, urllib.request
 from pathlib import Path
 import websocket
 
-SKIP = ('调手套', '返回主界面', '删除', '移除', '上传', '选择文件', '选择 PDF', '添加 PDF', '下载', '烧录', '升级', '更新固件', '重新编号', '全部重新校准', '开始调', '再调一遍')
+SKIP = ('调手套', '返回主界面', '单独校准', '测速', '五指同步', '删除', '移除', '上传', '选择文件', '选择 PDF', '添加 PDF', '下载', '烧录', '升级', '更新固件', '重新编号', '全部重新校准', '开始调', '再调一遍')
 PAGES = ('开始', '手指训练', '曲库', 'PDF 识谱')
 
 PROBE = r"""(async(skip)=>{
