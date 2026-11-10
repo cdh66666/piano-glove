@@ -24,7 +24,9 @@ static class PianoGloveLauncher
     [STAThread]
     static int Main(string[] args)
     {
-        string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PianoGloveSoftware", "runtime");
+        string local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+        if (string.IsNullOrEmpty(local)) local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string root = Path.Combine(local, "PianoGloveSoftware", "runtime");   // 先认环境变量：程序本身也这样找数据目录，隔离测试才真隔离
         string target = Path.Combine(root, Version);
         string marker = Path.Combine(target, ".ready");
         try
