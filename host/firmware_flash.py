@@ -297,7 +297,9 @@ class FirmwareManager:
             self.update(phase='identify', progress=35)
             info = self.run(base + ['chip_id'], 25)
             mac = re.search(r'MAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5})', info, re.I)
-            if not re.search(r'Chip is ESP32(?:\s|\(|-|$)', info) or re.search(r'Chip is ESP32-[SC][0-9]', info) or not mac:
+            # esptool 4 写 “Chip is ESP32-D0WD…”，5 写 “Chip type:  ESP32-D0WD-V3”；两种都认，S/C 系列一律拒绝
+            chip = re.search(r'Chip (?:is|type:)\s*(ESP32[^\s(]*)', info)
+            if not chip or re.match(r'ESP32-[SCHP][0-9]', chip.group(1)) or not mac:
                 raise RuntimeError('未确认经典 ESP32 芯片及 MAC，拒绝写入')
             self.update(detectedMac=mac.group(1).lower(), chip='ESP32')
             with tempfile.TemporaryDirectory(prefix='piano-firmware-') as directory:
