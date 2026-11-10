@@ -8,6 +8,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+MAX_PLAY = 25  # --max-play 覆盖；真手套只放几秒（用户：真手套测试要短）
 UA = ('Mozilla/5.0 (Linux; Android 13; Pixel 6a) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36')
 
@@ -101,7 +102,7 @@ def run_round(name, out, device, stall_every, stall, port, results):
             if play.count():
                 play.tap()
                 t0 = time.time(); worst = None; midshot = False
-                while time.time() - t0 < 25:
+                while time.time() - t0 < MAX_PLAY:
                     page.wait_for_timeout(500)
                     bad, text = lost()
                     if bad and worst is None: worst = f'{time.time()-t0:.1f}s {text}'
@@ -142,7 +143,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--out', required=True)
     p.add_argument('--device')
+    p.add_argument('--max-play', type=float, default=25)
     a = p.parse_args()
+    global MAX_PLAY
+    MAX_PLAY = a.max_play
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     results = {}
     run_round('信号正常', out, a.device, 0, 0, 8296, results)
