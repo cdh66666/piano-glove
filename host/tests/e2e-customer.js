@@ -124,7 +124,7 @@ const fingerprint = () => {
   check("标题是「调手套」", shell.title === "调手套", shell.title);
   check("有「返回主界面」", shell.back === "返回主界面", shell.back);
   check("6 个手指卡片都渲染出来", shell.cards === 6, shell.cards);
-  check("主按钮文案是客户话术（开始调/再调一遍）", /^(开始调|再调一遍)$/.test(shell.start || ""), shell.start);
+  check("主按钮文案是「开始校准」", /^开始校准$/.test(shell.start || ""), shell.start);
   check("「曲目展示」标签在客户版里隐藏", shell.songTabHidden === true);
   check("编号标签排在第一位（⓪ 舵机编号）", (shell.tabs[0] || "").includes("舵机编号"), shell.tabs.join(" / "));
 

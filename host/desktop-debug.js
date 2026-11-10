@@ -102,14 +102,14 @@
    const tabs=$('demoTabs'),enroll=$('demoTabEnrollment');if(enroll&&tabs){enroll.textContent='⓪ 舵机编号';enroll.classList.add('desktop-debug-aftersales');tabs.prepend(enroll); /* 11-05 用户：不写售后，写 0，放在 1、2 前面 */}
    const mount=$('demoMountOpen')?.closest('.demoSetupEntries')||$('demoMountOpen');mount?.style.setProperty('display','none','important'); // 装舵机臂是出厂/售后的事
    if($('demoCalibrationGuide'))$('demoCalibrationGuide').textContent='按你的手调一下（约 1 分钟）';
-   const progress=$('demoCalibrationProgress');if(progress&&/先抬起/.test(progress.textContent))progress.textContent='① 戴好手套　② 点「开始调」　③ 每根手指按提示慢慢弯到底，再伸直';
-   const start=$('demoCalStart');const label=()=>{if(start&&/校准/.test(start.textContent)&&!/单独/.test(start.textContent))start.textContent=handFitted()?'再调一遍':'开始调';};
+   const progress=$('demoCalibrationProgress');if(progress&&/先抬起/.test(progress.textContent))progress.textContent='① 戴好手套　② 点「开始校准」　③ 每根手指按提示慢慢弯到底，再伸直';
+   const start=$('demoCalStart');const label=()=>{if(start&&/校准/.test(start.textContent)&&!/单独/.test(start.textContent)&&start.textContent!=='开始校准')start.textContent='开始校准';};
    if(start){label();new MutationObserver(label).observe(start,{childList:true,characterData:true,subtree:true});}
    // 调完（页面提示去做动作）就记下来：开始页不再提醒
    if(progress)new MutationObserver(()=>{if(/单指、组合或交替/.test(progress.textContent)){try{root.localStorage.setItem('piano-hand-fitted','1');}catch{}label();}}).observe(progress,{childList:true,characterData:true,subtree:true});
   }
   // 会改动手套的按钮再确认一次（第一次调手套不问）。
-  const guarded={demoCalStart:'再调一遍？上次调的会被换掉。',demoEnrollStart:'重新编号会改动 6 个舵机的编号，弄错了手套就动不了。确定要重新编号吗？',demoFlash:'烧录会改写手套里的程序，中途断开可能让手套无法使用。确定要烧录吗？'};
+  const guarded={demoCalStart:'重新校准？上次的校准会被换掉。',demoEnrollStart:'重新编号会改动 6 个舵机的编号，弄错了手套就动不了。确定要重新编号吗？',demoFlash:'烧录会改写手套里的程序，中途断开可能让手套无法使用。确定要烧录吗？'};
   root.addEventListener('click',event=>{const button=event.target.closest?.('button'),warning=button&&!button.disabled&&guarded[button.id];if(button?.dataset.appConfirmed==='1'){delete button.dataset.appConfirmed;return;}if(warning&&(button.id!=='demoCalStart'||(handFitted()&&!root.deliveryDemoBusy?.()))){event.preventDefault();event.stopImmediatePropagation();(root.AppConfirm?root.AppConfirm(warning):Promise.resolve(root.confirm(warning))).then(ok=>{if(ok){button.dataset.appConfirmed='1';button.click();}});}},true);
   // 11-04 用户：调手套是客户收到后自己做的（每个人手不一样）→ 默认进「按我的手调」，说明三步；舵机编号挪到最后标「售后」
   fitForCustomer();
