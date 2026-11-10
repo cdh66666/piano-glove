@@ -8,6 +8,7 @@ import ast
 import hashlib
 import importlib.metadata
 import json
+import os
 from pathlib import Path
 import platform
 import re
@@ -305,7 +306,37 @@ def build(work, output, samples=None, firmware=None, firmware_sha=None, runtime_
                      json.loads(result.stdout.strip().splitlines()[-1]), sample_names, upgrade)
 
 
-def build_single_exe(work, output, lightweight=False):
+def wrap_with_launcher(work, app_dir, output, version_file):
+    """把 PyInstaller 目录版压成 zip，接在小启动器后面，得到一个 exe（格式见 tools/launcher/PianoGloveLauncher.cs）。"""
+    import zipfile, struct, hashlib
+    payload = work / 'payload.zip'
+    with zipfile.ZipFile(payload, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        for path in sorted(app_dir.rglob('*')):
+            if path.is_file():
+                zf.write(path, path.relative_to(app_dir).as_posix())
+    version = hashlib.sha256(payload.read_bytes()).hexdigest()[:16]
+    source = (REPO / 'tools' / 'launcher' / 'PianoGloveLauncher.cs').read_text(encoding='utf-8').replace('@@VERSION@@', version)
+    (work / 'launcher.cs').write_text(source, encoding='utf-8')
+    (work / 'launcher-info.cs').write_text('''using System.Reflection;
+[assembly: AssemblyTitle("钢琴手套 · 训练与曲谱转换")]
+[assembly: AssemblyProduct("钢琴手套软件")]
+[assembly: AssemblyFileVersion("2026.11.9.1")]
+[assembly: AssemblyVersion("2026.11.9.1")]
+''', encoding='utf-8')
+    csc = Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Microsoft.NET' / 'Framework64' / 'v4.0.30319' / 'csc.exe'
+    stub = work / 'launcher.exe'
+    subprocess.run([str(csc), '/nologo', '/target:winexe', '/optimize+', '/codepage:65001', '/platform:x64',
+                    '/out:' + str(stub), '/win32icon:' + str(HOST / 'assets' / 'app-icon.ico'),
+                    '/r:System.IO.Compression.dll', '/r:System.IO.Compression.FileSystem.dll',
+                    '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll',
+                    str(work / 'launcher.cs'), str(work / 'launcher-info.cs')], check=True)
+    data = payload.read_bytes()
+    with output.open('wb') as out:
+        out.write(stub.read_bytes()); out.write(data); out.write(struct.pack('<q', len(data))); out.write(b'PGLPAYLD')
+    return version
+
+
+def build_single_exe(work, output, lightweight=False, fast_start=False):
     """Bundle the complete desktop UI, PDF runtime, guide and notices in one EXE."""
     import html
     from urllib.parse import quote
@@ -369,7 +400,8 @@ StringStruct('OriginalFilename','钢琴手套.exe'),
 StringStruct('ProductName','钢琴手套软件'),
 StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Translation',[2052,1200])])])
 ''', encoding='utf-8')
-    command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--windowed',
+    # fast_start：PyInstaller 目录版 + 单文件启动器（tools/launcher），第一次打开解一次，以后约 1 秒启动
+    command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir' if fast_start else '--onefile', '--windowed',
                '--name', 'PianoGloveSoftware', '--distpath', str(work / 'dist'),
                '--workpath', str(work / 'build'), '--specpath', str(work), '--paths', str(stage),
                '--add-data', str(stage / 'web') + ';web', '--version-file', str(version_file),
@@ -386,7 +418,7 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
                str(stage / 'desktop_runtime.py')]
     with (work / 'build.log').open('w', encoding='utf-8') as log:
         subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True)
-    executable = work / 'dist' / 'PianoGloveSoftware.exe'
+    executable = work / 'dist' / ('PianoGloveSoftware/PianoGloveSoftware.exe' if fast_start else 'PianoGloveSoftware.exe')
     self_report = work / 'frozen-self-test.json'
     # 完整离线版要把 WebView2 组件和 esptool 都装进去，单文件解包 + 自检在慢机器上
     # 可以超过 90 秒；超时会把已经打好的包判成失败，白等一轮。
@@ -397,7 +429,16 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
         raise RuntimeError('实际单文件EXE自检失败或不应打开串口。')
     verify_sources(snapshot)
     output.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(executable, output)
+    if fast_start:
+        wrap_with_launcher(work, executable.parent, output, version_file)
+        launcher_report = work / 'launcher-self-test.json'
+        env = dict(os.environ, LOCALAPPDATA=str(work / 'launcher-test-localappdata'), PIANO_GLOVE_SILENT_PREPARE='1')
+        subprocess.run([str(output), '--self-test', '--report', str(launcher_report)], env=env,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600, check=True)
+        if not json.loads(launcher_report.read_text(encoding='utf-8')).get('ok'):
+            raise RuntimeError('启动器解包后的程序自检失败。')
+    else:
+        shutil.copy2(executable, output)
     digest = sha256(output)
     report = dict(ok=True,build_date=DATE,edition='customer-acceptance-test',single_executable=True,
                   executable=str(output),bytes=output.stat().st_size,sha256=digest,
@@ -530,6 +571,7 @@ def main():
     parser.add_argument('--resume-package', action='store_true', help='已完成冻结自检后，仅重做边界和ZIP验证')
     parser.add_argument('--runtime-only', action='store_true', help='只冻结主EXE和网页，等待最终固件冻结再封包')
     parser.add_argument('--single-exe', action='store_true', help='构建桌面单EXE，默认内置首次组件；--output指定新的.exe路径')
+    parser.add_argument('--fast-start', action='store_true', help='仅与--single-exe组合：目录版+单文件启动器，第一次打开解一次，以后约1秒启动')
     parser.add_argument('--lightweight', action='store_true', help='仅与--single-exe组合：首次WebView组件外置，已有组件时日常单文件运行')
     parser.add_argument('--samples', type=Path, help='可选：已复核的实际 .pgl 示例目录；不接收容量填充曲目')
     parser.add_argument('--firmware', type=Path, help='可选：供应方冻结的ESP32编译应用镜像')
@@ -544,7 +586,7 @@ def main():
     if args.single_exe:
         if args.firmware or args.samples or args.prepare_only or args.resume_package or args.runtime_only:
             parser.error('--single-exe 不与旧ZIP/固件封包选项组合')
-        build_single_exe(args.work,args.output,lightweight=args.lightweight)
+        build_single_exe(args.work,args.output,lightweight=args.lightweight,fast_start=args.fast_start)
     elif args.resume_package:
         resume_package(args.work, args.output)
     elif args.prepare_only:
