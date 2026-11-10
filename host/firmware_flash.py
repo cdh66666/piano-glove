@@ -18,6 +18,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -31,7 +32,90 @@ PIO_HOME = Path(os.environ.get('PLATFORMIO_CORE_DIR', str(Path.home() / '.platfo
 PYTHON = PIO_HOME / 'penv/Scripts/python.exe'
 PIO = PIO_HOME / 'penv/Scripts/pio.exe'
 ESPTOOL = PIO_HOME / 'packages/tool-esptoolpy/esptool.py'
-VERSION = '2.2.4'
+# 冻结镜像：随程序一起分发，现场只烧这一份，不做任何编译。
+IMAGE_DIR = Path(__file__).resolve().parent / 'assets' / 'firmware'
+IMAGE_MANIFEST = IMAGE_DIR / 'manifest.json'
+FALLBACK_VERSION = '2.2.5-r29.8'
+
+
+def image_directory():
+    """开发时在 host/assets/firmware，打包后在 _MEIPASS/web/firmware。"""
+    candidates = []
+    try:
+        import customer_runtime as runtime
+        candidates.append(Path(runtime.resources()) / 'firmware')
+    except Exception:
+        pass
+    candidates.append(IMAGE_DIR)
+    for path in candidates:
+        if (path / 'manifest.json').is_file():
+            return path
+    return candidates[-1]
+
+
+class FirmwareImageError(RuntimeError):
+    pass
+
+
+def read_image(directory=None):
+    """读取并校验冻结镜像。任何一项对不上就抛错 —— 宁可烧不了，也不烧错东西。
+
+    返回 dict(version, images=[(offset, Path, sha256)], manifest)。
+    校验项：分区表布局、每个文件的大小与 SHA-256、固件是否超出 app0 分区。
+    """
+    directory = Path(directory or image_directory())
+    manifest_path = directory / 'manifest.json'
+    if not manifest_path.is_file():
+        raise FirmwareImageError('程序里没有固件镜像（缺少 manifest.json），无法烧录')
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    except Exception as error:
+        raise FirmwareImageError('固件清单损坏：' + str(error))
+    rows = manifest.get('images')
+    if not isinstance(rows, list) or len(rows) != 4:
+        raise FirmwareImageError('固件清单内容不完整')
+    images, seen = [], set()
+    for row in rows:
+        name = str(row.get('name') or '')
+        path = directory / Path(name).name
+        if not name or Path(name).name != name or name in seen:
+            raise FirmwareImageError('固件清单里有非法文件名')
+        seen.add(name)
+        if not path.is_file():
+            raise FirmwareImageError('固件文件缺失：' + name)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != str(row.get('sha256')):
+            raise FirmwareImageError('固件文件被改动或损坏：' + name)
+        offset = int(row.get('offset_int', int(str(row.get('offset', '0')), 16)))
+        size = path.stat().st_size
+        if offset + size > 0x400000:
+            raise FirmwareImageError('固件偏移超出 4MB Flash：' + name)
+        if offset < 0xe000 and offset + size > 0x9000:
+            raise FirmwareImageError('镜像侵入校准 NVS（0x9000~0xdfff），拒绝写入')
+        if offset == 0x10000 and size > 0x140000:
+            raise FirmwareImageError('固件超出 app0 分区')
+        images.append((offset, path, digest))
+    images.sort(key=lambda item: item[0])
+    needed = {0x1000, 0x8000, 0xe000, 0x10000}
+    if {offset for offset, _, _ in images} != needed:
+        raise FirmwareImageError('固件清单的写入区间不是固定的 1000/8000/e000/10000')
+    return dict(version=str(manifest.get('version') or FALLBACK_VERSION),
+                images=images, manifest=manifest)
+
+
+def esptool_command():
+    """返回 (前缀参数)。冻结后跑自己（--esptool 透传给 esptool），未冻结用 python -m esptool。"""
+    if getattr(sys, 'frozen', False):
+        return [sys.executable, '--esptool']
+    try:
+        import esptool  # noqa: F401
+        return [sys.executable, '-m', 'esptool']
+    except Exception:
+        pass
+    if ESPTOOL.exists():
+        return [str(PYTHON), str(ESPTOOL)]
+    raise FirmwareImageError('找不到 esptool：既没有安装模块，也没有 PlatformIO 工具链')
+
 
 
 def exclusive(method):
@@ -66,13 +150,31 @@ class FirmwareManager:
                 for p in self.enumerate_ports()]
 
     def available(self):
-        return all(p.exists() for p in (SOURCE/'platformio.ini', PIO, PYTHON, ESPTOOL))
+        """有冻结镜像就能烧 —— 不再要求本机装 PlatformIO 或源码。"""
+        try:
+            read_image()
+            return True
+        except FirmwareImageError:
+            return False
 
     def status(self):
         with self._lock:
-            return dict(self._data, busy=self.busy, serialExclusive=self.serialExclusive, log=list(self._log), version=VERSION,
-                        board='esp32dev', baud=230400, ports=self.ports(), available=self.available(),
-                        source=str(SOURCE), selected=self.bridge.port if self.bridge else None)
+            data = dict(self._data)
+        try:
+            image = read_image()
+            bundle = dict(bundled=True, version=image['version'],
+                          built_at=image['manifest'].get('built_at', ''),
+                          images=[dict(name=path.name, offset=hex(offset), bytes=path.stat().st_size,
+                                       sha256=digest)
+                                  for offset, path, digest in image['images']])
+            version, error = image['version'], ''
+        except FirmwareImageError as exc:
+            bundle, version, error = dict(bundled=False), FALLBACK_VERSION, str(exc)
+        return dict(data, busy=self.busy, serialExclusive=self.serialExclusive, log=list(self._log),
+                    version=version, buildRequired=False, image=bundle,
+                    imageError=error, imageDir=str(image_directory()),
+                    board='esp32dev', baud=230400, ports=self.ports(), available=self.available(),
+                    source=str(SOURCE), selected=self.bridge.port if self.bridge else None)
 
     def update(self, **values):
         with self._lock:
@@ -107,7 +209,7 @@ class FirmwareManager:
             if self.busy:
                 raise RuntimeError('固件维护正在执行')
             if not self.available():
-                raise RuntimeError('固定源码或 PlatformIO 工具链不可用')
+                raise RuntimeError('程序里没有可用的固件镜像（assets/firmware），或镜像校验未通过')
             if action == 'flash' and self.bridge.connected and self.bridge.port != body['port']:
                 raise ValueError('所选端口与当前已连接主控不一致')
             self.busy = True
@@ -146,37 +248,16 @@ class FirmwareManager:
         return '\n'.join(lines)
 
     def build(self):
-        config = (SOURCE/'platformio.ini').read_text(encoding='utf-8')
-        main = (SOURCE/'src/main.cpp').read_text(encoding='utf-8')
-        if not re.search(r'^board\s*=\s*esp32dev\s*$', config, re.M) or not re.search(r'^upload_speed\s*=\s*230400\s*$', config, re.M):
-            raise RuntimeError('固定板型或波特率配置已改变，拒绝编译烧录')
-        if not re.search(r'#define\s+FW_VER\s+"' + re.escape(VERSION) + '"', main):
-            raise RuntimeError('源码版本不匹配安全版 ' + VERSION)
-        if not re.search(r'^platform\s*=\s*espressif32@6\.4\.0\s*$', config, re.M):
-            raise RuntimeError('平台版本发生变化')
-        for package, expected in [('framework-arduinoespressif32', '3.20011.230801'),
-                                  ('toolchain-xtensa-esp32', '8.4.0+2021r2-patch5'),
-                                  ('tool-esptoolpy', '1.40501.0'), ('tool-scons', '4.40801.0')]:
-            manifest = PIO_HOME/'packages'/package/'package.json'
-            if not manifest.exists() or json.loads(manifest.read_text())['version'] != expected:
-                raise RuntimeError('本机固定工具链缺失或版本变化：' + package)
-        self.update(phase='build', progress=10)
-        # Block dependency downloads: missing cached packages must fail, never update tools.
-        offline = "import socket,runpy; socket.socket.connect=lambda *a,**k: (_ for _ in ()).throw(RuntimeError('Firmware build is offline; dependency downloads disabled')); runpy.run_module('platformio',run_name='__main__')"
-        self.run([PYTHON, '-c', offline, 'run', '-d', SOURCE, '-e', 'esp32dev'], 300)
-        output = SOURCE/'.pio/build/esp32dev'
-        partitions = (output/'partitions.bin').read_bytes()
-        entries = {}
-        for start in range(0, len(partitions)-31, 32):
-            magic, kind, subtype, offset, size, name, flags = struct.unpack('<HBBII16sI', partitions[start:start+32])
-            if magic == 0x50aa:
-                entries[name.rstrip(b'\0').decode()] = (offset, size)
-        if entries.get('nvs') != (0x9000, 0x5000) or entries.get('app0') != (0x10000, 0x140000):
-            raise RuntimeError('分区布局改变，拒绝覆盖现有 NVS 校准')
-        self.update(buildSha256=hashlib.sha256((output/'firmware.bin').read_bytes()).hexdigest())
-        return [(0x1000, output/'bootloader.bin'), (0x8000, output/'partitions.bin'),
-                (0xe000, PIO_HOME/'packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin'),
-                (0x10000, output/'firmware.bin')]
+        """返回要烧写的 (偏移, 文件) 列表。
+
+        现场**不再编译**：直接交出随程序分发的冻结镜像。原来这里跑 PlatformIO，
+        客户机上只要没装工具链就整个烧录按钮是灰的；现在只要程序本身在就能烧。
+        """
+        image = read_image()
+        firmware = next(path for offset, path, _ in image['images'] if offset == 0x10000)
+        self.update(phase='build', progress=10, buildSha256=hashlib.sha256(firmware.read_bytes()).hexdigest())
+        self.log('使用内置镜像 ' + image['version'] + '（' + firmware.name + '），未做本地编译')
+        return [(offset, path) for offset, path, _ in image['images']]
 
     def _worker(self, action, port, identity):
         self.owner = threading.get_ident()
@@ -205,13 +286,14 @@ class FirmwareManager:
                 self.log('旧动作停止已确认' if confirmed else '旧固件未确认停止；后续仅进入 ROM 识别，不恢复任何目标')
                 bridge.close()
             artifacts = self.build()
+            expected_version = read_image()['version']
             if action == 'build':
                 self.update(state='built', phase='complete', progress=100)
                 return
-            # Recheck current USB identity after potentially lengthy compilation.
+            # Recheck current USB identity after preparing the image.
             if self.identity(port) != identity:
                 raise RuntimeError('USB 设备身份已改变，请重新选择')
-            base = [PYTHON, ESPTOOL, '--chip', 'esp32', '--port', port, '--baud', '230400']
+            base = esptool_command() + ['--chip', 'esp32', '--port', port, '--baud', '230400']
             self.update(phase='identify', progress=35)
             info = self.run(base + ['chip_id'], 25)
             mac = re.search(r'MAC:\s*([0-9a-f]{2}(?::[0-9a-f]{2}){5})', info, re.I)
@@ -246,8 +328,9 @@ class FirmwareManager:
                 response = bridge.send('INFO', timeout_ms=1500)
                 line = next((s for s in response.get('lines', []) if s.startswith('OK INFO ')), '')
                 fields = dict(re.findall(r'(\w+)=([^\s]+)', line))
-                if fields.get('fw') == 'PIANO_GLOVE_2' and fields.get('ver') == VERSION and fields.get('armed') == '0':
-                    self.update(readback=fields, verified=True, state='verified', phase='complete', progress=100)
+                if fields.get('fw') == 'PIANO_GLOVE_2' and fields.get('ver') == expected_version and fields.get('armed') == '0':
+                    self.update(readback=fields, verified=True, state='verified', phase='complete', progress=100,
+                                flashedVersion=expected_version)
                     return
                 self.update(readback=fields or None)
                 time.sleep(.4)

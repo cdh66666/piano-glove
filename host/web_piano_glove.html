@@ -1745,13 +1745,20 @@ function onBridgeWaiting(st){
   $("#connMsg").className = "msg";
   $("#connMsg").textContent = "未连接。";
 }
-/* 页面侧的状态巡视。桥自己会连，这里只是"看"，连上就接管。 */
+/* 页面侧的状态巡视。桥自己会连，这里只是"看"，连上就接管。
+   注意：问不到桥**不能**就此停掉巡视 —— 以前这里一问不到就 clearInterval + 显示
+   "没找到本地串口服务"，于是任何一次瞬时失败都变成永久放弃，只能靠用户刷新页面。 */
 function startBridgeWatch(){
   clearInterval(bridgeWatch);
+  let warned = false;
   bridgeWatch = setInterval(async () => {
     if(T.connected) { clearInterval(bridgeWatch); bridgeWatch = null; return; }
     const st = await T.detectBridge();
-    if(!st){ clearInterval(bridgeWatch); bridgeWatch = null; showBridgeDown(); return; }
+    if(!st){
+      if(!warned){ warned = true; showBridgeDown(); }
+      return;                                  // 继续巡视，桥起来/回来了会自动接管
+    }
+    warned = false;
     if(st.connected && !attachPending){
       attachPending = true;
       try{ await onBridgeUp(st); }finally{ attachPending = false; }
@@ -1897,17 +1904,77 @@ async function syncProfile(){
 function startPolling(){
   stopPolling();
   S.pollTimer = setInterval(async () => {
-    if(!T.connected) return;
-    await refreshSlots(true);
+    /* 断开后原来这里只 return —— 页面永远停在「已连接」，所有按钮点了都没反应，
+       用户看到的就是"点一下就断联、也回不来"。现在先确认桥的连接，再决定要不要恢复。 */
+    if(!T.connected){ bridgeRecover(); return; }
+    const alive = await refreshSlots(true);
+    if(!alive) { bridgeRecover(); return; }
     if(S.info.calibrated !== "1") await refreshInfo();
   }, 3000);
 }
 function stopPolling(){ if(S.pollTimer) clearInterval(S.pollTimer); S.pollTimer = null; }
 
+/* ---------- 掉线自动恢复 ----------
+   目标：拔线/串口抖一下之后，页面自己接回去，不要用户去点「重新扫描并连接」。
+   做法：问一次 /api/status；桥自己还在重连（它每 2 秒扫一次），所以这里只负责
+   在"桥说已经连上了"的时候重新接管。绝不主动发 /api/disconnect。 */
+let recovering = null;
+function bridgeRecover(){
+  if(recovering) return recovering;
+  recovering = (async () => {
+    try{
+      const st = await T.detectBridge();
+      if(!st || !st.connected){ onBridgeWaiting(st || {}); return false; }
+      T.detachBridge();
+      await onBridgeUp(st);
+      logLine("串口恢复，已自动接管。", "sys");
+      return true;
+    }catch(e){
+      return false;
+    }finally{
+      recovering = null;
+    }
+  })();
+  return recovering;
+}
+
 /* ======================= 2. 编号 ======================= */
 /* 状态机 —— 这里是修掉「日志里反复刷『请把它拔下来』死循环」的关键:
    必须等总线**真的空了**才允许插下一个, 否则会把已编过号的舵机又改一遍。 */
+/* 编号进度必须能跨刷新/断线活下来 —— 否则拔一次线就得从 1 号重来，
+   用户实测反馈就是「既然可以继续编号」。存 localStorage，键带版本号，
+   以后改结构直接换键，不会读到不兼容的旧值。 */
+const WIZ_KEY = "pg.wizard.v2";
+/* boot 期间会先 renderWizard() 一次（那时 S.wizard 还是空的）——
+   如果那次也落盘，就会在恢复进度之前先把存档清成空，等于没存。
+   所以落盘要等 restoreWizard 跑完才允许。 */
+let wizardReady = false;
+function wizardSave(){
+  if(!wizardReady) return;
+  try{
+    const w = S.wizard || {};
+    localStorage.setItem(WIZ_KEY, JSON.stringify({assigned:w.assigned || [], phase:w.phase || "need-plug"}));
+  }catch(e){}
+}
+function wizardLoad(){
+  try{
+    const raw = localStorage.getItem(WIZ_KEY);
+    if(!raw) return null;
+    const v = JSON.parse(raw);
+    if(!v || !Array.isArray(v.assigned)) return null;
+    const assigned = v.assigned.filter(n => Number.isInteger(n) && n >= 1 && n <= 6).sort((a,b)=>a-b);
+    /* 只接受"从 1 开始的连续前缀" —— 断线期间可能写进过脏值，
+       不连续的进度宁可丢掉，也不能让确认按钮对着错误的目标号。 */
+    for(let i=0;i<assigned.length;i++) if(assigned[i] !== i+1) return null;
+    const phase = v.phase === "done" ? "done" : (assigned.length ? "need-unplug" : "need-plug");
+    return {assigned, phase, detected:null};
+  }catch(e){ return null; }
+}
+function wizardClear(){
+  try{ localStorage.removeItem(WIZ_KEY); }catch(e){}
+}
 function wizardReset(){
+  wizardClear();
   S.wizard = { assigned:[], phase:"need-plug", detected:null };
   /* ⚠️ 这里**不要**调 T.mock.reset(true)。
      那是「恢复出厂」—— 档位会掉回 SC09，已校准的数据也会被抹掉。
@@ -1916,6 +1983,7 @@ function wizardReset(){
      实测偏差高达 4 倍（模拟显示 11.6 Hz，实机只有 5.0 Hz，
      因为 SC09 量程 1023 把行程算成了真实的 1/4）。（这个坑踩过） */
   renderWizard();
+  wizardClear();                       // renderWizard 会落盘，这里必须再清一次
   wizSay("", "点下面的「检测当前舵机」开始。");
 }
 
@@ -1937,6 +2005,7 @@ function renderWizard(){
   const btn = $("#btnAssignNext");
   btn.disabled = !(w.phase === "ready" && w.detected !== null);
   btn.textContent = doneAll ? "全部完成" : "确认设为 " + target + " 号";
+  wizardSave();      // 每次状态变化都落盘：拔线/刷新/换页回来能接着编号
 }
 
 function wizSay(kind, html){
@@ -1966,17 +2035,41 @@ $("#btnDetect").onclick = async () => {
   const found = await pingRange(10);
   S.found = found;
   const target = w.assigned.length + 1;
+  const sorted = found.slice().sort((a, b) => a - b);
+  /* 六个都在线、编号正好是 1~6 —— 这是"已经编好了"，不是"同 ID 抢答"。
+     原来这种情况被塞进 found.length>1 那条分支，提示写的是"多个同 ID 的舵机会
+     互相抢答"，还把确认按钮永久置灰。用户实测就是被这句话卡住的。 */
+  const alreadyNumbered = sorted.length === 6 && sorted.every((v, i) => v === i + 1);
+  const distinct = sorted.every((v, i) => i === 0 || v !== sorted[i - 1]);
 
   if(found.length === 0){
     w.phase = "need-plug";
-    wizSay("", "总线是空的 ✔　现在把要编号的那个舵机插上，再点「检测当前舵机」。");
+    w.detected = null;
+    /* 原来这里写的是「总线是空的 ✔」—— 一个绿色对勾。可用户当时明明插着舵机，
+       读到这句只会以为"是我插错了"。空总线不是成功，是"什么都没读到"。 */
+    wizSay("warn", "没有读到任何舵机。<br>" +
+      "请按顺序确认：<b>①</b> 舵机动力电源开着（不是只插了 USB）；<b>②</b> 总线插头插到底、卡扣扣上；" +
+      "<b>③</b> 刚上电时舵机要做自检，等 2 秒再点一次。<br>" +
+      "<span style='opacity:.75'>读不到不等于编号错，这一步只是「没人应答」。</span>");
+  }else if(alreadyNumbered){
+    w.assigned = [1, 2, 3, 4, 5, 6];
+    w.detected = null;
+    w.phase = "done";
+    wizSay("ok", "总线上 6 个舵机都在，编号已经是 <b>1~6</b> —— 不用再编了。" +
+      "<br>直接去「校准」页检查行程。确实要重编，才点「重新开始编号」。");
   }else if(found.length > 1){
     w.phase = "need-unplug";
-    wizSay("err", "总线上检测到 <b>" + found.length + " 个</b>舵机（" + found.join("、") +
-      "）。<br>多个同 ID 的舵机会互相抢答，请<b>只留下一个</b>，其余全部拔掉。");
+    w.detected = null;
+    const sameId = !distinct;
+    wizSay("err", (sameId
+        ? "总线上有 <b>" + found.length + " 个</b>同号舵机（都是 " + found[0] + " 号），它们会互相抢答。"
+        : "总线上现在有 <b>" + found.length + " 个</b>舵机（" + sorted.join("、") + " 号）。") +
+      "<br>编号必须<b>一次只插一个</b>：请只留下要编号的那一个，其余全部拔掉，再点「检测当前舵机」。");
   }else if(wasUnplugPhase){
-    wizSay("warn", "总线上还是 <b>" + found[0] + "</b> 号 —— 它就是刚编完号的那个。" +
-      "<br>请把它<b>拔下来、贴上标签</b>收好，再点一次「检测当前舵机」确认总线已经空了。");
+    const last = w.assigned[w.assigned.length - 1];
+    wizSay("warn", "总线上还是 <b>" + found[0] + "</b> 号 —— " +
+      (found[0] === last ? "它就是刚编完号的那个。" : "它还在总线上。") +
+      "<br>请把它<b>拔下来、贴上「" + found[0] + "」标签</b>收好，再点一次「检测当前舵机」确认总线已经空了。");
   }else{
     w.detected = found[0];
     w.phase = "ready";
@@ -2073,8 +2166,13 @@ async function refreshSlots(silent){
   const out = {};
   lines.filter(l => l.startsWith("SLOT")).forEach(l => { const d = kv(l); out[+d.slot] = d; });
   if(!Object.keys(out).length){
-    if(!silent) $("#statusMsg").className = "msg err";
-    return out;
+    /* 一条 SLOT 都没回来 = 板子没应答（断线/复位/被烧录独占），调用方要能据此判定"死了"。
+       返回 false 而不是空对象，是为了让轮询能区分"6 个都离线"和"根本没回话"。 */
+    if(!silent){
+      $("#statusMsg").className = "msg err";
+      $("#statusMsg").textContent = "主控没有回话 —— 检查 USB 线，或点「重新扫描并连接」。";
+    }
+    return false;
   }
   S.slots = out;
   const on = Object.values(out).filter(d => d.online === "1").length;
@@ -2082,7 +2180,7 @@ async function refreshSlots(silent){
   $("#statusMsg").textContent = on === 6 ? "6 个舵机全部在线 ✔" : "只有 " + on + "/6 在线，请检查接线和标签";
   renderSlots(); renderTest(); refreshChips();
   renderLatch();                 // 使能位的区间来自 STATUS_ALL 的 min/max，必须跟着刷
-  return out;
+  return true;
 }
 
 function renderSlots(){
@@ -2117,47 +2215,66 @@ $("#btnSimBus").onclick = () => {
 
 let calTimer = null;
 $("#btnCalStart").onclick = async () => {
+  /* 重复点击会并起好几个定时器，最后一个收尾时把进度条按到 100% 就再也不能重来。
+     加一个硬闸：正在采样时直接忽略。 */
+  if(calTimer){ $("#calMsg").className = "msg warn"; $("#calMsg").textContent = "正在采样，等这一轮结束或点「中止采样」。"; return; }
   const secs = parseInt($("#calSecs").value,10) || 15;
-  const lines = await T.send("CAL AUTO START", 6000);
-  if(lines.some(l => l.startsWith("ERR"))){
-    $("#calMsg").className = "msg err";
-    const m = lines.find(l => l.includes("feedback_missing"));
-    $("#calMsg").innerHTML = m
-      ? "启动失败：<b>有槽位的舵机读不到反馈</b>（" + esc(m) + "）。<br>请回第 2 步确认 6 个舵机都编好号并接回总线。"
-      : "启动失败，请看日志页的红色 ERR 行。";
-    return;
-  }
-  $("#calMsg").className = "msg ok";
-  $("#btnCalSave").disabled = true;
-  S.calSamples = {};
-  const t0 = Date.now();
-  clearInterval(calTimer);
-  calTimer = setInterval(async () => {
-    const snap = {};
-    (await T.send("CAL AUTO STATUS", 4000)).filter(l => l.startsWith("CAL_AUTO"))
-      .forEach(l => { const d = kv(l); snap[+d.slot] = d; });
-    renderCalTable(snap);
-    const el = (Date.now() - t0) / 1000;
-    $("#calFill").style.width = Math.min(100, el / secs * 100) + "%";
-    const samp = Object.values(snap).reduce((s,d) => s + (+d.samples || 0), 0);
-    $("#calMsg").textContent = "采样中 " + el.toFixed(0) + "/" + secs + " 秒 · 累计样本 " + samp +
-      " —— 请反复做：拇指直按 ↔ 松开、拇指侧压 ↔ 松开、四指伸直 ↔ 握拳";
-    if(el >= secs){
-      clearInterval(calTimer);
-      await T.send("CAL AUTO FINISH", 6000);
-      await refreshCal();
-      $("#calFill").style.width = "100%";
-      $("#btnCalSave").disabled = false;
-      $("#calMsg").className = "msg ok";
-      $("#calMsg").textContent = "采样结束。确认每根手指都有幅度后，点「保存校准结果」。";
+  const startBtn = $("#btnCalStart");
+  startBtn.disabled = true;
+  try{
+    const lines = await T.send("CAL AUTO START", 6000);
+    if(lines.some(l => l.startsWith("ERR"))){
+      $("#calMsg").className = "msg err";
+      const m = lines.find(l => l.includes("feedback_missing"));
+      $("#calMsg").innerHTML = m
+        ? "启动失败：<b>有槽位的舵机读不到反馈</b>（" + esc(m) + "）。<br>请回第 2 步确认 6 个舵机都编好号并接回总线。"
+        : "启动失败，请看日志页的红色 ERR 行。";
+      return;
     }
-  }, 1300);
+    $("#calMsg").className = "msg ok";
+    $("#btnCalSave").disabled = true;
+    S.calSamples = {};
+    const t0 = Date.now();
+    clearInterval(calTimer);
+    calTimer = setInterval(async () => {
+      try{
+        const snap = {};
+        (await T.send("CAL AUTO STATUS", 4000)).filter(l => l.startsWith("CAL_AUTO"))
+          .forEach(l => { const d = kv(l); snap[+d.slot] = d; });
+        renderCalTable(snap);
+        const el = (Date.now() - t0) / 1000;
+        $("#calFill").style.width = Math.min(100, el / secs * 100) + "%";
+        const samp = Object.values(snap).reduce((s,d) => s + (+d.samples || 0), 0);
+        $("#calMsg").textContent = "采样中 " + el.toFixed(0) + "/" + secs + " 秒 · 累计样本 " + samp +
+          " —— 请反复做：拇指直按 ↔ 松开、拇指侧压 ↔ 松开、四指伸直 ↔ 握拳";
+        if(el >= secs){
+          clearInterval(calTimer); calTimer = null;
+          await T.send("CAL AUTO FINISH", 6000);
+          await refreshCal();
+          $("#calFill").style.width = "100%";
+          $("#btnCalSave").disabled = false;
+          $("#calMsg").className = "msg ok";
+          $("#calMsg").textContent = "采样结束。确认每根手指都有幅度后，点「保存校准结果」。";
+        }
+      }catch(e){
+        /* 采样循环里抛出去就再也没人清定时器了 —— 停掉并恢复按钮，才谈得上"再调一遍" */
+        clearInterval(calTimer); calTimer = null;
+        $("#calMsg").className = "msg err";
+        $("#calMsg").textContent = "采样中断：" + (e && e.message ? e.message : e) + "。可以点「开始校准」重来。";
+      }
+    }, 1300);
+  }finally{
+    /* 原来这个按钮从来不 disabled、也从来不在收尾时恢复别的东西；
+       现在统一在这里放开，无论上面从哪条路 return，都能再点一次。 */
+    startBtn.disabled = false;
+  }
 };
 $("#btnCalCancel").onclick = async () => {
-  clearInterval(calTimer);
+  clearInterval(calTimer); calTimer = null;
   await T.send("CAL AUTO CANCEL", 3000);
   $("#calMsg").className = "msg warn";
-  $("#calMsg").textContent = "已中止采样。";
+  $("#calMsg").textContent = "已中止采样。点「开始校准」可以重来。";
+  await refreshCal();          // 板子里可能已经有可用数据，别让保存按钮一直灰着
 };
 $("#btnCalAlign").onclick = async () => {
   const r = await T.send("CAL ALIGN", 6000);
@@ -2207,6 +2324,13 @@ async function refreshCal(){
       msg.textContent = "板子里已经有完整的校准数据 —— 点「保存校准结果」就能解锁演奏。"
                       + "（如果刚换过固件、或动过连杆／手指结构，建议重新采一次再保存。）";
     }
+  }else if(!allValid && Object.keys(snap).length && msg && /未开始|已清空/.test(msg.textContent || "")){
+    /* 板子里有 min/max 但 valid=0 —— 这套数据不算数，保存按钮必须是灰的。
+       不解释一句的话，用户只会看到"保存点不了"，然后反复刷新页面。 */
+    const gap = [0,1,2,3,4,5].filter(s => !(snap[s] && String(snap[s].valid) === "1"));
+    msg.className = "msg err";
+    msg.textContent = "板子里的校准数据没有通过校验（" + gap.map(s => (s + 1) + " 号").join("、") +
+      "）—— 这套不能用，也存不进去。请点上面的「开始校准」重新采一次，再保存。";
   }
   return snap;
 }
@@ -2397,11 +2521,17 @@ function renderTest(){
   });
   tb.querySelectorAll("[data-press]").forEach(b => b.onclick = async () => {
     const s = +b.dataset.press;
+    if(b.disabled) return;
     b.disabled = true; b.textContent = "按下…";
-    await T.send("PRESS " + s, 2000);
-    await sleep(420);
-    await T.send("RELEASE " + s, 2000);
-    b.disabled = false; b.textContent = "按一下";
+    /* try/finally：中途抛错（串口掉线、固件拒动）时按钮会永远停在"按下…"且点不动，
+       用户看到的就是"再点一下就没反应"。 */
+    try{
+      await T.send("PRESS " + s, 2000);
+      await sleep(420);
+      await T.send("RELEASE " + s, 2000);
+    }finally{
+      b.disabled = false; b.textContent = "按一下";
+    }
   });
   tb.querySelectorAll("[data-dir]").forEach(sel => {
     sel.value = (S.slots[+sel.dataset.dir] || {}).press || "max";
@@ -4336,6 +4466,21 @@ refreshRoleUI();
 updateGates();
 goto(location.hash.slice(1) || "connect");
 
+/* 上次没编完的进度，刷新/断线回来接着编（用户实测：拔一次线就得从 1 号重来） */
+(function restoreWizard(){
+  const saved = wizardLoad();
+  wizardReady = true;                 // 从这里开始才允许落盘
+  if(!saved) return;
+  if(!saved.assigned.length && saved.phase !== "done") return;
+  S.wizard = saved;
+  renderWizard();
+  const done = saved.phase === "done";
+  wizSay(done ? "ok" : "warn", done
+    ? "上次已经编完 <b>1~6</b> 号（进度已保存）。要重编请点「重新开始编号」。"
+    : "接着上次的进度：已经编好 <b>" + saved.assigned.join("、") + "</b> 号，" +
+      "下一个是 <b>" + (saved.assigned.length + 1) + "</b> 号。<br>把下一个舵机单独插上，点「检测当前舵机」。");
+})();
+
 if(SIM_ENABLED){
   /* 只有自测会走到这 —— 界面上没有引导，也不该有 */
   logLine("自测模式（?sim=1）：串口由页面内置的假固件顶替，数字不代表实机。", "sys");
@@ -5001,17 +5146,22 @@ window.addEventListener('pagehide',()=>{
 (()=>{
 if(new URLSearchParams(location.search).get('simple')==='1')return;
 const q=id=>document.getElementById(id),card=document.createElement('div');card.className='card';card.id='mainFirmware';
-card.innerHTML=`<h2>主控固件</h2><p class="desc">更新手套主控程序：先断开舵机动力电源、摘下手套，仅保留主控 USB 接线。</p><p id="fwVersion" class="hint">正在读取固件信息…</p><div class="fw-actions"><select id="fwPort" aria-label="主控USB串口"></select><button id="fwRefresh">刷新</button><button id="fwBuild">仅编译</button><button id="fwFlash" class="primary">烧录主控</button></div><label><input id="fwPowerOff" type="checkbox"> 我已断开动力电源、未穿戴手套，主控 USB 已接好</label><p class="hint">固定微雪 ESP32 板型 · 烧录速率 230400 · 不清空校准 · 完成后不自动运动</p><progress id="fwProgress" max="100" value="0"></progress><p id="fwStatus" class="msg" role="status" aria-live="polite">等待固件服务</p><details><summary>编译与烧录日志</summary><pre id="fwLog">尚无日志</pre></details>`;
+card.innerHTML=`<h2>主控固件</h2><p class="desc">更新手套主控程序：先断开舵机动力电源、摘下手套，仅保留主控 USB 接线。<b>固件已经随程序打包好，这里不需要编译。</b></p><p id="fwVersion" class="hint">正在读取固件信息…</p><div class="fw-actions"><select id="fwPort" aria-label="主控USB串口"></select><button id="fwRefresh">刷新</button><button id="fwFlash" class="primary">烧录主控</button></div><label><input id="fwPowerOff" type="checkbox"> 我已断开动力电源、未穿戴手套，主控 USB 已接好</label><p class="hint">固定微雪 ESP32 板型 · 烧录速率 230400 · 不清空校准 · 完成后不自动运动</p><progress id="fwProgress" max="100" value="0"></progress><p id="fwStatus" class="msg" role="status" aria-live="polite">等待固件服务</p><details><summary>烧录日志</summary><pre id="fwLog">尚无日志</pre></details>`;
 q('p-connect').append(card);
 let status=null,requesting=false,polling=false,lastActionError='';
 const moving=()=>S.playing||!!window.pianoStrictTrainingActive?.()||!!window.pianoMountBusy?.();
 const locked=()=>requesting||!!status?.busy;
-function render(){const busy=locked(),motion=moving();q('fwBuild').disabled=busy||motion||!status||status.available===false;q('fwFlash').disabled=busy||motion||!status||status.available===false||!q('fwPort').value||!q('fwPowerOff').checked;q('fwPort').disabled=busy;q('fwPowerOff').disabled=busy;q('fwRefresh').disabled=requesting;q('fwVersion').textContent=`版本：${status?.version||'待读取'} · 板型：${status?.board||'微雪 ESP32（固定）'}`;if(motion&&!busy)q('fwStatus').textContent='请先停止演奏或手套训练，再编译或烧录。';}
-function paint(data){status=data;if(T.bridge?.auto===false&&!T.bridge.connected)onBridgeWaiting(T.bridge);const previous=q('fwPort').value;const ports=Array.isArray(data.ports)?data.ports:[];q('fwPort').replaceChildren(new Option('选择主控 USB 串口',''),...ports.map(p=>{const value=typeof p==='string'?p:p.port||p.device||p.name;const option=new Option(typeof p==='string'?p:(p.label||p.description||value)+' · '+value,value);if(typeof p==='object'&&p.eligible===false)option.disabled=true;return option;}));if([...q('fwPort').options].some(o=>o.value===previous))q('fwPort').value=previous;else if(ports.length===1)q('fwPort').selectedIndex=1;const pct=Number(data.progress);if(Number.isFinite(pct))q('fwProgress').value=Math.max(0,Math.min(100,pct));else q('fwProgress').removeAttribute('value');const state=data.state||'待机';const labels={idle:'等待操作',running:'处理中',built:'编译完成，未烧录',verified:'烧录及回读验证完成',failed:'失败',written_unverified:'已写入，回读未验证',queued:'准备中',build:'正在编译',identify:'核对主控身份',write:'正在写入',verify:'校验写入内容',readback:'读取主控状态',complete:'已完成'};let text=data.busy?`进行中：${labels[data.phase]||data.phase||state}`:`状态：${labels[state]||state}`;if(data.error)text+='\n失败：'+(typeof data.error==='string'?data.error:JSON.stringify(data.error));if(data.verified===true)text+='\n写入完成，主控回读已验证；未启动任何动作。';else if(data.verified!==true&&(data.written===true||data.uploadDone===true||['written_unverified','verify_failed'].includes(state)))text+='\n写入结果不等于回读通过：主控尚未验证，请查看日志。';if(data.available===false)text+='\n固件工具尚未就绪，无法开始。';if(lastActionError)text+='\n上次操作未完成：'+lastActionError;q('fwStatus').textContent=text;q('fwLog').textContent=Array.isArray(data.log)?data.log.map(x=>typeof x==='string'?x:JSON.stringify(x)).join('\n'):String(data.log||'尚无日志');render();}
+function render(){const busy=locked(),motion=moving();q('fwFlash').disabled=busy||motion||!status||status.available===false||!q('fwPort').value||!q('fwPowerOff').checked;q('fwPort').disabled=busy;q('fwPowerOff').disabled=busy;q('fwRefresh').disabled=requesting;
+  const img=status?.image||{};q('fwVersion').textContent=img.bundled?`内置版本：${status.version} · 板型：${status.board||'微雪 ESP32（固定）'} · 已打包，无需编译`:`内置版本：${status?.version||'待读取'} · 板型：${status?.board||'微雪 ESP32（固定）'}`;
+  if(status&&status.available===false){q('fwStatus').textContent='程序里的固件镜像缺失或校验未通过，无法烧录：'+(status.imageError||'');}
+  else if(motion&&!busy)q('fwStatus').textContent='请先停止演奏或手套训练，再烧录。';}
+function paint(data){status=data;if(T.bridge?.auto===false&&!T.bridge.connected)onBridgeWaiting(T.bridge);const previous=q('fwPort').value;const ports=Array.isArray(data.ports)?data.ports:[];q('fwPort').replaceChildren(new Option('选择主控 USB 串口',''),...ports.map(p=>{const value=typeof p==='string'?p:p.port||p.device||p.name;const option=new Option(typeof p==='string'?p:(p.label||p.description||value)+' · '+value,value);if(typeof p==='object'&&p.eligible===false)option.disabled=true;return option;}));if([...q('fwPort').options].some(o=>o.value===previous))q('fwPort').value=previous;else if(ports.length===1)q('fwPort').selectedIndex=1;const pct=Number(data.progress);if(Number.isFinite(pct))q('fwProgress').value=Math.max(0,Math.min(100,pct));else q('fwProgress').removeAttribute('value');const state=data.state||'待机';const labels={idle:'等待操作',running:'处理中',built:'镜像已就绪，未烧录',verified:'烧录及回读验证完成',failed:'失败',written_unverified:'已写入，回读未验证',queued:'准备中',build:'校验内置镜像',identify:'核对主控身份',write:'正在写入',verify:'校验写入内容',readback:'读取主控状态',complete:'已完成'};let text=data.busy?`进行中：${labels[data.phase]||data.phase||state}`:`状态：${labels[state]||state}`;if(data.error)text+='\n失败：'+(typeof data.error==='string'?data.error:JSON.stringify(data.error));if(data.verified===true)text+='\n写入完成，主控回读已验证；未启动任何动作。';else if(data.verified!==true&&(data.written===true||data.uploadDone===true||['written_unverified','verify_failed'].includes(state)))text+='\n写入结果不等于回读通过：主控尚未验证，请查看日志。';if(data.available===false)text+='\n固件工具尚未就绪，无法开始。';if(lastActionError)text+='\n上次操作未完成：'+lastActionError;q('fwStatus').textContent=text;q('fwLog').textContent=Array.isArray(data.log)?data.log.map(x=>typeof x==='string'?x:JSON.stringify(x)).join('\n'):String(data.log||'尚无日志');render();}
 async function api(path,body){const r=await fetch(path,body===undefined?{cache:'no-store'}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw Error(j.error||j.message||`请求失败 ${r.status}`);return j;}
-async function refresh(){if(polling)return;polling=true;try{paint(await api('/api/firmware'));}catch(e){q('fwStatus').textContent='固件服务不可用：'+e.message;status=null;render();}finally{polling=false;}}
+async function refresh(){if(polling)return;/* 模拟模式没有本地串口服务，/api/firmware 必然 404。
+   以前每 1.5 秒打一次、每次都往控制台喷一条 404，把"页面无报错"这类断言也带脏了。
+   这里直接不请求，把原因写在卡片上。 */if(T.mode==='sim'){status=null;q('fwStatus').textContent='模拟模式：不连接固件服务。烧录请在程序本体里操作。';render();return;}polling=true;try{paint(await api('/api/firmware'));}catch(e){q('fwStatus').textContent='固件服务不可用：'+e.message;status=null;render();}finally{polling=false;}}
 async function run(flash){if(locked()||moving())return;if(flash&&(!q('fwPowerOff').checked||!q('fwPort').value))return;lastActionError='';requesting=true;render();try{if(flash){T._q.length=0;if(T._qTimer){clearTimeout(T._qTimer);T._qTimer=null;}stopPlay(true);}const data=await api('/api/firmware/'+(flash?'flash':'build'),flash?{port:q('fwPort').value}:{});if(data&&'busy'in data)paint(data);await refresh();}catch(e){lastActionError=e.message;q('fwStatus').textContent='未完成：'+e.message;}finally{requesting=false;render();}}
-q('fwRefresh').onclick=()=>{lastActionError='';return refresh();};q('fwBuild').onclick=()=>run(false);q('fwFlash').onclick=()=>run(true);q('fwPort').onchange=render;q('fwPowerOff').onchange=render;
+q('fwRefresh').onclick=()=>{lastActionError='';return refresh();};q('fwFlash').onclick=()=>run(true);q('fwPort').onchange=render;q('fwPowerOff').onchange=render;
 document.addEventListener('click',e=>{if(!locked())return;const control=e.target.closest('button,input,select');if(control&&!card.contains(control)&&!['btnStop','btnSafe','simpleEmergencyStop','strictActionHardwareStop'].includes(control.id)){e.preventDefault();e.stopImmediatePropagation();}},true);
 window.pianoFirmwareBusy=locked;setInterval(()=>{render();refresh();},1500);refresh();
 })();

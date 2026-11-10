@@ -20,7 +20,14 @@ class LightweightBuildTests(unittest.TestCase):
                 'drivers/CP210x_Windows_Update.cab':b'driver', 'app-icon.ico':b'icon',
                 'score-library/manifest.json':b'{}','score-library/projects/raw.json':b'{"notes":[]}',
                 'score-library/original.pdf':b'%PDF-synthetic-packaging-fixture',
-                'score-library/ready/song/score.pglpack':b'pack','score-library/ready/song/score.pgl':b'PGL'}
+                'score-library/ready/song/score.pglpack':b'pack','score-library/ready/song/score.pgl':b'PGL',
+                # r30 起固件镜像随包交付（客户机不装 PlatformIO、不现场编译），
+                # prepare() 会校验这份 manifests；夹具必须跟上，否则测的是"旧世界"。
+                'firmware/manifest.json':b'{"version":"synthetic-fixture","images":[]}',
+                'firmware/firmware.bin':b'synthetic-app-image',
+                'firmware/bootloader.bin':b'synthetic-bootloader',
+                'firmware/partitions.bin':b'synthetic-partitions',
+                'firmware/boot_app0.bin':b'synthetic-boot-app0'}
         for name,data in assets.items():
             path=host/'assets'/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
         return host,assets
@@ -35,7 +42,9 @@ class LightweightBuildTests(unittest.TestCase):
             self.assertEqual(files(full)-files(light),{'assets/runtime/MicrosoftEdgeWebView2RuntimeInstallerX64.exe'})
             self.assertEqual(files(light)-files(full),set())
             for name,data in assets.items():
-                if name.startswith('runtime/'):continue
+                # runtime/ 与 firmware/ 都由 build() 复制（prepare() 只做校验），
+                # 不在 prepare 的产物里 —— 断言要跳过，否则测的是错的层。
+                if name.startswith(('runtime/','firmware/')):continue
                 self.assertEqual((light/'web/assets'/name).read_bytes(),data)
             source_key='host/assets/runtime/MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
             self.assertEqual(full_snapshot[source_key],light_snapshot[source_key],'optional offline provenance retained')

@@ -283,6 +283,16 @@ def test_api():
               st == 403 and not hd.get("Access-Control-Allow-Origin"),
               "%s %s" % (st, hd.get("Access-Control-Allow-Origin")))
 
+        # ---- ★ connect 空 body = "你自己挑" ----
+        # 页面有两处 bridgePost("/api/connect", {})，语义是"不指定，你自动连"。
+        # 曾经的错法：把空 body 兜底成 --url 的值（联调时是 socket://…，真机拔线后是旧口名），
+        # 再拿它去 rank_ports() 里比对 —— 必然不在列表里，于是回 400
+        # 「这个串口不是 USB 主控」。用户看到的是"连不上"，其实线插着、口也好着。
+        s, j = post("/api/connect", {})
+        check("connect 空 body 走自动选口，不再误报「不是 USB 主控」",
+              s == 200 and j.get("ok") is not False,
+              "%s %s" % (s, j.get("error") or j.get("msg")))
+
         # ---- send：普通命令 ----
         s, j = post("/api/send", {"cmd": "INFO", "since": 0})
         lines = j.get("lines") or []

@@ -250,6 +250,7 @@ class Bridge(object):
     def _read_loop(self):
         buf = b""
         ser = self.ser
+        fails = 0
         while not self._stop:
             if ser is None or ser is not self.ser or not self.connected:
                 return
@@ -259,11 +260,23 @@ class Bridge(object):
                 chunk = ser.read(max(1, min(4096, ser.in_waiting)))
             except Exception as e:
                 # 主动 close() 时 ser 已经关了，这里必然会抛 —— 那是正常收工，不是掉线
-                if self.connected and ser is self.ser:
+                if not (self.connected and ser is self.ser):
+                    return
+                # 单次读异常不等于掉线。CP210x 在 USB 抖动、系统省电、或对端刚复位
+                # 时会抛一次 SerialException，紧接着就恢复；以前这里立刻 _drop，
+                # 页面看到的就是"点一下就断联"，然后要人去点「重新扫描并连接」。
+                fails += 1
+                if fails >= 5:
                     self._drop("串口读失败：" + str(e))
-                return
-            if not chunk:
+                    return
+                time.sleep(0.12)
                 continue
+            if not chunk:
+                # 长时间没有数据是正常的（空闲），不算失败；一旦读回来就清零。
+                if fails:
+                    fails = 0
+                continue
+            fails = 0
             buf += chunk
             while b"\n" in buf:
                 raw, buf = buf.split(b"\n", 1)
@@ -1450,6 +1463,7 @@ def make_handler(bridge):
                 if u.path == "/api/connect":
                     port = (b.get("port") or "").strip()
                     baud = b.get("baud")
+                    explicit = bool(port)          # 调用方有没有点名要哪个口
                     port = port or bridge.url
                     if port and port != bridge.url:
                         peer_url = peer_console_url(self.server.server_port, port)
@@ -1460,11 +1474,20 @@ def make_handler(bridge):
                         bridge._reload_ports()
                         # Auto-connect only trusts the current CP210x board; an explicit choice may
                         # be another USB serial board (INFO still confirms the firmware).
-                        if not any(p['device'] == port and (p.get('candidate') or p.get('score', 0) != SCORE_BLACKLISTED) for p in bridge.ports):
+                        known = any(p['device'] == port and (p.get('candidate') or p.get('score', 0) != SCORE_BLACKLISTED) for p in bridge.ports)
+                        # 页面用 `{}` 表示"你自己挑"（web_piano_glove.html 有两处 bridgePost('/api/connect', {})）。
+                        # 以前这里把空 body 兜底成 --url 的值，再拿它去枚举结果里比对：
+                        # --url 是 socket://…（联调）或已经拔掉的旧口时必然对不上，
+                        # 于是回 400「这个串口不是 USB 主控」—— 用户看到的是"连不上"，
+                        # 实际只是没插线或口名过期。**没点名就不该按"点名"来判。**
+                        if not known and explicit:
                             return self._json({'ok': False, 'error': '这个串口不是 USB 主控（蓝牙或主板自带串口），请换一个'}, 400)
-                        ok, msg = bridge.select_port(port, baud)
-                        if ok:
-                            bridge.probe_ok = port
+                        if known:
+                            ok, msg = bridge.select_port(port, baud)
+                            if ok:
+                                bridge.probe_ok = port
+                        else:
+                            ok, msg = bridge.autoconnect_once()
                     else:
                         ok, msg = bridge.autoconnect_once()
                     return self._json({"ok": ok, "msg": msg, "port": bridge.port,

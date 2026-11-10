@@ -471,8 +471,10 @@ class DesktopAPI(NativeAPI):
                 result.append(dict(name=path.name, error=str(error)))
         return result
 
-    # 11-05 用户：换了新主控就用不了——软件自己认出手套程序旧了/没有，一键打开独立升级器。
-    # 主程序不链接 esptool（许可要求单独分发），只找放在旁边的「固件升级」文件夹并启动它。
+    # 11-05 用户：换了新主控就用不了——软件自己认出手套程序旧了/没有，一键烧录。
+    # R30（11-08）起主程序内嵌 esptool + 冻结镜像，外置「固件升级」文件夹只作为兼容回退：
+    # 还在用旧升级器的机器能识别到就优先用它，识别不到就走内置烧录。
+    # ⚠️ esptool 是 GPL-2.0，内嵌后主程序含 GPL 组件；对外公开发布需按 GPL 提供源码。
     @staticmethod
     def _upgrader_candidates():
         import sys
@@ -498,10 +500,63 @@ class DesktopAPI(NativeAPI):
 
     def firmware_upgrade_info(self):
         found = sorted(self._upgrader_candidates(), key=lambda row: self._version_key(row[0]))
-        if not found:
-            return {'available': False}
-        version, exe = found[-1]
-        return {'available': True, 'version': version, 'path': str(exe)}
+        if found:
+            version, exe = found[-1]
+            return {'available': True, 'version': version, 'path': str(exe), 'mode': 'external'}
+        # 没有外置「固件升级」文件夹也能更新：程序里已经打包了冻结镜像 + 烧录器。
+        # 用户反馈「换个电脑就得多带一个文件夹」就是这一条。
+        try:
+            from firmware_flash import read_image
+            image = read_image()
+            return {'available': True, 'version': image['version'], 'mode': 'builtin'}
+        except Exception as error:
+            return {'available': False, 'error': str(error)}
+
+    def _builtin_flash(self, state):
+        """用程序自带的镜像和烧录器走一遍：让出串口 → 烧录 → 验证 → 自动重连。"""
+        try:
+            port = None
+            try:
+                port = (self.request('/api/status').get('body') or {}).get('port')
+                self.request('/api/send', 'POST', {'cmd': 'SAFE', 'timeoutMs': 1500, 'quietMs': 25})
+            except Exception:
+                pass
+            if not port:
+                candidates = (self.request('/api/status').get('body') or {}).get('ports') or []
+                eligible = [p for p in candidates if p.get('eligible')]
+                port = eligible[0]['device'] if len(eligible) == 1 else None
+            if not port:
+                raise RuntimeError('没读到主控串口，请先插好 USB（只有一个 CP210x 时会自动选）')
+            state['text'] = '正在让出串口…'
+            self.request('/api/disconnect', 'POST', {})
+            reply = self.request('/api/firmware/flash', 'POST', {'port': port})
+            if reply.get('status') not in (200, 202):
+                body = reply.get('body') or {}
+                raise RuntimeError(str(body.get('error') or '烧录未能开始'))
+            last = ''
+            for _ in range(600):                      # 最多 5 分钟
+                time.sleep(0.5)
+                st = (self.request('/api/firmware').get('body') or {})
+                state['percent'] = max(state['percent'], int(st.get('progress') or 0))
+                stage = str(st.get('phase') or st.get('state') or '')
+                if stage and stage != last:
+                    state['text'] = '正在升级：' + stage
+                    last = stage
+                if st.get('verified'):
+                    state.update(state='done', percent=100, text='更新好了')
+                    return
+                if st.get('state') in ('failed', 'written_unverified'):
+                    raise RuntimeError(str(st.get('error') or '写入没有通过回读验证'))
+            raise RuntimeError('升级超时，请检查 USB 线后重试')
+        except Exception as error:
+            state.update(state='error', text=str(error))
+        finally:
+            try:
+                time.sleep(1.5)
+                self.request('/api/connect', 'POST', {'auto': True})
+            except Exception:
+                pass
+            state['reconnected'] = True
 
     def firmware_upgrade_start(self):
         """11-05 用户：更新固件不要重启软件。舵机先失能，让出 USB 口，在后台跑升级器，完了自动重连。"""
@@ -511,7 +566,12 @@ class DesktopAPI(NativeAPI):
             return dict(state)
         info = self.firmware_upgrade_info()
         if not info.get('available'):
-            raise ValueError('没找到「固件升级」文件夹，请把它放在钢琴手套软件旁边')
+            raise ValueError('程序里的固件镜像不可用，无法更新')
+        self._fw_upgrade = dict(state='running', percent=0, text='准备升级…', version=info.get('version'))
+        if info.get('mode') == 'builtin':
+            threading.Thread(target=self._builtin_flash, args=(self._fw_upgrade,),
+                             name='glove-firmware-upgrade', daemon=True).start()
+            return dict(self._fw_upgrade)
         exe = Path(info['path'])
         port = None
         try:
@@ -564,7 +624,11 @@ class DesktopAPI(NativeAPI):
         import subprocess
         info = self.firmware_upgrade_info()
         if not info.get('available'):
-            raise ValueError('没找到「固件升级」文件夹，请把它放在钢琴手套软件旁边')
+            raise ValueError('程序里的固件镜像不可用，无法更新')
+        if info.get('mode') == 'builtin':
+            # 没有外置升级器也不必重启软件：内置烧录直接在窗口里跑完。
+            self.firmware_upgrade_start()
+            return {'started': True, 'version': info['version'], 'mode': 'builtin'}
         exe = Path(info['path'])
         # 11-05 用户：直接更新就完事了，更新前把舵机失能一下。先发 SAFE（舵机松开），再让升级器自己开始、做完重开软件
         port = None

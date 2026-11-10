@@ -43,7 +43,9 @@ def local_imports(name):
     for node in ast.walk(tree):
         imports = [node.module] if isinstance(node, ast.ImportFrom) else [x.name for x in node.names] if isinstance(node, ast.Import) else []
         for item in imports:
-            if item and (HOST / (item + '.py')).is_file() and item != 'firmware_flash':
+            # r30 起固件维护随程序交付，firmware_flash 必须真实进包；
+            # 旧版在这里把它排除掉再塞一个禁用桩，客户版因此永远烧不了。
+            if item and (HOST / (item + '.py')).is_file():
                 output.append(item + '.py')
     return output
 
@@ -83,27 +85,13 @@ def prepare(work, include_webview_installer=True):
                 raise RuntimeError('bridge 校准记录路径结构已变，需复核冻结适配。')
             text = text.replace(target, 'os.path.join(RUNTIME_DATA_DIR, "calibration_recordings"')
         (stage / name).write_text(text, encoding='utf-8')
-    # Firmware build/maintenance stays out of the customer executable. An
-    # optional vendor-approved compiled application image is handled separately.
-    (stage / 'firmware_flash.py').write_text('''import functools
-def exclusive(method):
-    @functools.wraps(method)
-    def guarded(self, *args, **kwargs):
-        with self._maintenance_lock:
-            return method(self, *args, **kwargs)
-    return guarded
-class FirmwareManager:
-    serialExclusive = False
-    busy = False
-    owner = None
-    def __init__(self, bridge): self.bridge = bridge
-    def status(self):
-        return dict(state='idle', phase='idle', progress=0, busy=False,
-                    serialExclusive=False, available=False, verified=False,
-                    version='2.2.4', log=[], error='', customerEdition=True)
-    def start(self, action, body):
-        raise RuntimeError('测试版不提供固件源码构建，请按供应方升级说明操作。')
-''', encoding='utf-8')
+    # 固件维护随程序一起交付（r30 起）：客户机上没有 PlatformIO，也不再现场编译。
+    # 打包前已由 tools/bundle_firmware.py 把 esp32dev 产物冻结到 host/assets/firmware，
+    # 运行时 firmware_flash 只读这份镜像并调用内置 esptool。
+    # 旧版在这里把 firmware_flash.py 覆盖成 available=False 的桩，导致客户版
+    # 永远提示「固件镜像不可用」——那是历史设计，r30 已废除，不要再加回来。
+    if not (HOST / 'assets' / 'firmware' / 'manifest.json').is_file():
+        raise RuntimeError('缺少冻结固件镜像：先跑 python tools/bundle_firmware.py')
     web = stage / 'web'
     web.mkdir()
     assets = ['software.html', 'software.js', 'software.css', 'software-audio.js', 'software-pack.js', 'software-review.js', 'software-review.css', 'software-tempo.js', 'software-tempo.css', 'software-upload.js', 'software-upload.css', 'web_piano_glove.html', 'calibration_trace.html', 'usb-driver.js', 'usb-driver.css', 'guide.html', 'desktop-ui.css', 'desktop-shell.js', 'native-transport.js', 'desktop-debug.css', 'desktop-debug.js', 'native-catalog.js', 'desktop-catalog.css', 'comic-ui.css', 'comic-art.js', 'comic-shell.js', 'comic-guide.js', 'comic-pages.css', 'proof-coach.js', 'score-list.js', 'reading-lesson.js']
@@ -344,6 +332,15 @@ def build_single_exe(work, output, lightweight=False):
     if component_hash != setup_constants['RUNTIME_SHA256']:
         raise RuntimeError('微软离线界面组件与已固定的版本校验不一致。')
     stage, snapshot = prepare(work, include_webview_installer=not lightweight)
+    # 固件镜像随程序一起冻结：现场只烧这一份，不再编译，也不需要外置「固件升级」文件夹。
+    firmware_source = HOST / 'assets' / 'firmware'
+    firmware_manifest = firmware_source / 'manifest.json'
+    if not firmware_manifest.is_file():
+        raise RuntimeError('缺少固件镜像：先跑 python tools/bundle_firmware.py，再打包')
+    firmware_meta = json.loads(firmware_manifest.read_text(encoding='utf-8'))
+    if len(firmware_meta.get('images') or []) != 4:
+        raise RuntimeError('固件镜像清单不完整')
+    shutil.copytree(firmware_source, stage / 'web' / 'firmware', dirs_exist_ok=True)
     legal = work / 'legal'
     legal.mkdir()
     copy_notices(legal, ('pyserial', 'pypdfium2', 'pypdf', 'Pillow', 'PyInstaller', 'pywebview', 'pythonnet', 'clr_loader', 'cffi', 'pycparser', 'proxy_tools', 'bottle', 'typing_extensions', 'qrcode', 'colorama'))
@@ -378,7 +375,10 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
                '--add-data', str(stage / 'web') + ';web', '--version-file', str(version_file),
                '--icon', str(stage / 'web' / 'assets' / 'app-icon.ico'),
                '--collect-all', 'pypdfium2', '--copy-metadata', 'pypdfium2', '--copy-metadata', 'pypdf',
-               '--exclude-module', 'fitz', '--exclude-module', 'pymupdf', '--exclude-module', 'esptool',
+               '--exclude-module', 'fitz', '--exclude-module', 'pymupdf',
+               # esptool 必须打进去：客户机上没有 Python / PlatformIO，
+               # 冻结后的程序自己就是烧录器的解释器（--esptool 透传）。
+               '--collect-submodules', 'esptool', '--hidden-import', 'esptool',
                '--hidden-import', 'score_converter_engine', '--hidden-import', 'webview.platforms.winforms',
                '--hidden-import', 'webview.platforms.edgechromium', '--hidden-import', 'clr',
                '--collect-data', 'webview', '--collect-data', 'pythonnet',
@@ -388,8 +388,10 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
         subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True)
     executable = work / 'dist' / 'PianoGloveSoftware.exe'
     self_report = work / 'frozen-self-test.json'
+    # 完整离线版要把 WebView2 组件和 esptool 都装进去，单文件解包 + 自检在慢机器上
+    # 可以超过 90 秒；超时会把已经打好的包判成失败，白等一轮。
     subprocess.run([str(executable), '--self-test', '--report', str(self_report)],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=90, check=True)
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300, check=True)
     runtime_test = json.loads(self_report.read_text(encoding='utf-8'))
     if not runtime_test.get('ok') or runtime_test.get('serial_opened'):
         raise RuntimeError('实际单文件EXE自检失败或不应打开串口。')
@@ -409,7 +411,15 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
                       component_exported=False,installation_performed=False),
                   web_files={p.relative_to(stage / 'web').as_posix():sha256(p)
                              for p in (stage / 'web').rglob('*') if p.is_file()},
-                  self_test=runtime_test,firmware_image_included=False,serial_opened=False,
+                  self_test=runtime_test,firmware_image_included=True,
+                  firmware_image=dict(version=firmware_meta.get('version'),
+                                      built_at=firmware_meta.get('built_at'),
+                                      files=[dict(name=row['name'], offset=row['offset'],
+                                                  bytes=row['bytes'], sha256=row['sha256'])
+                                             for row in firmware_meta['images']],
+                                      compiled_on_customer_machine=False,
+                                      external_folder_required=False),
+                  esptool_bundled=True,serial_opened=False,
                   os_tested=platform.platform(),other_windows_versions_tested=False,
                   proprietary_application_source_included=False,customer_sent=False)
     (work / 'single-exe-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')

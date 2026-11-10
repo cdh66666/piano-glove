@@ -12,6 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import bridge
 import firmware_flash as ff
 
+# 回读校验比对的是「程序里冻结的那一版镜像」，不再写死某个版本号。
+IMAGE_VERSION = ff.read_image()['version']
+
 
 class FirmwareTests(unittest.TestCase):
     def setUp(self):
@@ -59,7 +62,7 @@ class FirmwareTests(unittest.TestCase):
         finally:
             server.shutdown();server.server_close();thread.join()
 
-    def run_flash(self, mac='28:05:a5:c4:f1:88', fields='fw=PIANO_GLOVE_2 ver=2.2.4 armed=0', fail_verify=False):
+    def run_flash(self, mac='28:05:a5:c4:f1:88', fields='fw=PIANO_GLOVE_2 ver=%s armed=0' % IMAGE_VERSION, fail_verify=False):
         commands=[]
         self.f.update(written=False, hashVerified=False, verified=False, readback=None)
         with tempfile.TemporaryDirectory() as directory:
@@ -127,7 +130,7 @@ class FirmwareTests(unittest.TestCase):
         self.assertEqual(status['state'],'written_unverified');self.assertFalse(status['hashVerified'])
 
     def test_armed_readback_refused(self):
-        _,status=self.run_flash(fields='fw=PIANO_GLOVE_2 ver=2.2.4 armed=1')
+        _,status=self.run_flash(fields='fw=PIANO_GLOVE_2 ver=%s armed=1' % IMAGE_VERSION)
         self.assertFalse(status['verified'])
 
     def test_close_waits_for_reader(self):

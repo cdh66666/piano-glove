@@ -1202,11 +1202,18 @@ function metaKinds(buf){
     chip: document.querySelector("#cFingers").textContent,
     chipTitle: document.querySelector("#cFingers").title
   }));
-  check("默认：1 号=拇指按压（参与演奏）、2 号=拇指侧摆（不参与）",
-    role0.slots[0] === "拇指按压" && role0.slots[1] === "拇指侧摆" && role0.latch === 1,
+  /* ⚠️ 这里期望的是「1 号=侧摆、2 号=按压」——和本文件 5f 节初版写反了，是有原因的：
+     09-20 decbdef 初版把默认设成 [press, latch, …]（1 号按压），
+     10-01 cb168ed「Fix thumb press mapping」按实物改了默认：
+     手套上标着"按压"的那根舵机（1 号）物理上驱动的是**侧摆**，所以默认改成
+     [latch, press, …]，同时加 normalizeGloveRoles 把旧存档强制迁移。
+     那次只改了实现、忘了改这几条断言，于是从 10-01 起 e2e 一直红 5 条。
+     2026-11-09 核对 git 历史后把断言修到与实物一致（不是为了让测试变绿而改实现）。 */
+  check("默认：1 号=拇指侧摆（不参与演奏）、2 号=拇指按压（参与）",
+    role0.slots[0] === "拇指侧摆" && role0.slots[1] === "拇指按压" && role0.latch === 0,
     JSON.stringify(role0.slots) + " latch=" + role0.latch);
   check("参与演奏的槽位 = 拇指按压 + 四指（共 5 根）",
-    JSON.stringify(role0.play) === JSON.stringify([0,2,3,4,5]), JSON.stringify(role0.play));
+    JSON.stringify(role0.play) === JSON.stringify([1,2,3,4,5]), JSON.stringify(role0.play));
   check("顶栏写明参与演奏的手指数，且注明侧摆不演奏",
     role0.chip.includes("5") && role0.chipTitle.includes("拇指侧摆"), role0.chip);
 
@@ -1245,7 +1252,7 @@ function metaKinds(buf){
     savedLatch.pos === latchUi.pos && savedLatch.auto === true,
     JSON.stringify(savedLatch));
   check("存的是「槽位:位置」，不是光一个位置（对调角色后不会串到另一根轴上）",
-    String(savedLatch.raw).split(":").length === 2 && +String(savedLatch.raw).split(":")[0] === 1,
+    String(savedLatch.raw).split(":").length === 2 && +String(savedLatch.raw).split(":")[0] === 0,
     savedLatch.raw);
   check("演奏页那一行显示使能位，并写明不参与演奏",
     savedLatch.row.includes("使能位") && savedLatch.row.includes("不参与演奏"),
@@ -1303,9 +1310,9 @@ function metaKinds(buf){
     await wait(600);
     return { before, after, back: snap() };
   });
-  check("对调后：1 号变侧摆、2 号变按压，参与演奏的仍是 5 根",
-    swap.after.slots[0] === "拇指侧摆" && swap.after.slots[1] === "拇指按压" &&
-    JSON.stringify(swap.after.play) === JSON.stringify([1,2,3,4,5]),
+  check("对调后：1 号变按压、2 号变侧摆，参与演奏的仍是 5 根",
+    swap.after.slots[0] === "拇指按压" && swap.after.slots[1] === "拇指侧摆" &&
+    JSON.stringify(swap.after.play) === JSON.stringify([0,2,3,4,5]),
     JSON.stringify(swap.after.slots) + " " + JSON.stringify(swap.after.play));
   check("对调角色不清校准（校准按槽位存，与角色无关）",
     swap.after.cal === "1", "cal=" + swap.after.cal);
@@ -1313,8 +1320,8 @@ function metaKinds(buf){
     swap.after.latchPos === null && swap.before.latchPos !== null,
     "前 " + swap.before.latchPos + " → 后 " + swap.after.latchPos);
   check("再对调一次回到默认安排，使能位也回来",
-    swap.back.slots[0] === "拇指按压" && swap.back.latch === 1 &&
-    JSON.stringify(swap.back.play) === JSON.stringify([0,2,3,4,5]) &&
+    swap.back.slots[0] === "拇指侧摆" && swap.back.latch === 0 &&
+    JSON.stringify(swap.back.play) === JSON.stringify([1,2,3,4,5]) &&
     swap.back.latchPos === swap.before.latchPos,
     JSON.stringify(swap.back));
 
@@ -1615,10 +1622,16 @@ function metaKinds(buf){
                                 "--url", `socket://127.0.0.1:${FAKE_PORT}`],
                        { cwd: ROOT, stdio: "ignore" });
   const brErrors = [];
+  /* 只用于诊断：把 4xx/5xx 的 URL 抓出来，附在失败信息后面。
+     不参与判定（判定仍是 brErrors 是否为空），否则会变成"测试更严"而不是"程序更对"。
+     踩过：只有 "400 Bad Request" 这一句，根本不知道是哪条请求——排查全靠猜。 */
+  const brBadReqs = [];
   try{
     const bp = await browser.newPage({ viewport: { width: 430, height: 900 }, deviceScaleFactor: 2 });
     bp.on("pageerror", e => brErrors.push("pageerror: " + e.message));
     bp.on("console", m => { if(m.type() === "error") brErrors.push("console.error: " + m.text()); });
+    bp.on("response", r => { if(r.status() >= 400) brBadReqs.push(r.status() + " " + r.request().method() + " " + r.url()
+      + (r.request().postData() ? "  body=" + String(r.request().postData()).slice(0, 120) : "")); });
 
     // 不带 ?sim=1 —— 用户看到的就是这个
     await bp.goto(`http://127.0.0.1:${BRIDGE_PORT}/web_piano_glove.html`, { waitUntil: "load" });
@@ -1743,7 +1756,9 @@ function metaKinds(buf){
     check("点「重新扫描并连接」能恢复（自动重连开关被重新打开）",
       back.pageConn && back.bridgeConn && back.paused === false, JSON.stringify(back));
 
-    check("桥这一段没有 JS 报错", brErrors.length === 0, brErrors.slice(0, 3).join(" ; "));
+    check("桥这一段没有 JS 报错", brErrors.length === 0,
+      brErrors.slice(0, 3).join(" ; ")
+      + (brBadReqs.length ? " || HTTP: " + [...new Set(brBadReqs)].slice(0, 5).join(", ") : ""));
     await bp.close();
 
     /* ------------------------------------------------------------------

@@ -24,3 +24,14 @@
 |---|---|
 | [mobile-speed-20261022.png](mobile-speed-20261022.png) | 手机尺寸浏览器中的速度精调面板，处于待机；不是手机穿戴演奏验收。 |
 | [mobile-upload-20261022.png](mobile-upload-20261022.png) | 实际网页上传带原谱包到临时位置100，显示上传及原谱保存成功；回读核对后已删除该测试副本。 |
+
+2026-11-02 新增（漫画风改版，分支 `rewrite/comic-ui`）：
+
+| 文件 | 内容与范围 |
+|---|---|
+| [comic-home-20261102.png](comic-home-20261102.png) | 「开始」页与小音入门气泡。 |
+| [comic-training-20261102.png](comic-training-20261102.png) | 手指训练页，五指统一配色，待机中。 |
+| [comic-library-20261102.png](comic-library-20261102.png) | 曲库页与内置曲谱。 |
+| [comic-review-20261102.png](comic-review-20261102.png) | PDF 识谱校对：整行指法对照与放大镜，内置原谱「第6首」。 |
+
+以上 4 张由 `tools/dev/dev_preview.py` 在浏览器中按 1280×800 截取，界面与 EXE 同源；连接的是 `tools/dev/sim_glove.py` 模拟手套（顶栏显示 `socket://127.0.0.1`），不是实机运动截图。

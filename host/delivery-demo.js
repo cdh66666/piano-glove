@@ -182,24 +182,61 @@ async function recalibrateSlots(slots){if(root.deliveryDemoBusy()||!onlineReady|
 document.querySelectorAll('.demoSlotCalibrate').forEach(button=>{button.onclick=()=>recalibrateSlots([Number(button.dataset.calibrateSlot)]);});
 el('demoRepairIndex').onclick=()=>recalibrateSlots(calibration.state().samples.flatMap((v,i)=>v?.qualityRejected?[i]:[]));
 el('demoRepairCalibration').onclick=()=>recalibrateSlots(pendingRepairSlots);
-async function runCalibration(){const slotsToSave=repairQueue?[...repairQueue]:null;if(root.deliveryDemoBusy()||(root.pianoFirmwareBusy?.()||(root.pianoMountBusy?.()||root.pianoValidationBusy?.())))return;wizardActive=true;paint();const token=++wizardToken;const check=()=>{if(token!==wizardToken)throw Error('本轮已停止');};el('demoCalStart').disabled=false;el('demoCalStart').textContent='全部重新校准';try{const safeReply=await root.PianoDeliveryHooks.send('SAFE',1000,180);if(!safeReply.some(l=>/^OK SAFE /.test(l)))throw Error('停止未确认，请检查连接后继续');check();await prepareCalibrationOrigin(root.PianoDeliveryHooks,{resume:wizardStarted,repair:!!repairQueue});check();if(!wizardStarted){levelHistory.fill(null);calibration.reset();document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.remove('done','current');const badge=n.querySelector('.demoCycleCount');if(badge)badge.textContent='0/1';});wizardStep=0;wizardStarted=true;}for(const slot of (repairQueue||Array.from({length:6-Math.floor(wizardStep/2)},(_,i)=>i+Math.floor(wizardStep/2)))){check();wizardStep=slot*2;levelHistory[slot]=null;el('demoCalibrationGuide').textContent=names[slot]+(slot===0?'：完整往返一次，最后保持一端':'：按下再抬起，最后保持抬起');document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.toggle('done',!!calibration.state().samples[Number(n.dataset.slot)]?.range&&Number(n.dataset.slot)!==slot);n.classList.toggle('current',Number(n.dataset.slot)===slot);});await captureRepeated(()=>calibration.measureFast(slot),result=>calibration.commitRange(slot,result),{check,onRecording:persistRecording,onProgress:p=>{el('demoCalibrationProgress').textContent=p.phase==='prepare'?`正在记录活动 · ${p.cycles}/${p.requiredCycles||1} 次 · 实测 ${Math.round(p.hz||0)} Hz`:`第 ${slot+1}/6 步 · ${p.cycles}/${p.requiredCycles||1} 次 · ${p.phase==='direction'?'请抬起到舒适上端并保持':p.phase==='finish'?'保持不动，正在确认行程':p.phase==='back'?'抬起 → 再按下':'按下 → 抬起'} · 幅度 ${Math.round(p.measuredDegrees||0)}° / 需约 ${Math.round(p.requiredDegrees||0)}° · ${Math.round(p.hz||0)} Hz`;const card=document.querySelector(`#demoCalibrationSlots [data-slot="${slot}"] .demoCycleCount`);if(card)card.textContent=p.cycles+'/'+(p.requiredCycles||1);}});check();wizardStep=(slot+1)*2;if(repairQueue)repairQueue=repairQueue.filter(n=>n!==slot);paint();}el('demoCalibrationGuide').textContent='正在保存六槽校准…';await calibration.save({slots:slotsToSave});check();pendingRepairSlots=[];el('demoCalibrationGuide').textContent='校准已保存，可以开始练习';el('demoCalibrationProgress').textContent='点击右侧单指、组合或交替。';document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.add('done');n.classList.remove('current');});el('demoQuickSingle').focus();el('demoCalStart').textContent='全部重新校准';wizardStarted=false;repairQueue=null;}catch(e){el('demoCalibrationProgress').textContent=wizardStep>=12?'六根记录已保留，保存未完成：'+e.message:e.message;if(wizardStep>=12)el('demoCalibrationGuide').textContent='动作采集完成，等待保存';el('demoCalStart').textContent='全部重新校准';}finally{wizardActive=false;el('demoCalStart').disabled=false;paint();}};
+async function runCalibration(){const slotsToSave=repairQueue?[...repairQueue]:null;/* 忙碌时不要静默 return —— 调用方会以为校准开始了 */if(root.deliveryDemoBusy()||(root.pianoFirmwareBusy?.()||(root.pianoMountBusy?.()||root.pianoValidationBusy?.())))throw Error('还有任务没停下，请点右上角「停止」后再试');wizardActive=true;paint();const token=++wizardToken;const check=()=>{if(token!==wizardToken)throw Error('本轮已停止');};el('demoCalStart').disabled=false;el('demoCalStart').textContent='全部重新校准';try{/* 串口桥在断联时可能一直不回。不设上限的话，下面每一步都只能干等，
+     界面停在「正在停止动作…」不动 —— 又变成「点了没用」。 */
+ let guardTimer=null;
+ const safety=new Promise((resolve,reject)=>{guardTimer=setTimeout(()=>reject(Error('主控 5 秒没有回应：检查 USB 线是否插好，再点「再调一遍」')),5000);});
+ safety.catch(()=>{}); /* 正常路径下它会在 5 秒后 reject，先挂个 handler 免得报未处理异常 */
+ let safeReply;
+ try{safeReply=await Promise.race([root.PianoDeliveryHooks.send('SAFE',1000,180),safety]);}
+ finally{clearTimeout(guardTimer);}
+ if(!safeReply.some(l=>/^OK SAFE /.test(l)))throw Error('停止未确认，请检查连接后继续');check();
+ el('demoCalibrationProgress').textContent='已停止动作，正在确认主控状态…';
+ await prepareCalibrationOrigin(root.PianoDeliveryHooks,{resume:wizardStarted,repair:!!repairQueue});check();if(!wizardStarted){levelHistory.fill(null);calibration.reset();document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.remove('done','current');const badge=n.querySelector('.demoCycleCount');if(badge)badge.textContent='0/1';});wizardStep=0;wizardStarted=true;}for(const slot of (repairQueue||Array.from({length:6-Math.floor(wizardStep/2)},(_,i)=>i+Math.floor(wizardStep/2)))){check();wizardStep=slot*2;levelHistory[slot]=null;el('demoCalibrationGuide').textContent=names[slot]+(slot===0?'：完整往返一次，最后保持一端':'：按下再抬起，最后保持抬起');document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.toggle('done',!!calibration.state().samples[Number(n.dataset.slot)]?.range&&Number(n.dataset.slot)!==slot);n.classList.toggle('current',Number(n.dataset.slot)===slot);});await captureRepeated(()=>calibration.measureFast(slot),result=>calibration.commitRange(slot,result),{check,onRecording:persistRecording,onProgress:p=>{el('demoCalibrationProgress').textContent=p.phase==='prepare'?`正在记录活动 · ${p.cycles}/${p.requiredCycles||1} 次 · 实测 ${Math.round(p.hz||0)} Hz`:`第 ${slot+1}/6 步 · ${p.cycles}/${p.requiredCycles||1} 次 · ${p.phase==='direction'?'请抬起到舒适上端并保持':p.phase==='finish'?'保持不动，正在确认行程':p.phase==='back'?'抬起 → 再按下':'按下 → 抬起'} · 幅度 ${Math.round(p.measuredDegrees||0)}° / 需约 ${Math.round(p.requiredDegrees||0)}° · ${Math.round(p.hz||0)} Hz`;const card=document.querySelector(`#demoCalibrationSlots [data-slot="${slot}"] .demoCycleCount`);if(card)card.textContent=p.cycles+'/'+(p.requiredCycles||1);}});check();wizardStep=(slot+1)*2;if(repairQueue)repairQueue=repairQueue.filter(n=>n!==slot);paint();}el('demoCalibrationGuide').textContent='正在保存六槽校准…';await calibration.save({slots:slotsToSave});check();pendingRepairSlots=[];el('demoCalibrationGuide').textContent='校准已保存，可以开始练习';el('demoCalibrationProgress').textContent='点击右侧单指、组合或交替。';document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.add('done');n.classList.remove('current');});el('demoQuickSingle').focus();el('demoCalStart').textContent='全部重新校准';wizardStarted=false;repairQueue=null;}catch(e){el('demoCalibrationProgress').textContent=wizardStep>=12?'六根记录已保留，保存未完成：'+e.message:e.message;if(wizardStep>=12)el('demoCalibrationGuide').textContent='动作采集完成，等待保存';el('demoCalStart').textContent='全部重新校准';}finally{wizardActive=false;el('demoCalStart').disabled=false;paint();}};
 
 el('demoCalStart').onclick=async()=>{
- /* 11-05 用户：「再调一遍」点了没反应——原来不能调时直接返回、一个字不说。现在说清楚为什么 */
- const why=restartPending?'':playing?'手套正在弹，先点右上角「停止」。':(enrollActive||enrollStarting)?'舵机还没通电（或正在编号）。先打开舵机电源，等 6 个舵机都亮起来再调。':root.pianoFirmwareBusy?.()?'正在更新固件，等它做完。':root.pianoMountBusy?.()?'正在装舵机臂，先做完或停止。':root.pianoValidationBusy?.()?'正在测试动作，先停止。':'';
- if(why){root.AppConfirm?root.AppConfirm(why,{ok:'知道了',cancel:'关闭'}):null;return;}
- if(restartPending)return;
+ /* 11-05 用户：「再调一遍」点了没反应——不能调时直接返回、一个字不说。
+    11-09 又碰到一次（客户版）：上一轮校准卡在没应答的串口请求上时，这里会
+    `await wizardRun` 等一个永不结束的 promise，同时 restartPending 一直是 true，
+    之后每次点击都在下面静默 return —— 按钮从此彻底失效，只能重启软件。
+    所以：① 每条不开始的路径都要说话；② 等旧轮次必须带超时；③ 卡死就强制释放。 */
+ const progress=el('demoCalibrationProgress'),guide=el('demoCalibrationGuide');
+ const say=text=>{if(progress)progress.textContent=text;};
+ const why=playing?'手套正在弹，先点右上角「停止」。':(enrollActive||enrollStarting)?'舵机还没通电（或正在编号）。先打开舵机电源，等 6 个舵机都亮起来再调。':root.pianoFirmwareBusy?.()?'正在更新固件，等它做完。':root.pianoMountBusy?.()?'正在装舵机臂，先做完或停止。':root.pianoValidationBusy?.()?'正在测试动作，先停止。':'';
+ if(why){if(root.AppConfirm)root.AppConfirm(why,{ok:'知道了',cancel:'关闭'});else say(why);return;}
+ if(restartPending){say('正在重新开始，请等上一轮退出…');return;}
  restartPending=true;
+ /* 点击的瞬间就要有变化。之前这里先清状态、再发 SAFE，SAFE 没回话时
+    整整几秒界面一个字都不动 —— 用户看到的就是「点了没用」。 */
+ say('正在停止动作、解除使能…');
+ let started=false;
  try{
-  if(wizardRun){wizardToken++;calibration.cancel();await wizardRun;}
+  if(wizardRun){
+   wizardToken++;calibration.cancel();
+   const settled=await Promise.race([Promise.resolve(wizardRun).then(()=>true,()=>true),
+                                     new Promise(resolve=>setTimeout(()=>resolve(false),4000))]);
+   wizardRun=null;
+   if(!settled){/* 旧轮次没按约定退出：强行摘掉它的独占标志，否则新一轮会被自己挡住 */
+    wizardActive=false;say('上一轮没有正常结束，已强制停止。');}
+  }
   wizardStarted=false;wizardStep=0;repairQueue=null;pendingRepairSlots=[];
   calibration.reset();levelHistory.fill(null);forceCalibration=true;
   document.querySelectorAll('.demoCalSlot').forEach(n=>{n.classList.remove('done','current','outside');n.querySelector('.demoCycleCount').textContent='0/1';n.querySelector('.demoDelta').textContent='等待新记录';for(const key of ['--sweep-height','--wrap-height'])n.style.setProperty(key,'0%');});
-  el('demoCalibrationGuide').textContent='从第一台开始重新校准';
-  el('demoCalibrationProgress').textContent='本轮进度已清空';
-  paint();wizardRun=runCalibration();
- }finally{restartPending=false;}
- await wizardRun;
+  if(guide)guide.textContent='从第一台开始重新校准';
+  say('本轮进度已清空');
+  paint();
+  /* runCalibration 自己在忙时只会 return（静默），先在这里把话说清楚，别让它空转 */
+  if(root.deliveryDemoBusy?.()){
+   say('还有动作没停下（'+((calibration.state().busy?'校准正在处理':'动作进行中'))+'），请点右上角「停止」后再点这里。');
+   return;
+  }
+  started=true;wizardRun=runCalibration();
+  /* 这里**不能** await：一 await，restartPending 就会在整轮校准（可能几分钟）里一直是 true，
+     用户中途想重来只会看到「正在重新开始…」，跟按钮坏了一样。
+     锁只需要盖住「停旧轮 + 清状态 + 起新轮」这一小段。 */
+  wizardRun.catch(e=>say('重新校准没有开始：'+(e&&e.message?e.message:e)));
+ }catch(e){say('重新校准没有开始：'+(e&&e.message?e.message:e));}
+ finally{if(!started)wizardRun=null;restartPending=false;}
 };
 
 for(const [id,kind] of [['demoQuickSingle','single'],['demoQuickTogether','together'],['demoQuickAlternate','alternate']])el(id).onclick=()=>{return play(servoDemoPlan(kind));};

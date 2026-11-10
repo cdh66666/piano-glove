@@ -135,11 +135,21 @@ def self_test():
         catalog.read(entry['id'])
         if entry.get('source_kind') == 'manual':
             catalog.project(entry['id'])
+    # 固件镜像必须能被真实读到并校验通过。r30 出过「自检全绿、点更新却提示
+    # 镜像不可用」的事故，根因是打包把 firmware_flash 换成了禁用桩，
+    # 而自检只查网页资源。这里把镜像校验纳入自检，避免同类问题再次流到客户机。
+    import firmware_flash
+    try:
+        firmware = firmware_flash.read_image()
+    except Exception as error:
+        raise RuntimeError('内置固件镜像不可用：' + str(error)) from error
     output = dict(ok=True, build_date=BUILD_DATE, python=sys.version.split()[0],
                   serial_version=serial.__version__, pdfium_version=importlib.metadata.version('pypdfium2'),
                   pypdf_version=importlib.metadata.version('pypdf'),
                   assets=len(required), pgl_roundtrip=True, pdf_pipeline=True,
                   pdf_preview_png=True, driver_helper=True, driver_diagnostics=driver['state'], serial_opened=False,
+                  firmware_image_version=firmware['version'], firmware_images=len(firmware['images']),
+                  firmware_esptool=bool(firmware_flash.esptool_command()),
                   **catalog_source_counts(bundled), manual_pdf_holdouts=len(catalog.manifest['holdout_ids']))
     print(json.dumps(output, ensure_ascii=False))
     return output
