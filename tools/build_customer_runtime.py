@@ -408,6 +408,9 @@ StringStruct('ProductVersion','2026.11.1.1')])]),VarFileInfo([VarStruct('Transla
                '--icon', str(stage / 'web' / 'assets' / 'app-icon.ico'),
                '--collect-all', 'pypdfium2', '--copy-metadata', 'pypdfium2', '--copy-metadata', 'pypdf',
                '--exclude-module', 'fitz', '--exclude-module', 'pymupdf',
+               # 11-09：程序没用到、却被连带打进来的库（jedi 一个就 5500 多个文件），去掉后包小、第一次打开解压快
+               '--exclude-module', 'jedi', '--exclude-module', 'parso', '--exclude-module', 'matplotlib',
+               '--exclude-module', 'numpy', '--exclude-module', 'lxml', '--exclude-module', 'IPython',
                # esptool 必须打进去：客户机上没有 Python / PlatformIO，
                # 冻结后的程序自己就是烧录器的解释器（--esptool 透传）。
                '--collect-submodules', 'esptool', '--hidden-import', 'esptool',

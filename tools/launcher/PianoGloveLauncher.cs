@@ -36,6 +36,7 @@ static class PianoGloveLauncher
                 string error = ExtractWithProgress(root, target, marker);
                 if (error != null)
                 {
+                    if (Environment.GetEnvironmentVariable("PIANO_GLOVE_SILENT_PREPARE") == "1") { Console.Error.WriteLine(error); return 2; }
                     MessageBox.Show("钢琴手套没能准备好：" + error + "\n\n请确认 C 盘还有 1 GB 以上空间后再打开。", "钢琴手套", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 2;
                 }
@@ -109,23 +110,36 @@ static class PianoGloveLauncher
             if (Directory.Exists(temp)) Directory.Delete(temp, true);
             if (Directory.Exists(target)) Directory.Delete(target, true);
             Directory.CreateDirectory(temp);
-            using (var slice = new SubStream(file, start, length))
-            using (var zip = new ZipArchive(slice, ZipArchiveMode.Read))
+            // 先把压缩包整段顺序拷出来（大缓冲，几百毫秒），再用普通文件解压。
+            // 直接在 exe 中间“开窗”读会每小块都重新定位，慢几十倍（实测 10 分钟才 25 MB）。
+            string zipPath = target + ".zip";
+            using (var zipOut = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
             {
-                long total = 0, done = 0;
-                foreach (var entry in zip.Entries) total += entry.Length;
-                string tempFull = Path.GetFullPath(temp) + Path.DirectorySeparatorChar;
-                foreach (var entry in zip.Entries)
+                file.Seek(start, SeekOrigin.Begin);
+                var buffer = new byte[1 << 20]; long left = length;
+                while (left > 0) { int n = file.Read(buffer, 0, (int)Math.Min(buffer.Length, left)); if (n <= 0) throw new EndOfStreamException(); zipOut.Write(buffer, 0, n); left -= n; }
+            }
+            try
+            {
+                using (var zip = ZipFile.OpenRead(zipPath))
                 {
-                    string path = Path.GetFullPath(Path.Combine(temp, entry.FullName));
-                    if (!path.StartsWith(tempFull, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("程序包内路径不正确");
-                    if (entry.FullName.EndsWith("/")) { Directory.CreateDirectory(path); continue; }
-                    Directory.CreateDirectory(Path.GetDirectoryName(path));
-                    entry.ExtractToFile(path, true);
-                    done += entry.Length;
-                    if (total > 0) progress((double)done / total);
+                    long total = 0, done = 0;
+                    foreach (var entry in zip.Entries) total += entry.Length;
+                    string tempFull = Path.GetFullPath(temp) + Path.DirectorySeparatorChar;
+                    int count = 0;
+                    foreach (var entry in zip.Entries)
+                    {
+                        string path = Path.GetFullPath(Path.Combine(temp, entry.FullName));
+                        if (!path.StartsWith(tempFull, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("程序包内路径不正确");
+                        if (entry.FullName.EndsWith("/")) { Directory.CreateDirectory(path); continue; }
+                        Directory.CreateDirectory(Path.GetDirectoryName(path));
+                        entry.ExtractToFile(path, true);
+                        done += entry.Length;
+                        if (total > 0 && (++count % 50 == 0)) progress((double)done / total);
+                    }
                 }
             }
+            finally { try { File.Delete(zipPath); } catch { } }
             Directory.Move(temp, target);
             File.WriteAllText(marker, Version);
         }
