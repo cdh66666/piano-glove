@@ -1,29 +1,39 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>钢琴手套</title>
 <style>
-body{margin:0;padding:16px;background:#1e1a2e;color:#fff;font:18px/1.45 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-.step{margin:0 0 14px;padding:16px;border-radius:18px;background:#fff;color:#1e1a2e}
-.no{display:inline-grid;place-items:center;width:34px;height:34px;margin-right:10px;border-radius:50%;background:#1e1a2e;color:#ffd23f;font-weight:900;vertical-align:middle}
-.big{font-size:24px;font-weight:900;vertical-align:middle}
-.hot{background:#ffd23f;animation:glow 1.2s ease-in-out infinite alternate}
-@keyframes glow{from{box-shadow:0 0 0 0 #ffd23f}to{box-shadow:0 0 0 8px #ffd23f66}}
-.small{display:block;margin-top:6px;font-size:15px;color:#4a4458}
-.btn{display:block;margin-top:12px;padding:18px;border-radius:16px;background:#ff5a36;color:#fff;font:inherit;font-size:22px;font-weight:900;text-align:center;text-decoration:none;border:0;width:100%;box-sizing:border-box}
-.foot{margin-top:6px;font-size:15px;color:#cfc9dc}.foot a{color:#ffd23f}[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:#f5efe4;color:#23212b;font:17px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:16px 20px;background:#23212b;color:#fff;font-size:20px;font-weight:900}
+header svg{width:30px;height:30px}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px;padding:22px 20px 12px}
+.step{position:relative;display:flex;align-items:center;gap:14px;padding:16px;border:2.5px solid #23212b;border-radius:18px;background:#fff;box-shadow:4px 4px 0 #23212b}
+.step .no{position:absolute;top:-13px;left:14px;width:26px;height:26px;border-radius:50%;background:#23212b;color:#ffd23f;font-size:15px;font-weight:900;display:grid;place-items:center}
+.ico{flex:none;width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:#fde9e4}
+.ico svg{width:32px;height:32px}
+.txt b{display:block;font-size:20px}.txt small{color:#6b6578;font-size:14px}
+.go{background:#fff7d6}
+.btn{display:block;width:100%;margin-top:4px;padding:18px;border:2.5px solid #23212b;border-radius:16px;background:#ff5a36;color:#fff;font:inherit;font-size:21px;font-weight:900;text-align:center;text-decoration:none;box-shadow:4px 4px 0 #23212b}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 #23212b}
+.wrap{display:flex;flex-direction:column;gap:28px;width:100%}.step .wrap{gap:8px}
+footer{padding:14px 20px 22px;text-align:center;color:#6b6578;font-size:14px}footer b{color:#23212b}footer a{color:#d9480f;font-weight:700}
+[hidden]{display:none!important}
 </style></head><body>
-<div id="android" hidden>
- <div class="step hot"><span class="no">1</span><span class="big">点这个按钮</span><a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></div>
- <p class="foot" id="slow" hidden>手机还在检测网络，稍等几秒再点</p>
- <p class="foot">小窗自己关了：直接打开浏览器输入 <b>192.168.4.1</b><br>还打不开：关掉「移动数据」再试</p>
+<header><svg viewBox="0 0 32 32" fill="none" stroke="#ffd23f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17V8a2 2 0 0 1 4 0v7M13 14V6a2 2 0 0 1 4 0v8M17 14V7a2 2 0 0 1 4 0v9M21 15v-4a2 2 0 0 1 4 0v8c0 5-3 9-9 9s-8-3-10-7l-2-5a2 2 0 0 1 3.5-2L9 18"/></svg>钢琴手套</header>
+<main>
+<div id="android" class="wrap" hidden>
+ <div class="step"><span class="no">1</span><span class="ico"><svg viewBox="0 0 32 32" fill="none" stroke="#d9480f" stroke-width="2.6" stroke-linecap="round"><path d="M8 24v-3M13 24v-7M18 24v-11M23 24V8"/><path d="M5 5l22 22" stroke="#23212b"/></svg></span><span class="txt"><b>关掉「移动数据」</b><small>下拉通知栏关；用完再开</small></span></div>
+ <div class="step go"><span class="no">2</span><div class="wrap"><a id="open" class="btn" href="http://192.168.4.1/">打开控制页</a></div></div>
+ <p id="slow" class="txt" hidden><small>手机还在检测网络，稍等几秒</small></p>
 </div>
-<div id="ios" hidden>
- <div class="step hot"><span class="no">1</span><span class="big">点「复制」</span><button class="btn copy" type="button">复制网址</button></div>
- <div class="step"><span class="no">2</span><span class="big">点右上角「完成」</span></div>
- <div class="step"><span class="no">3</span><span class="big">打开 Safari，粘贴</span></div>
+<div id="ios" class="wrap" hidden>
+ <div class="step"><span class="no">1</span><div class="wrap"><button class="btn copy" type="button">复制网址</button></div></div>
+ <div class="step"><span class="no">2</span><span class="ico"><svg viewBox="0 0 32 32" fill="none" stroke="#d9480f" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l6 6L25 9"/></svg></span><span class="txt"><b>点右上角「完成」</b></span></div>
+ <div class="step"><span class="no">3</span><span class="ico"><svg viewBox="0 0 32 32" fill="none" stroke="#d9480f" stroke-width="2.4"><circle cx="16" cy="16" r="11"/><path d="M21 11l-3 7-7 3 3-7z" stroke-linejoin="round"/></svg></span><span class="txt"><b>打开 Safari，粘贴</b></span></div>
 </div>
-<div id="other" hidden>
- <div class="step hot"><span class="no">1</span><span class="big">浏览器打开 192.168.4.1</span><button class="btn copy" type="button">复制网址</button></div>
+<div id="other" class="wrap" hidden>
+ <div class="step"><span class="no">1</span><div class="wrap"><button class="btn copy" type="button">复制网址</button><span class="txt"><small>在浏览器里粘贴打开</small></span></div></div>
 </div>
-<p class="foot" id="in-browser">已经在浏览器里？<a href="http://192.168.4.1/">进控制页</a></p>
+</main>
+<footer>打不开？在浏览器输入 <b>192.168.4.1</b><span id="in-browser"> · <a href="http://192.168.4.1/">进控制页</a></span></footer>
 <script>
 (function(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua),$=function(i){return document.getElementById(i)},mini=(android&&/; wv\)/.test(ua))||(ios&&!/Safari\//.test(ua));
 $(ios?'ios':android?'android':'other').hidden=false;if(mini)$('in-browser').hidden=true;
@@ -34,11 +44,12 @@ if(ios&&!/ok=1/.test(location.search))pass().then(function(){setTimeout(function
 if(android){var intent='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
  // 11-11 荣耀实测：点完马上跳，手机还没重新检测联网，浏览器仍走流量一直转圈。先让手机重测，等手套答过“已联网”再跳
  var go=function(){$('open').textContent='正在打开浏览器…';location.href=intent;};
- function wait(n){fetch('/portal/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(st){if(st.online){setTimeout(go,800);}else if(n>0){setTimeout(function(){wait(n-1);},500);}else{$('open').textContent='再点一次';$('slow').hidden=false;}}).catch(function(){if(n>0)setTimeout(function(){wait(n-1);},500);});}
- if(/ok=1/.test(location.search)){$('open').textContent='正在切到手套 Wi-Fi…';wait(30);}
+ function wait(n){fetch('/portal/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(st){if(st.online){setTimeout(go,800);}else if(n>0){setTimeout(function(){wait(n-1);},500);}else{go();}}).catch(function(){if(n>0)setTimeout(function(){wait(n-1);},500);else go();});}
+ if(/ok=1/.test(location.search)){$('open').textContent='正在切到手套 Wi-Fi…';wait(12);}
  $('open').onclick=function(e){e.preventDefault();$('open').textContent='正在切到手套 Wi-Fi…';pass().then(function(){setTimeout(function(){location.replace('/help?ok=1');},300);});};}
 [].forEach.call(document.querySelectorAll('.copy'),function(b){b.onclick=function(){pass();var t='http://192.168.4.1',ok=function(){b.textContent='已复制 ✓';};
  function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按复制：192.168.4.1';}a.remove();}
  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,fallback);else fallback();};});
 })();
 </script></body></html>
+
