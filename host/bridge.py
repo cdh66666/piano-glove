@@ -1177,6 +1177,13 @@ class SoftwareConsole:
                 self.state()
                 if self.controller_id is not None:
                     raise RuntimeError('controller_mismatch')
+            # 11-11：上传中途没收尾时，这里以前会永远拒绝所有动作（只能重开软件）。超过 30 秒没动静就自动取消
+            if self.upload_session is not None and action not in ('stop','keep') and time.monotonic() - self.upload_session['updated'] > 30:
+                try:
+                    self.command('LIB ABORT')
+                except Exception:
+                    pass
+                self.upload_session = None
             if self.upload_session is not None and action not in ('stop','keep'):
                 raise RuntimeError('upload_active_finish_or_abort_first')
             if action == 'delete':
