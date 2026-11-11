@@ -3,21 +3,21 @@
 'use strict';
 const valid = value => typeof value==='number' && Number.isFinite(value);
 class DeviceClock {
-  constructor(){this.state=null;this.anchor=0;this.rtt=0;this.minRtt=Infinity;}
-  // 11-11 用户：手机上音符进度一抖一抖。Wi-Fi 每次来回时间忽长忽短，按单次中点对时会前后跳几十到几百毫秒。
-  // 改成：小偏差慢慢追（来回快的读数追得快、慢的追得少），进度不往回退；开始/跳转/暂停等大变化才直接对齐。
+  constructor(){this.state=null;this.anchor=0;this.rtt=0;this.smooth=null;}
+  // 11-11 用户：手机上音符进度一抖一抖，要很稳。Wi-Fi 每次来回时间忽长忽短，按单次读数对时会前后跳。
+  // 改成：画面时钟一直匀速走；和手套读数有偏差时只把快慢调 ±8%，约 1.5 秒内追平，不跳、不退。
+  // 开始、跳转、暂停、改速度等大变化（偏差 > 600 ms）才直接对齐。
   sync(state,began,ended){
-    const rtt=Math.max(0,ended-began),prevState=this.state,running=s=>!!(s&&s.active&&!s.initializing&&!s.clock_paused);
-    this.minRtt=Math.min(rtt,Number.isFinite(this.minRtt)?this.minRtt*1.02+1:rtt);
+    const prevState=this.state,running=s=>!!(s&&s.active&&!s.initializing&&!s.clock_paused);
     const prev=prevState?this.position(ended):null;
-    this.state={...state};this.anchor=(began+ended)/2;this.rtt=rtt;
-    if(prev===null||!running(prevState)||!running(this.state)||Number(prevState.tempo)!==Number(this.state.tempo))return;
-    const raw=this.position(ended),diff=raw-prev;
-    if(Math.abs(diff)>600)return;
-    const k=rtt<=this.minRtt*1.5+20?0.35:0.08,target=Math.max(prev,prev+diff*k);
-    this.state.elapsed_ms=target;this.anchor=ended;
+    this.state={...state};this.anchor=(began+ended)/2;this.rtt=Math.max(0,ended-began);
+    const raw=this.rawPosition(ended);
+    if(prev===null||!running(prevState)||!running(this.state)||Number(prevState.tempo)!==Number(this.state.tempo)||Math.abs(raw-prev)>600){this.smooth=null;return;}
+    const err=raw-prev,adj=Math.min(1.08,Math.max(0.92,1+err/(1500*this.rate)));
+    this.smooth={at:ended,pos:prev,adj};
   }
-  position(now){const s=this.state;if(!s)return 0;let ms=Number(s.elapsed_ms)||0;if(s.active&&!s.initializing&&!s.clock_paused)ms+=Math.max(0,now-this.anchor)*this.rate;return Math.min(Math.max(0,ms),this.limit);}
+  rawPosition(now){const s=this.state;if(!s)return 0;let ms=Number(s.elapsed_ms)||0;if(s.active&&!s.initializing&&!s.clock_paused)ms+=Math.max(0,now-this.anchor)*this.rate;return Math.min(Math.max(0,ms),this.limit);}
+  position(now){const s=this.state;if(!s)return 0;const m=this.smooth;if(m&&s.active&&!s.initializing&&!s.clock_paused)return Math.min(Math.max(0,m.pos+Math.max(0,now-m.at)*this.rate*m.adj),this.limit);return this.rawPosition(now);}
   get rate(){return Math.max(.01,Number(this.state?.tempo)||100)/100;}
   get paused(){return !this.state?.active||!!this.state.initializing||!!this.state.clock_paused;}
   get limit(){const value=this.state?.clock_limit_ms;return valid(value)&&value>=0?Math.max(-.001,value-.001):Infinity;}
