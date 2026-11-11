@@ -193,7 +193,7 @@ def _review_edits_only(review):
 
 
 # 11-10 用户：程序名后面要带版本号（文件名 钢琴手套_V1.0.exe、窗口标题都显示），每次发新版加一
-APP_VERSION = 'V2.1'
+APP_VERSION = 'V2.2'
 
 class DesktopAPI(NativeAPI):
     def __init__(self, session):
@@ -544,7 +544,7 @@ class DesktopAPI(NativeAPI):
                 state['percent'] = max(state['percent'], int(st.get('progress') or 0))
                 stage = str(st.get('phase') or st.get('state') or '')
                 if stage and stage != last:
-                    state['text'] = '正在升级：' + stage
+                    state['text'] = '正在升级：' + {'queued':'准备','stop':'松开舵机','build':'准备固件','identify':'核对手套','write':'写入','verify':'验证','readback':'确认','complete':'完成'}.get(stage, stage)
                     last = stage
                 if st.get('verified'):
                     state.update(state='done', percent=100, text='更新好了')
@@ -600,7 +600,7 @@ class DesktopAPI(NativeAPI):
                     if 'percent' in event:
                         state['percent'] = max(state['percent'], int(event['percent']))
                     if event.get('stage'):
-                        state['text'] = '正在升级：' + str(event['stage'])
+                        state['text'] = '正在升级：' + {'queued':'准备','stop':'松开舵机','build':'准备固件','identify':'核对手套','write':'写入','verify':'验证','readback':'确认','complete':'完成'}.get(str(event['stage']), str(event['stage']))
                     if event.get('error'):
                         state.update(state='error', text=str(event['error']))
                     if event.get('done'):

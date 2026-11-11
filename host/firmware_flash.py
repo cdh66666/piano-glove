@@ -221,10 +221,12 @@ class FirmwareManager:
                              name='pg-firmware', daemon=True).start()
         return self.status()
 
-    def run(self, args, timeout=240):
+    def run(self, args, timeout=240, on_line=None):
         # No shell, no caller-provided flags; CREATE_NO_WINDOW prevents console flashes.
+        # 子进程输出要不带缓冲，否则进度攒成一大块才到（写入停在一个数很久再突然跳到验证）
         proc = subprocess.Popen([str(a) for a in args], stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, encoding='utf-8', errors='replace',
+                                env=dict(os.environ, PYTHONUNBUFFERED='1'),
                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         lines = deque(maxlen=250)
         timed_out = threading.Event()
@@ -234,11 +236,31 @@ class FirmwareManager:
         timer = threading.Timer(timeout, kill)
         timer.start()
         try:
-            for line in proc.stdout:
-                line = line.strip()
-                if line:
+            # 11-11 用户：写入时进度一直不动，突然跳到“验证”。esptool 用回车 \r 在同一行里刷新百分比，
+            # 按换行读要等整个文件写完才收到；所以 \r 和换行都当一行。
+            buffer = []
+            def emit():
+                line = ''.join(buffer).strip()
+                buffer.clear()
+                if not line:
+                    return
+                if on_line is not None:
+                    try:
+                        on_line(line)
+                    except Exception:
+                        pass
+                if not re.search(r'\d%\s+\d+/\d+ bytes', line) or line.endswith('100.0%') or ' 100.0% ' in line:
                     self.log(line)
-                    lines.append(line)
+                lines.append(line)
+            while True:
+                ch = proc.stdout.read(1)
+                if not ch:
+                    break
+                if ch in '\r\n':
+                    emit()
+                else:
+                    buffer.append(ch)
+            emit()
             result = proc.wait()
             if timed_out.is_set() or result:
                 raise RuntimeError('工具超时' if timed_out.is_set() else '工具失败，退出码 %s' % result)
@@ -316,7 +338,33 @@ class FirmwareManager:
                     hashes[source.name] = hashlib.sha256(target.read_bytes()).hexdigest()
                     args += [hex(offset), target]
                 self.update(phase='write', progress=45, hashes=hashes)
-                self.run(base + ['write_flash', '--flash_mode', 'keep', '--flash_freq', 'keep', '--flash_size', 'keep'] + args, 150)
+                # esptool 的输出不接屏幕时，写程序本体只报 0% 和一次 2.6%，之后 20~30 秒一声不吭。
+                # 按“压缩后字节数 ÷ 实测速度”估算总用时，每半秒按时间推进；真报了百分比就按真的走。
+                baud = next((int(base[i + 1]) for i in range(len(base) - 1) if str(base[i]) in ('--baud', '-b')), 230400)
+                timing = dict(start=None, expected=None, real=0.0, done=False)
+                def write_progress(line):
+                    c = re.search(r'Compressed (\d+) bytes to (\d+)', line)
+                    if c and int(c.group(1)) > 100000:
+                        timing.update(start=time.monotonic(), expected=max(3.0, int(c.group(2)) / (22000.0 * baud / 230400)))
+                    m = re.search(r'Writing at 0x([0-9a-fA-F]+).*?(\d+(?:\.\d+)?)%\s+(\d+)/(\d+) bytes', line)
+                    if m and timing['start'] is not None and int(m.group(4)) > 100000:
+                        timing['real'] = max(timing['real'], float(m.group(2)) / 100)
+                    if re.search(r'Wrote \d+ bytes .* at 0x0*10000', line):
+                        timing['done'] = True
+                def ticker():
+                    while not timing['done']:
+                        time.sleep(0.5)
+                        if timing['start'] is None:
+                            continue
+                        guess = min(0.97, (time.monotonic() - timing['start']) / timing['expected'])
+                        self.update(phase='write', progress=45 + min(29, int(max(guess, timing['real']) * 29)))
+                tick = threading.Thread(target=ticker, daemon=True)
+                tick.start()
+                try:
+                    self.run(base + ['write_flash', '--flash_mode', 'keep', '--flash_freq', 'keep', '--flash_size', 'keep'] + args, 150,
+                             on_line=write_progress)
+                finally:
+                    timing['done'] = True
                 self.update(written=True, phase='verify', progress=75)
                 self.run(base + ['verify_flash'] + args, 150)
                 self.update(hashVerified=True, phase='readback', progress=90)
