@@ -87,12 +87,17 @@ static String lastStopReason="none";
 static uint32_t lastStopAt=0,lastPrepareMs=0,lastPoseMs=0;
 static void recordStop(const String&reason){lastStopReason=reason;lastStopAt=millis();emitUsbDiagnostic(String("LIB_STOP reason=")+reason+" owner="+owner+" slot="+String(currentSlot)+" mask="+String(unsigned(mask)));}
 static String path(int slot){return String("/s")+slot+".pgc";}
+// 11-11 用户：换电脑播放提示“导入完整琴声”。完整琴声（左右手所有音）原来只存在送曲子的那台电脑上；
+// 现在随曲子一起存进手套：/sN.pga，电脑压缩好的数据原样存取，手套不解析。
+static String audioPath(int slot){return String("/s")+slot+".pga";}
+static const uint32_t AUDIO_MAX_BYTES=131072;
+static bool uploadAudio=false;
 static String escape(String s){String out;out.reserve(s.length()+8);for(size_t i=0;i<s.length();++i){uint8_t c=s[i];if(c<32){char value[7];snprintf(value,sizeof(value),"\\u%04x",c);out+=value;}else if(c=='"'||c=='\\'){out+='\\';out+=char(c);}else out+=char(c);}return out;}
 static bool validSlot(int s){return s>=1&&s<=100;}
 static String requestController(const char*who){if(strcmp(who,"wifi"))return "";return web.hasHeader("X-Piano-Controller")?web.header("X-Piano-Controller"):web.arg("controller");}
 static bool validController(const char*who){String token=requestController(who);if(!librarycontroller::validToken(token.c_str(),token.length())){failure="controller_token_invalid";return false;}return true;}
 static bool motionOwnerMatches(const char*who){if(!validController(who))return false;String token=requestController(who);if(!librarycontroller::matches(running,owner==who,controller.c_str(),controller.length(),token.c_str(),token.length())){failure="controller_mismatch";return false;}return true;}
-static void abortUpload(){if(incoming)incoming.close();SPIFFS.remove("/upload.tmp");uploadSlot=0;expectedBytes=received=0;uploadOwner="none";uploadController="";}
+static void abortUpload(){if(incoming)incoming.close();SPIFFS.remove("/upload.tmp");uploadSlot=0;uploadAudio=false;expectedBytes=received=0;uploadOwner="none";uploadController="";}
 static bool ownerMatches(const char*who){if(!validController(who))return false;if(incoming||uploadSlot){if(uploadOwner!=who){failure="upload_owned_by_other_transport";return false;}if(uploadController!=requestController(who)){failure="controller_mismatch";return false;}}return true;}
 static bool startUpload(int slot,uint32_t bytes,const char*who){
  if(!ready){failure="storage_not_ready";return false;}
@@ -104,6 +109,18 @@ static bool startUpload(int slot,uint32_t bytes,const char*who){
  if(librarystorage::stagingSpace(bytes)>free){failure="storage_full";return false;}
  incoming=SPIFFS.open("/upload.tmp",FILE_WRITE);if(!incoming){failure="open_failed";return false;}
  uploadSlot=slot;expectedBytes=bytes;uploadOwner=who;uploadController=requestController(who);uploadLast=millis();failure="none";return true;
+}
+static bool startAudioUpload(int slot,uint32_t bytes,const char*who){
+ if(!ready){failure="storage_not_ready";return false;}
+ if(running){failure="motion_busy";return false;}
+ if(!validSlot(slot)){failure="slot_out_of_range";return false;}
+ if(!meta[slot].valid){failure="score_missing_or_corrupt";return false;}
+ if(bytes<8||bytes>AUDIO_MAX_BYTES){failure="audio_size_invalid";return false;}
+ if(!ownerMatches(who))return false;
+ abortUpload();uint32_t free=SPIFFS.totalBytes()-SPIFFS.usedBytes();
+ if(bytes+8192>free){failure="storage_full";return false;}
+ incoming=SPIFFS.open("/upload.tmp",FILE_WRITE);if(!incoming){failure="open_failed";return false;}
+ uploadSlot=slot;uploadAudio=true;expectedBytes=bytes;uploadOwner=who;uploadController=requestController(who);uploadLast=millis();failure="none";return true;
 }
 static bool chunk(const uint8_t*p,size_t n){if(!incoming){failure="upload_not_started";return false;}if(!n||received>expectedBytes||n>expectedBytes-received){failure="upload_chunk_bounds";abortUpload();return false;}if(incoming.write(p,n)!=n){failure="upload_write_failed";abortUpload();return false;}received+=n;uploadLast=millis();failure="none";return true;}
 // All library/file handlers execute synchronously on Arduino's one loop task.
@@ -120,6 +137,7 @@ static bool validateRaw(File &f,pgl::Validator &v,uint8_t*header){
 }
 static bool commit(){
  if(!incoming||received!=expectedBytes){failure="incomplete";abortUpload();return false;}
+ if(uploadAudio){incoming.close();int slot=uploadSlot;String target=audioPath(slot);SPIFFS.remove(target);bool ok=SPIFFS.rename("/upload.tmp",target);abortUpload();failure=ok?"none":"audio_commit_failed";return ok;}
  storageDiagnostics("commit_begin");
  incoming.close();File raw=SPIFFS.open("/upload.tmp",FILE_READ);uint8_t header[128];pgl::Validator validator;
  if(!validateRaw(raw,validator,header)){raw.close();failure="invalid_pgl_crc_or_events";abortUpload();return false;}
@@ -139,7 +157,7 @@ static bool commit(){
  if(!SPIFFS.rename("/compressed.tmp",target)){bool restored=!SPIFFS.exists(backup)||SPIFFS.rename(backup,target);SPIFFS.remove("/compressed.tmp");if(!restored&&meta[slot].valid){meta[slot].valid=false;--cachedCount;}failure=restored?"commit_rename_failed":"commit_rollback_failed";return false;}
  bool verified=openScore(slot,raw,header);uint32_t stored=verified?raw.size():0;raw.close();
  if(!verified){bool restored=SPIFFS.remove(target);if(SPIFFS.exists(backup))restored=restored&&SPIFFS.rename(backup,target);if(!restored&&meta[slot].valid){meta[slot].valid=false;--cachedCount;}failure=restored?"compressed_readback_crc_failed":"commit_rollback_failed";return false;}
- SPIFFS.remove(backup);cacheEntry(slot,header,stored);failure="none";storageDiagnostics("commit_done");return true;
+ SPIFFS.remove(backup);SPIFFS.remove(audioPath(slot));cacheEntry(slot,header,stored);failure="none";storageDiagnostics("commit_done");return true;
 }
 static bool readCompressedEvent(File &f,uint32_t prev,pgl::Event &event){
  uint8_t p[14];size_t k=0;for(int field=0;field<2;++field){bool end=false;for(int n=0;n<5;++n){if(!readExact(f,p+k,1))return false;if(!(p[k++]&128)){end=true;break;}}if(!end)return false;}
@@ -176,9 +194,9 @@ static bool recoverStoredSlot(int slot){
  if((SPIFFS.exists(path(slot))&&!SPIFFS.remove(path(slot)))||!SPIFFS.rename(backup,path(slot))){failure="storage_recovery_required";return false;}
  return true;
 }
-static String entry(int slot){const auto&m=meta[slot];if(!m.valid)return "";return "{\"slot\":"+String(slot)+",\"title\":\""+escape(m.title)+"\",\"bytes\":"+String(m.bytes)+",\"stored\":"+String(m.stored)+",\"notes\":"+String(m.notes)+",\"duration_ms\":"+String(m.duration)+"}";}
+static String entry(int slot){const auto&m=meta[slot];if(!m.valid)return "";return "{\"slot\":"+String(slot)+",\"title\":\""+escape(m.title)+"\",\"bytes\":"+String(m.bytes)+",\"stored\":"+String(m.stored)+",\"notes\":"+String(m.notes)+",\"duration_ms\":"+String(m.duration)+",\"audio\":"+String(SPIFFS.exists(audioPath(slot))?1:0)+"}";}
 static int libraryCount(){return cachedCount;}
-static bool deleteScore(int slot){if(!ready){failure="storage_not_ready";return false;}if(running){failure="motion_busy";return false;}if(incoming||uploadSlot){failure="upload_active_finish_or_abort_first";return false;}if(!validSlot(slot)){failure="slot_out_of_range";return false;}if(!meta[slot].valid){failure="score_missing_or_corrupt";return false;}if(!SPIFFS.remove(path(slot))){failure="delete_failed";return false;}meta[slot].valid=false;--cachedCount;failure="none";return true;}
+static bool deleteScore(int slot){if(!ready){failure="storage_not_ready";return false;}if(running){failure="motion_busy";return false;}if(incoming||uploadSlot){failure="upload_active_finish_or_abort_first";return false;}if(!validSlot(slot)){failure="slot_out_of_range";return false;}if(!meta[slot].valid){failure="score_missing_or_corrupt";return false;}if(!SPIFFS.remove(path(slot))){failure="delete_failed";return false;}SPIFFS.remove(audioPath(slot));meta[slot].valid=false;--cachedCount;failure="none";return true;}
 static String listing(){String json="{\"ready\":"+String(ready?"true":"false")+",\"max\":100,\"count\":"+String(libraryCount())+",\"total\":"+String(SPIFFS.totalBytes())+",\"used\":"+String(SPIFFS.usedBytes())+",\"free\":"+String(SPIFFS.totalBytes()-SPIFFS.usedBytes())+",\"slots\":[";bool comma=false;for(int slot=1;slot<=100;++slot){String item=entry(slot);if(item.length()){if(comma)json+=",";json+=item;comma=true;}}return json+"]}";}
 static uint32_t elapsed(){if(!running||initializing)return 0;return training?millis()-started:min(duration,scoreClock.desired(millis(),tempo));}
 static int scoreLimit(){return -1;} // Continuous score time has no arrival/event barrier.
@@ -371,6 +389,15 @@ static void serveScore(){
 }
 // Keep serial readback's temporary formatting/header frame out of every LIB
 // command, particularly upload commit/verification on the same loop stack.
+static bool __attribute__((noinline)) readAudioUsb(int slot){
+ if(!scoreReadAllowed())return false;
+ if(!validSlot(slot)||!meta[slot].valid){failure="score_missing_or_corrupt";return false;}
+ if(!SPIFFS.exists(audioPath(slot))){failure="audio_missing";return false;}File file=SPIFFS.open(audioPath(slot),FILE_READ);if(!file){failure="audio_missing";return false;}
+ Serial.printf("LIB_AUDIO bytes=%u\n",unsigned(file.size()));
+ char hex[257];uint8_t data[128];size_t got;int line=0;
+ while((got=file.read(data,sizeof(data)))>0){for(size_t j=0;j<got;++j)sprintf(hex+2*j,"%02x",data[j]);hex[2*got]=0;Serial.printf("LIB_DATA hex=%s\n",hex);if(!(++line%32))delay(0);}
+ file.close();failure="none";return true;
+}
 static bool __attribute__((noinline)) readScoreUsb(int slot){
  if(!scoreReadAllowed())return false;
  File file;uint8_t header[128];if(!openScore(slot,file,header)){file.close();failure="score_missing_or_corrupt";return false;}
@@ -503,6 +530,8 @@ void begin(){
  web.on("/api/upload/begin",HTTP_POST,[]{int slot,bytes;response(httpInteger("slot",1,100,slot)&&httpInteger("bytes",144,librarystorage::maximumRawBytes,bytes)&&startUpload(slot,bytes,"wifi"));});
  web.on("/api/upload/chunk",HTTP_POST,[]{if(!ownerMatches("wifi")){response(false);return;}String body=web.arg("plain");if(body.length()>librarystorage::chunkBytes){failure="upload_chunk_too_large";response(false);return;}response(chunk((const uint8_t*)body.c_str(),body.length()));});
  web.on("/api/upload/commit",HTTP_POST,[]{response(ownerMatches("wifi")&&commit());});
+ web.on("/api/audio/begin",HTTP_POST,[]{int slot,bytes;response(httpInteger("slot",1,100,slot)&&httpInteger("bytes",8,131072,bytes)&&startAudioUpload(slot,bytes,"wifi"));});
+ web.on("/api/audio",HTTP_GET,[]{int slot=web.arg("slot").toInt();if(!validSlot(slot)||!meta[slot].valid){failure="score_missing_or_corrupt";response(false);return;}if(!SPIFFS.exists(audioPath(slot))){failure="audio_missing";response(false);return;}File file=SPIFFS.open(audioPath(slot),FILE_READ);if(!file){failure="audio_missing";response(false);return;}portalCacheHeaders();web.streamFile(file,"application/octet-stream");file.close();});
  web.on("/api/upload/abort",HTTP_POST,[]{if(!ownerMatches("wifi")){response(false);return;}abortUpload();failure="none";response(true);});
  web.on("/api/upload",HTTP_POST,[]{int slot;String body=web.arg("plain");if(body.length()>16384){failure="upload_use_chunks";response(false);return;}bool ok=httpInteger("slot",1,100,slot)&&startUpload(slot,body.length(),"wifi");if(ok)ok=chunk((const uint8_t*)body.c_str(),body.length());if(ok)ok=commit();response(ok);});
  web.begin();Serial.printf("LIB_READY ready=%d ap=%s ip=%s max=100\n",ready,apName,ip().c_str());
@@ -583,7 +612,7 @@ bool command(int n,char**t){
  if(action=="RELEASE"){if(n!=2){Serial.println("ERR LIB RELEASE usage");return true;}releaseUsb();return true;}
  if(action=="TEST"&&n==3&&(!strcmp(t[2],"OFFHAND")||!strcmp(t[2],"NORMAL"))){stop("test_mode_changed");glove::safe();offhandTestMode=!strcmp(t[2],"OFFHAND");recoveryMask=0;Serial.printf("OK LIB TEST mode=%s torque=off persistent=0\n",offhandTestMode?"OFFHAND":"NORMAL");return true;}
  if(action=="INFO"){Serial.printf("OK LIB INFO ready=%d count=%d max=100 release_usb=1 score_clock=continuous-v1 calibration_advisory=1 firmware_perf=r29 software_inset=0 software_speed=native_max arrival_wait=0 boot_wait_files=1 fastest_feedback_turn=1 fastest_turn=native_motion_end play_from=1 chunk_max=384 upload_owner=%s total=%u used=%u free=%u ap=%s ip=%s\n",ready,libraryCount(),uploadOwner.c_str(),unsigned(SPIFFS.totalBytes()),unsigned(SPIFFS.usedBytes()),unsigned(SPIFFS.totalBytes()-SPIFFS.usedBytes()),ssid(),ip().c_str());return true;}
- if(action=="LIST"){for(int s=1;s<=100;++s){const auto&m=meta[s];if(!m.valid)continue;char title[193]={};for(size_t j=0;j<strlen(m.title);++j)sprintf(title+j*2,"%02x",uint8_t(m.title[j]));Serial.printf("LIB_ITEM slot=%d bytes=%u stored=%u notes=%u duration_ms=%u title_hex=%s\n",s,unsigned(m.bytes),unsigned(m.stored),unsigned(m.notes),unsigned(m.duration),title);}Serial.printf("OK LIB LIST count=%d\n",cachedCount);return true;}
+ if(action=="LIST"){for(int s=1;s<=100;++s){const auto&m=meta[s];if(!m.valid)continue;char title[193]={};for(size_t j=0;j<strlen(m.title);++j)sprintf(title+j*2,"%02x",uint8_t(m.title[j]));Serial.printf("LIB_ITEM slot=%d bytes=%u stored=%u notes=%u duration_ms=%u audio=%d title_hex=%s\n",s,unsigned(m.bytes),unsigned(m.stored),unsigned(m.notes),unsigned(m.duration),SPIFFS.exists(audioPath(s))?1:0,title);}Serial.printf("OK LIB LIST count=%d\n",cachedCount);return true;}
  if(action=="STATE"){writeUsbCooperatively(String("LIB_STATE ")+compactState()+"\nOK LIB STATE\n");return true;}
  if(action=="SNAP"){
   refreshIdlePositions();String line="LIB_SNAP3 "+String(millis())+" "+String(positionSampleMs[0])+" "+String(running?1:0)+" "+String(initializing?1:0)+" "+String(mask)+" "+String(playedEventCount)+" "+String(count)+" "+String(elapsed())+" "+String(positionValidMask)+" "+String(patternSequence.step)+" "+String(patternSequence.total)+" "+String(patternRunning&&patternSequence.fastest()?1:0);
@@ -592,13 +621,16 @@ bool command(int n,char**t){
   writeUsbCooperatively(line+"\nOK LIB SNAP\n");return true;
  }
  if(action=="PORTAL"){printPortalStatus();return true;}
- if((action=="BEGIN"||action=="CHUNK"||action=="COMMIT"||action=="ABORT")&&!ownerMatches("usb")){Serial.printf("ERR LIB %s %s\n",action.c_str(),failure.c_str());return true;}
+ if((action=="BEGIN"||action=="ABEGIN"||action=="CHUNK"||action=="COMMIT"||action=="ABORT")&&!ownerMatches("usb")){Serial.printf("ERR LIB %s %s\n",action.c_str(),failure.c_str());return true;}
  if(action=="KEEP"){ok=keep("usb");}
  else if(action=="STOP"){stop();glove::safe();ok=true;}
  else if(action=="ABORT"){abortUpload();ok=true;}
  else if(action=="COMMIT")ok=commit();
  else if(action=="CHUNK"&&n==3){size_t size=strlen(t[2]);ok=size>0&&!(size%2)&&size<=768;for(size_t i=0;ok&&i<size;i+=2){char a=t[2][i],b=t[2][i+1];auto nibble=[](char c)->int{if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;if(c>='A'&&c<='F')return c-'A'+10;return -1;};int x=nibble(a),y=nibble(b);ok=x>=0&&y>=0;if(ok)usbChunkBuffer[i/2]=x*16+y;}if(ok)ok=chunk(usbChunkBuffer,size/2);else failure="invalid_hex";}
  else{long slot=0,a=0,b=0,c=0,d=0;if(action=="BEGIN"&&n==4&&integer(t[2],1,100,slot)&&integer(t[3],144,960128,a))ok=startUpload(slot,a,"usb");
+  else if(action=="ABEGIN"&&n==4&&integer(t[2],1,100,slot)&&integer(t[3],8,131072,a))ok=startAudioUpload(slot,a,"usb");
+  else if(action=="AREAD"&&n==3&&integer(t[2],1,100,slot))ok=readAudioUsb(slot);
+  else if(action=="ADEL"&&n==3&&integer(t[2],1,100,slot)){if(running){failure="motion_busy";}else if(incoming||uploadSlot){failure="upload_active_finish_or_abort_first";}else{SPIFFS.remove(audioPath(slot));failure="none";ok=true;}}
   else if(action=="DELETE"&&n==3&&integer(t[2],1,100,slot))ok=deleteScore(slot);
   else if(action=="PLAY"&&(n>=5&&n<=7)&&integer(t[2],1,100,slot)&&integer(t[3],50,1000,a)&&integer(t[4],1,100,b)){long resistance=100,from=0;if((n==5||integer(t[5],0,100,resistance))&&(n<7||integer(t[6],0,86400000,from)))ok=startPlay(slot,a,b,"usb",resistance,uint32_t(from));}
   else if(action=="TEMPO"&&n==3&&integer(t[2],50,1000,a))ok=changeTempo(a,"usb");

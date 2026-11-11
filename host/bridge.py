@@ -1050,6 +1050,31 @@ class SoftwareConsole:
             self.upload_session = dict(slot=slot, expected=size, data=bytearray(), controller=owner, updated=time.monotonic())
         return dict(ok=True, slot=slot, bytes=size, chunk_max=self.chunk_max)
 
+    # 11-11 用户：换电脑播放提示“导入完整琴声”。完整琴声随曲子存进手套（固件 /sN.pga，LIB ABEGIN / AREAD）。
+    def begin_audio(self, slot, size, controller=None):
+        slot = self.number(slot, 1, 100, '曲目位置')
+        size = self.number(size, 8, 131072, '琴声大小')
+        owner = self.controller(controller)
+        with self.lock:
+            if self.upload_session is not None:
+                if time.monotonic() - self.upload_session['updated'] <= 30:
+                    raise RuntimeError('upload_active_finish_or_abort_first')
+                self.command('LIB ABORT')
+                self.upload_session = None
+            self.command('LIB ABEGIN %d %d' % (slot, size))
+            self.upload_session = dict(slot=slot, expected=size, data=bytearray(), controller=owner,
+                                       updated=time.monotonic(), kind='audio')
+        return dict(ok=True, slot=slot, bytes=size, chunk_max=self.chunk_max)
+
+    def audio(self, slot):
+        slot = self.number(slot, 1, 100, '曲目位置')
+        with self.lock:
+            lines = self.command('LIB AREAD %d' % slot, 15000)
+        blob = bytes.fromhex(''.join(self.fields(line)['hex'] for line in lines if line.startswith('LIB_DATA ')))
+        if not blob:
+            raise RuntimeError('audio_missing')
+        return dict(ok=True, base64=base64.b64encode(blob).decode('ascii'), bytes=len(blob))
+
     def upload_chunk(self, blob, controller=None):
         if not isinstance(blob, (bytes, bytearray)) or not 1 <= len(blob) <= self.chunk_max:
             raise ValueError('upload_chunk_size_invalid')
@@ -1068,6 +1093,12 @@ class SoftwareConsole:
             session = self._upload_owned(controller)
             if len(session['data']) != session['expected']:
                 raise ValueError('upload_incomplete')
+            if session.get('kind') == 'audio':
+                try:
+                    self.command('LIB COMMIT', 15000)
+                finally:
+                    self.upload_session = None
+                return dict(ok=True, slot=session['slot'], bytes=session['expected'], kind='audio')
             try:
                 score = decode(session['data'])
                 self.score_cache.clear()
@@ -1292,6 +1323,11 @@ def make_handler(bridge):
             if u.path == '/api/portal':
                 try:return self._json(software.portal())
                 except Exception as e:return self._json({'ok':False,'error':str(e)},409)
+            if u.path == '/api/audio':
+                try:
+                    return self._json(software.audio((q.get('slot') or ['0'])[0]))
+                except Exception as e:
+                    return self._json({'ok': False, 'error': str(e)}, 409)
             if u.path in ('/api/library', '/api/state', '/api/score'):
                 try:
                     result = software.library() if u.path == '/api/library' else software.score((q.get('slot') or ['0'])[0]) if u.path == '/api/score' else software.state()
@@ -1331,7 +1367,7 @@ def make_handler(bridge):
             if not self._origin_ok():
                 return self._json({"ok": False, "error": "跨站请求被拒绝"}, 403)
             u = urlparse(self.path)
-            if u.path in ('/api/upload/begin', '/api/upload/chunk', '/api/upload/commit', '/api/upload/abort'):
+            if u.path in ('/api/upload/begin', '/api/upload/chunk', '/api/upload/commit', '/api/upload/abort', '/api/audio/begin'):
                 try:
                     size = int(self.headers.get('Content-Length') or 0)
                     if not 0 <= size <= (384 if u.path.endswith('/chunk') else 4096):
@@ -1339,7 +1375,9 @@ def make_handler(bridge):
                     raw = self.rfile.read(size)
                     body = {} if u.path.endswith('/chunk') else (json.loads(raw) if 'application/json' in (self.headers.get('Content-Type') or '') else {k:v[0] for k,v in parse_qs(raw.decode('utf-8')).items()})
                     controller = self.headers.get('X-Piano-Controller') or body.get('controller')
-                    if u.path.endswith('/begin'):
+                    if u.path == '/api/audio/begin':
+                        result = software.begin_audio(body.get('slot'), body.get('bytes'), controller)
+                    elif u.path.endswith('/begin'):
                         result = software.begin_upload(body.get('slot'), body.get('bytes'), controller)
                     elif u.path.endswith('/chunk'):
                         result = software.upload_chunk(raw, controller)
