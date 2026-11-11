@@ -432,7 +432,10 @@ static void markPortalPassed(){uint32_t ip=(uint32_t)web.client().remoteIP();if(
 static uint32_t portalOnlineIp[8]={};static uint8_t portalOnlineNext=0;
 static bool portalOnline(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip)return false;for(uint32_t v:portalOnlineIp)if(v==ip)return true;return false;}
 static void markPortalOnline(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip||portalOnline())return;portalOnlineIp[portalOnlineNext++%8]=ip;Serial.printf("LIB_PORTAL_ONLINE ip=%s\n",web.client().remoteIP().toString().c_str());}
-static void portalProbe(int code,const char*body){if(!portalPassed()){redirectPortal(true);return;}markPortalOnline();++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
+// 11-11 用户：每次连手套 Wi-Fi 都要弹提示页。有手机连上就清空“已点过/已答联网”，让它重新弹
+static volatile bool portalForget=false;
+static void portalForgetNow(){if(!portalForget)return;portalForget=false;for(auto&v:portalPassedIp)v=0;for(auto&v:portalOnlineIp)v=0;Serial.println("LIB_PORTAL_FORGET");}
+static void portalProbe(int code,const char*body){portalForgetNow();if(!portalPassed()){redirectPortal(true);return;}markPortalOnline();++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
 static const char APPLE_SUCCESS[]="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>";
 static void servePortalPage(){++portalLandings;recordPortal("landing");markPortalPassed();portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",SOFTWARE_HTML);}
 void begin(){
@@ -451,7 +454,7 @@ void begin(){
  }
  uint64_t mac=ESP.getEfuseMac();snprintf(apName,sizeof(apName),"PIANO_GLOVE_%06X",unsigned(mac&0xffffff));
  // Keep the user's confirmed legacy hotspot connection and page layout.
- WiFi.mode(WIFI_AP);ap=WiFi.softAP(apName);
+ WiFi.mode(WIFI_AP);ap=WiFi.softAP(apName);WiFi.onEvent([](WiFiEvent_t,WiFiEventInfo_t){portalForget=true;},ARDUINO_EVENT_WIFI_AP_STACONNECTED);
  const char*headers[]={"X-Piano-Controller","Host","User-Agent"};web.collectHeaders(headers,3);
  web.setWaitHandler([]{serviceHttpWait();});
  if(ap){portalDnsReady=portalDns.begin(53)==1;portalDhcpReady=configurePortalDhcp();Serial.printf("LIB_PORTAL_READY dhcp_dns=%d dns=%d offer_before=%u offer_after=%u error=%d\n",portalDhcpReady,portalDnsReady,unsigned(portalDnsOfferBefore),unsigned(portalDnsOfferAfter),portalDhcpError);}
@@ -506,7 +509,7 @@ void begin(){
 }
 void tick(){
  if(ap)servicePortalDns();
- web.handleClient();if(incoming&&millis()-uploadLast>15000){failure="upload_timeout";abortUpload();}
+ portalForgetNow();web.handleClient();if(incoming&&millis()-uploadLast>15000){failure="upload_timeout";abortUpload();}
  serviceMotion();
 }
 // Called only on the Arduino loop, including cooperative HTTP waits. It never
