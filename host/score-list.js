@@ -300,7 +300,10 @@ let bFilter='全部',bQuery='',bSource='builtin'; /* 11-05 用户：PDF 转换�
 function builtinRows(){return rows.filter(r=>r.source===bSource&&(r.source_kind==='manual'||r.stats?.notes!==0)&&!(bSource==='import'&&jobs.get(String(r.id))&&['waiting','converting'].includes(jobs.get(String(r.id)).state)));} /* 扫描版有人工编配的也保留 */
 function builtinVisible(){
  const q=bQuery.trim().toLowerCase();
- return builtinRows().filter(r=>(bFilter==='全部'||r.category===bFilter)&&(!q||titleOf(r).toLowerCase().includes(q)))
+ const hit=r=>!q||titleOf(r).toLowerCase().includes(q);
+ let rows=builtinRows().filter(r=>(bFilter==='全部'||r.category===bFilter)&&hit(r));
+ if(q&&!rows.length)rows=builtinRows().filter(hit); /* 11-10：在「练习曲」里搜「山火」显示没找到，新手会以为没有这首；当前分类没有就去全部里找 */
+ return rows
   .sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||Number(!!b.playable)-Number(!!a.playable)||(numbers(a).pages||0)-(numbers(b).pages||0));
 }
 function builtinHtml(row){

@@ -29,9 +29,12 @@ const heroCopy={
  off:['先把手套连上吧','用 USB 数据线把手套主控接到电脑，我会自动去找它。找不到时点「USB / 驱动帮助」。不连手套也能先做 PDF 识谱校对。'],
  wait:['正在和手套打招呼…','已经发现设备，正在读取舵机、校准和曲库。稍等几秒，状态变成「已就绪」就能开始。'],
  servo:['舵机还没通电','主控已经连上，但舵机没有回应。请打开手套的舵机电源（先别戴在手上），通电后会自动就绪。编号、校准和手套里的曲谱都还在，不用重新设置。不通电也能先做 PDF 识谱校对。'],
+ uncal:['先调一下手套','手套连上了，但还没按你的手校准。点右上角「调手套」→「开始校准」，每根手指慢慢弯到底再伸直，就能开始练了。'],
  ready:['手套已就绪！','选一种练习开始吧。任何时候都可以点右上角红色「停止」，或者按 Esc 键。'],
  run:['动起来啦！','正在练习中。想停就点「停止」或按 Esc；断开或重启后手套不会自己再动。']
 };
+let uncalibrated=false; // 11-10：校准无效时开始页别说「已就绪」
+window.addEventListener('glove-state',e=>{const fb=e.detail?.feedback;const v=Array.isArray(fb)&&fb.length?fb.some(f=>f&&f.calibration_valid===false):false;if(v!==uncalibrated){uncalibrated=v;refreshState();}});
 function refreshState(){
  const state=connectionState(),busy=running(),conn=$('connection');
  if(conn){conn.classList.toggle('comic-conn-ready',state==='ready');conn.classList.toggle('comic-conn-wait',state==='wait'||state==='servo');conn.classList.toggle('comic-conn-off',state==='off');}
@@ -42,7 +45,7 @@ function refreshState(){
  if(brand&&brand.dataset.mood!==mood){brand.dataset.mood=mood;brand.querySelector('.comic-mascot')?.remove();brand.insertAdjacentHTML('afterbegin',art().mascot(mood,'钢琴手套小音'));}
  const hero=$('comic-hero-mascot');
  if(hero&&hero.dataset.mood!==(busy?'sing':state==='ready'?'happy':moods[state])){const m=busy?'sing':state==='ready'?'happy':moods[state];hero.dataset.mood=m;hero.innerHTML=art().mascot(m);}
- const copy=heroCopy[busy?'run':state];
+ const copy=heroCopy[busy?'run':state==='ready'&&uncalibrated?'uncal':state];
  if($('comic-hero-title')&&$('comic-hero-title').textContent!==copy[0]){$('comic-hero-title').textContent=copy[0];$('comic-hero-text').textContent=copy[1];}
  const chip=$('comic-hero-connection');if(chip){chip.textContent=conn?.textContent||'正在读取设备';chip.title=chip.textContent;chip.className='comic-chip '+state;}
  for(const id of ['comic-hero-activity','comic-step-activity']){const act=$(id);if(act)act.textContent=$('activity')?.textContent||'待机';}

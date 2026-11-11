@@ -319,8 +319,8 @@ def wrap_with_launcher(work, app_dir, output, version_file):
     (work / 'launcher.cs').write_text(source, encoding='utf-8')
     (work / 'launcher-info.cs').write_text('''using System.Reflection;
 [assembly: AssemblyTitle("钢琴手套 · 训练与曲谱转换")]
-[assembly: AssemblyProduct("钢琴手套 V1.1")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyProduct("钢琴手套 V1.2")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 [assembly: AssemblyVersion("2026.11.9.1")]
 ''', encoding='utf-8')
     csc = Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Microsoft.NET' / 'Framework64' / 'v4.0.30319' / 'csc.exe'
@@ -394,11 +394,11 @@ def build_single_exe(work, output, lightweight=False, fast_start=False):
 ffi=FixedFileInfo(filevers=(2026,11,1,1),prodvers=(2026,11,1,1),mask=0x3f,flags=0,OS=0x40004,fileType=0x1,subtype=0,date=(0,0)),
 kids=[StringFileInfo([StringTable('080404b0',[
 StringStruct('FileDescription','钢琴手套 · 训练与曲谱转换'),
-StringStruct('FileVersion','1.1.0.0'),
+StringStruct('FileVersion','1.2.0.0'),
 StringStruct('InternalName','PianoGloveSoftware'),
 StringStruct('OriginalFilename','钢琴手套.exe'),
 StringStruct('ProductName','钢琴手套软件'),
-StringStruct('ProductVersion','V1.1')])]),VarFileInfo([VarStruct('Translation',[2052,1200])])])
+StringStruct('ProductVersion','V1.2')])]),VarFileInfo([VarStruct('Translation',[2052,1200])])])
 ''', encoding='utf-8')
     # fast_start：PyInstaller 目录版 + 单文件启动器（tools/launcher），第一次打开解一次，以后约 1 秒启动
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir' if fast_start else '--onefile', '--windowed',
