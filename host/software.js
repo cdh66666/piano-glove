@@ -114,6 +114,8 @@ async function usbScoreTransfer(operation,verb='读取',expectedIdentity=usbConn
   const link=await api('/api/status');window.__gloveLink={connected:!!link.connected,info:String(link.device_info||''),at:Date.now()}; /* 11-05：给“固件太旧”提示用 */
   if(epoch!==connectionEpoch||!link.connected||usbConnectionKey(link)!==expectedIdentity)throw Error('设备连接已变化，请重新选择曲谱');
   fresh=await sampleState();
+  // 11-11 实测：刚传完曲谱，舵机位置采样还是传输前的旧值（>1 秒），第一次读必然不新鲜→报错，重试一次又好。等最多约 4 秒再判
+  for(let i=0;i<10&&fresh&&!validRecovery(fresh)&&epoch===connectionEpoch;i++){await new Promise(r=>setTimeout(r,400));fresh=await sampleState()||fresh;}
  }catch(error){stateError=error;lostState();}
  try{
   if(!stateError&&(!fresh||!validRecovery(fresh)))stateError=Error('曲谱已'+verb+'，但尚未收到新鲜的位置反馈，请稍后重试');

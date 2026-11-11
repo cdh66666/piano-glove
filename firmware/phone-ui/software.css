@@ -61,3 +61,5 @@ input[type=range]::-webkit-slider-thumb{width:30px;height:30px}
 /* 11-10：上传单独一页 */
 #upload-page .upload-hint{margin:6px 0 14px;font-size:14px;opacity:.8}
 #upload-page .upload{display:flex;flex-direction:column;gap:12px;align-items:stretch}
+
+.mini-window{margin:0 0 12px;padding:12px;border:3px solid #222;border-radius:14px;background:#fff3b0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mini-window[hidden]{display:none}.mini-window b{flex:1 0 100%;font-size:17px}.mini-open{display:inline-block;padding:10px 16px;border-radius:12px;background:#ff7a59;color:#fff;font-weight:700;text-decoration:none;border:2px solid #222}.mini-window p{flex:1 0 100%;margin:0;font-size:14px}

@@ -209,14 +209,17 @@ async function openScore(id){
  await window.GloveCatalog?.open(id);
  const row=byId.get(String(id)),label=$('review-current-file');if(row&&label)label.textContent=titleOf(row);
 }
+async function waitGloveReady(ms=8000){const end=Date.now()+ms;while(!window.GloveWorkspace?.gloveReady?.()){if(Date.now()>end)return false;await new Promise(r=>setTimeout(r,300));}return true;}
 async function send(ids){
  if(sending)return;
- if(!window.GloveWorkspace?.gloveReady?.()){toast('先连上手套（顶栏圆点变绿）再送',true);return;}
+ if(!(await waitGloveReady())){toast('先连上手套（顶栏圆点变绿）再送',true);return;}
  sending=true;let ok=0,skipped=0;
  try{
   for(const id of ids){
    const row=byId.get(id);if(!row)continue;const job={state:'sending',label:'正在打包…'};jobs.set(id,job);updateRow(id);
    try{
+    // 11-11：上一首刚存完，手套要一两秒恢复位置反馈；等它好了再送下一首，别直接报错
+    if(!(await waitGloveReady()))throw Error('手套还没准备好，请稍后再送');
     const bundle=row.playable?await api.catalog_package(id):await window.GloveWorkspace.packageCatalogScore(id,titleOf(row));skipped+=bundle.skipped||0;
     job.label='正在存进手套…';updateRow(id);
     const status={style:{},classList:{add(){},remove(){},toggle(){}},set textContent(v){job.label=v;updateRow(id);},get textContent(){return job.label;}}; /* 播放报 setting 'color'：状态框要有 style */
@@ -327,7 +330,7 @@ function renderBuiltins(){
 }
 async function playOne(id){
  const row=byId.get(id);if(!row)return;
- if(!window.GloveWorkspace?.gloveReady?.()){toast('先连上手套（顶栏圆点变绿）再播放',true);return;}
+ if(!(await waitGloveReady())){toast('先连上手套（顶栏圆点变绿）再播放',true);return;}
  const job={state:'playing',label:'正在准备…'};jobs.set(id,job);updateRow(id);
  const status={style:{},classList:{add(){},remove(){},toggle(){}},set textContent(v){job.label=v;updateRow(id);},get textContent(){return job.label;}}; /* 播放报 setting 'color'：状态框要有 style */
  try{await window.GloveWorkspace.playBuiltin(()=>row.playable?api.catalog_package(id):window.GloveWorkspace.packageCatalogScore(id,titleOf(row)),document.createElement('button'),status);job.state='sent';job.played=true;}
