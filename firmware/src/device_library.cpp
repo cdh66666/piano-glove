@@ -423,7 +423,14 @@ static String portalStatus(){return "{\"ap\":"+String(ap?"true":"false")+",\"sta
 static void __attribute__((noinline)) printPortalStatus(){Serial.printf("LIB_PORTAL %s\n",portalStatus().c_str());Serial.println("OK LIB PORTAL");}
 static void redirectPortal(bool probe){if(probe){++portalProbes;recordPortal("probe");}else recordPortal("redirect");++portalRedirects;portalCacheHeaders();String url="http://"+ip()+"/help";web.sendHeader("Location",url,true);web.send(302,"text/html; charset=utf-8","<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta http-equiv=refresh content=\"0;url="+url+"\"><title>钢琴手套</title><p>正在打开钢琴手套控制页面…</p><p><a href=\""+url+"\">打开手套控制页</a></p>");}
 static bool appleProbeHost(){String h=web.header("Host");h.toLowerCase();return h.indexOf("apple.com")>=0||h.indexOf("appleiphonecell")>=0||h.indexOf("itools.info")>=0||h.indexOf("ibook.info")>=0||h.indexOf("airport.us")>=0||h.indexOf("thinkdifferent.us")>=0;}
-static void servePortalPage(){++portalLandings;recordPortal("landing");portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",SOFTWARE_HTML);}
+// 11-11 用户：不关移动数据也要能打开。像酒店 Wi-Fi：先弹提示页，点了按钮（或已在浏览器里打开控制页）后，
+// 对这台手机的联网检测改答“已联网”，手机就把手套 Wi-Fi 当正常网络用，浏览器走 Wi-Fi 不走流量。按 IP 记，重启清空。
+static uint32_t portalPassedIp[8]={};static uint8_t portalPassedNext=0;
+static bool portalPassed(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip)return false;for(uint32_t v:portalPassedIp)if(v==ip)return true;return false;}
+static void markPortalPassed(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip||portalPassed())return;portalPassedIp[portalPassedNext++%8]=ip;Serial.printf("LIB_PORTAL_PASS ip=%s\n",web.client().remoteIP().toString().c_str());}
+static void portalProbe(int code,const char*body){if(!portalPassed()){redirectPortal(true);return;}++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
+static const char APPLE_SUCCESS[]="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>";
+static void servePortalPage(){++portalLandings;recordPortal("landing");markPortalPassed();portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",SOFTWARE_HTML);}
 void begin(){
  ready=SPIFFS.begin(false);
  if(!ready){
@@ -446,10 +453,16 @@ void begin(){
  if(ap){portalDnsReady=portalDns.begin(53)==1;portalDhcpReady=configurePortalDhcp();Serial.printf("LIB_PORTAL_READY dhcp_dns=%d dns=%d offer_before=%u offer_after=%u error=%d\n",portalDhcpReady,portalDnsReady,unsigned(portalDnsOfferBefore),unsigned(portalDnsOfferAfter),portalDhcpError);}
  // 11-11 用户：连 Wi-Fi 照常弹出小窗，但小窗里只放一张提示页（/help：复制网址、关小窗、去浏览器），
  // 不放控制页——小窗里选不了文件也下载不了，还会抢走浏览器页的控制权。浏览器直接输 192.168.4.1 进控制页。
- for(const char*route:{"/generate_204","/gen_204","/generate204","/hotspot-detect.html","/library/test/success.html","/success.html","/connecttest.txt","/ncsi.txt","/success.txt","/fwlink","/redirect","/canonical.html","/check_network_status.txt","/mobile/status.php","/checknet","/check_network","/portal","/captive"})web.on(route,HTTP_ANY,[]{redirectPortal(true);});
+ for(const char*route:{"/generate_204","/gen_204","/generate204","/fwlink","/redirect","/check_network_status.txt","/mobile/status.php","/checknet","/check_network","/portal","/captive"})web.on(route,HTTP_ANY,[]{portalProbe(204,"");});
+ for(const char*route:{"/hotspot-detect.html","/library/test/success.html","/success.html"})web.on(route,HTTP_ANY,[]{portalProbe(200,APPLE_SUCCESS);});
+ web.on("/connecttest.txt",HTTP_ANY,[]{portalProbe(200,"Microsoft Connect Test");});
+ web.on("/ncsi.txt",HTTP_ANY,[]{portalProbe(200,"Microsoft NCSI");});
+ web.on("/success.txt",HTTP_ANY,[]{portalProbe(200,"success");});
+ web.on("/canonical.html",HTTP_ANY,[]{portalProbe(200,"<meta http-equiv=\"refresh\" content=\"0;url=https://support.mozilla.org/kb/captive-portal\"/>");});
+ web.on("/portal/ok",HTTP_ANY,[]{markPortalPassed();portalCacheHeaders();web.send(204);});
  web.on("/help",HTTP_GET,[]{++portalLandings;recordPortal("help");portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",PORTAL_HELP_HTML);});
  web.onNotFound([](){if(web.uri().startsWith("/api/"))web.send(404,"application/json","{\"error\":\"unknown_api\"}");else redirectPortal(false);});
- web.on("/",HTTP_GET,[]{if(appleProbeHost()){redirectPortal(true);return;}servePortalPage();});
+ web.on("/",HTTP_GET,[]{if(appleProbeHost()){portalProbe(200,APPLE_SUCCESS);return;}servePortalPage();});
  web.on("/software.html",HTTP_GET,[]{servePortalPage();});
  web.on("/software.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_JS);});
  web.on("/software-audio.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_AUDIO_JS);});

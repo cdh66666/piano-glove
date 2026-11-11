@@ -8,29 +8,31 @@ body{margin:0;padding:16px;background:#1e1a2e;color:#fff;font:18px/1.45 -apple-s
 @keyframes glow{from{box-shadow:0 0 0 0 #ffd23f}to{box-shadow:0 0 0 8px #ffd23f66}}
 .small{display:block;margin-top:6px;font-size:15px;color:#4a4458}
 .btn{display:block;margin-top:12px;padding:18px;border-radius:16px;background:#ff5a36;color:#fff;font:inherit;font-size:22px;font-weight:900;text-align:center;text-decoration:none;border:0;width:100%;box-sizing:border-box}
-.addr{font-size:30px;font-weight:900;letter-spacing:1px;user-select:all}
 .foot{margin-top:6px;font-size:15px;color:#cfc9dc}.foot a{color:#ffd23f}[hidden]{display:none!important}
 </style></head><body>
 <div id="android" hidden>
- <div class="step hot"><span class="no">1</span><span class="big">关掉「移动数据」</span><span class="small">下拉通知栏，点一下「移动数据」变灰。不关就打不开。</span></div>
- <div class="step"><span class="no">2</span><span class="big">点下面按钮</span><a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></div>
- <p class="foot">还是不行：浏览器地址栏输入 <b>192.168.4.1</b></p>
+ <div class="step hot"><span class="no">1</span><span class="big">点这个按钮</span><a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></div>
+ <p class="foot">没跳：关掉这个小窗，浏览器输入 <b>192.168.4.1</b><br>还打不开：关掉「移动数据」再试</p>
 </div>
 <div id="ios" hidden>
  <div class="step hot"><span class="no">1</span><span class="big">点「复制」</span><button class="btn copy" type="button">复制网址</button></div>
- <div class="step"><span class="no">2</span><span class="big">右上角「取消」</span><span class="small">再选「不连接互联网使用」</span></div>
+ <div class="step"><span class="no">2</span><span class="big">点右上角「完成」</span></div>
  <div class="step"><span class="no">3</span><span class="big">打开 Safari，粘贴</span></div>
 </div>
 <div id="other" hidden>
- <div class="step hot"><span class="no">1</span><span class="big">关掉「移动数据」</span></div>
- <div class="step"><span class="no">2</span><span class="big">浏览器打开</span><span class="addr"> 192.168.4.1</span><button class="btn copy" type="button">复制网址</button></div>
+ <div class="step hot"><span class="no">1</span><span class="big">浏览器打开 192.168.4.1</span><button class="btn copy" type="button">复制网址</button></div>
 </div>
 <p class="foot" id="in-browser">已经在浏览器里？<a href="http://192.168.4.1/">进控制页</a></p>
 <script>
 (function(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua),$=function(i){return document.getElementById(i)},mini=(android&&/; wv\)/.test(ua))||(ios&&!/Safari\//.test(ua));
 $(ios?'ios':android?'android':'other').hidden=false;if(mini)$('in-browser').hidden=true;
-if(android)$('open').href='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
-[].forEach.call(document.querySelectorAll('.copy'),function(b){b.onclick=function(){var t='http://192.168.4.1',ok=function(){b.textContent='已复制 ✓';};
+// 告诉手套“这台手机已看过提示”：之后手套对它的联网检测答“已联网”，手机就走手套 Wi-Fi，不用关流量
+function pass(){try{return fetch('/portal/ok',{cache:'no-store'}).catch(function(){});}catch(e){return Promise.resolve();}}
+// 苹果：一打开就算看过，右上角会变成「完成」
+if(ios&&!/ok=1/.test(location.search))pass().then(function(){setTimeout(function(){location.replace('/help?ok=1');},300);});
+if(android){var intent='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+ $('open').onclick=function(e){e.preventDefault();var go=function(){location.href=intent;};pass().then(function(){setTimeout(go,1500);});$('open').textContent='正在打开…';};}
+[].forEach.call(document.querySelectorAll('.copy'),function(b){b.onclick=function(){pass();var t='http://192.168.4.1',ok=function(){b.textContent='已复制 ✓';};
  function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按复制：192.168.4.1';}a.remove();}
  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,fallback);else fallback();};});
 })();
