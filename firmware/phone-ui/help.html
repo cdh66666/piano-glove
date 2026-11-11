@@ -12,7 +12,8 @@ body{margin:0;padding:16px;background:#1e1a2e;color:#fff;font:18px/1.45 -apple-s
 </style></head><body>
 <div id="android" hidden>
  <div class="step hot"><span class="no">1</span><span class="big">点这个按钮</span><a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></div>
- <p class="foot">没跳：关掉这个小窗，浏览器输入 <b>192.168.4.1</b><br>还打不开：关掉「移动数据」再试</p>
+ <p class="foot" id="slow" hidden>手机还在检测网络，稍等几秒再点</p>
+ <p class="foot">小窗自己关了：直接打开浏览器输入 <b>192.168.4.1</b><br>还打不开：关掉「移动数据」再试</p>
 </div>
 <div id="ios" hidden>
  <div class="step hot"><span class="no">1</span><span class="big">点「复制」</span><button class="btn copy" type="button">复制网址</button></div>
@@ -31,7 +32,11 @@ function pass(){try{return fetch('/portal/ok',{cache:'no-store'}).catch(function
 // 苹果：一打开就算看过，右上角会变成「完成」
 if(ios&&!/ok=1/.test(location.search))pass().then(function(){setTimeout(function(){location.replace('/help?ok=1');},300);});
 if(android){var intent='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
- $('open').onclick=function(e){e.preventDefault();var go=function(){location.href=intent;};pass().then(function(){setTimeout(go,1500);});$('open').textContent='正在打开…';};}
+ // 11-11 荣耀实测：点完马上跳，手机还没重新检测联网，浏览器仍走流量一直转圈。先让手机重测，等手套答过“已联网”再跳
+ var go=function(){$('open').textContent='正在打开浏览器…';location.href=intent;};
+ function wait(n){fetch('/portal/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(st){if(st.online){setTimeout(go,800);}else if(n>0){setTimeout(function(){wait(n-1);},500);}else{$('open').textContent='再点一次';$('slow').hidden=false;}}).catch(function(){if(n>0)setTimeout(function(){wait(n-1);},500);});}
+ if(/ok=1/.test(location.search)){$('open').textContent='正在切到手套 Wi-Fi…';wait(30);}
+ $('open').onclick=function(e){e.preventDefault();$('open').textContent='正在切到手套 Wi-Fi…';pass().then(function(){setTimeout(function(){location.replace('/help?ok=1');},300);});};}
 [].forEach.call(document.querySelectorAll('.copy'),function(b){b.onclick=function(){pass();var t='http://192.168.4.1',ok=function(){b.textContent='已复制 ✓';};
  function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按复制：192.168.4.1';}a.remove();}
  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,fallback);else fallback();};});

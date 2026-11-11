@@ -428,7 +428,11 @@ static bool appleProbeHost(){String h=web.header("Host");h.toLowerCase();return 
 static uint32_t portalPassedIp[8]={};static uint8_t portalPassedNext=0;
 static bool portalPassed(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip)return false;for(uint32_t v:portalPassedIp)if(v==ip)return true;return false;}
 static void markPortalPassed(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip||portalPassed())return;portalPassedIp[portalPassedNext++%8]=ip;Serial.printf("LIB_PORTAL_PASS ip=%s\n",web.client().remoteIP().toString().c_str());}
-static void portalProbe(int code,const char*body){if(!portalPassed()){redirectPortal(true);return;}++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
+// 11-11 荣耀实测：点了按钮马上跳浏览器，手机还没重新检测联网，浏览器仍走流量一直转圈。记下“已对这台手机答过已联网”，提示页等到它再跳
+static uint32_t portalOnlineIp[8]={};static uint8_t portalOnlineNext=0;
+static bool portalOnline(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip)return false;for(uint32_t v:portalOnlineIp)if(v==ip)return true;return false;}
+static void markPortalOnline(){uint32_t ip=(uint32_t)web.client().remoteIP();if(!ip||portalOnline())return;portalOnlineIp[portalOnlineNext++%8]=ip;Serial.printf("LIB_PORTAL_ONLINE ip=%s\n",web.client().remoteIP().toString().c_str());}
+static void portalProbe(int code,const char*body){if(!portalPassed()){redirectPortal(true);return;}markPortalOnline();++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
 static const char APPLE_SUCCESS[]="<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>";
 static void servePortalPage(){++portalLandings;recordPortal("landing");markPortalPassed();portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",SOFTWARE_HTML);}
 void begin(){
@@ -460,6 +464,7 @@ void begin(){
  web.on("/success.txt",HTTP_ANY,[]{portalProbe(200,"success");});
  web.on("/canonical.html",HTTP_ANY,[]{portalProbe(200,"<meta http-equiv=\"refresh\" content=\"0;url=https://support.mozilla.org/kb/captive-portal\"/>");});
  web.on("/portal/ok",HTTP_ANY,[]{markPortalPassed();portalCacheHeaders();web.send(204);});
+ web.on("/portal/state",HTTP_ANY,[]{portalCacheHeaders();web.send(200,"application/json",String("{\"passed\":")+(portalPassed()?1:0)+",\"online\":"+(portalOnline()?1:0)+"}");});
  web.on("/help",HTTP_GET,[]{++portalLandings;recordPortal("help");portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",PORTAL_HELP_HTML);});
  web.onNotFound([](){if(web.uri().startsWith("/api/"))web.send(404,"application/json","{\"error\":\"unknown_api\"}");else redirectPortal(false);});
  web.on("/",HTTP_GET,[]{if(appleProbeHost()){portalProbe(200,APPLE_SUCCESS);return;}servePortalPage();});

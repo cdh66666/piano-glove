@@ -20,7 +20,7 @@
 #include "device_library.h"
 
 #define FW_ID  "PIANO_GLOVE_2"
-#define FW_VER "2.2.5-r30.5"
+#define FW_VER "2.2.5-r30.6"
 // 2.2.0: 型号 / 位置量程改成**从舵机读回来**（STS3032 + SC09 双适配）；
 //        新增 POSALL 一帧读回全部槽位位置（演奏闭环的心跳）。
 // 2.1.2: 静止位改回「松开端」（原来被设成量程中点，按压只有半个行程）
