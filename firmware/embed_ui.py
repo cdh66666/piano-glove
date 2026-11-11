@@ -5,7 +5,7 @@ root = Path(env['PROJECT_DIR'])
 phone = root / 'phone-ui'
 legacy = (phone / 'manifest.json').is_file()
 parts = ['#pragma once\n#include <Arduino.h>\n', f'#define PIANO_GLOVE_LEGACY_PHONE_UI {int(legacy)}\n']
-for name, variable in [('software.html','SOFTWARE_HTML'),('software.js','SOFTWARE_JS'),('software.css','SOFTWARE_CSS'),('software-tempo.js','SOFTWARE_TEMPO_JS'),('software-tempo.css','SOFTWARE_TEMPO_CSS'),('software-upload.js','SOFTWARE_UPLOAD_JS'),('software-upload.css','SOFTWARE_UPLOAD_CSS'),('software-audio.js','SOFTWARE_AUDIO_JS'),('software-pack.js','SOFTWARE_PACK_JS'),('software-review.js','SOFTWARE_REVIEW_JS'),('software-review.css','SOFTWARE_REVIEW_CSS')]:
+for name, variable in [('software.html','SOFTWARE_HTML'),('software.js','SOFTWARE_JS'),('software.css','SOFTWARE_CSS'),('software-tempo.js','SOFTWARE_TEMPO_JS'),('software-tempo.css','SOFTWARE_TEMPO_CSS'),('software-upload.js','SOFTWARE_UPLOAD_JS'),('software-upload.css','SOFTWARE_UPLOAD_CSS'),('software-audio.js','SOFTWARE_AUDIO_JS'),('software-pack.js','SOFTWARE_PACK_JS'),('software-review.js','SOFTWARE_REVIEW_JS'),('software-review.css','SOFTWARE_REVIEW_CSS'),('help.html','PORTAL_HELP_HTML')]:
     source = (phone if legacy else root.parent / 'host') / name
     if legacy and not source.is_file():
         continue

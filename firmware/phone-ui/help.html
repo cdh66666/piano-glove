@@ -1,0 +1,31 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>钢琴手套已连上</title>
+<style>
+body{margin:0;padding:18px 16px 28px;background:#fff8e6;color:#1e1a2e;font:17px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+h1{font-size:24px;margin:0 0 4px}.sub{margin:0 0 16px;color:#5a5466}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+li{background:#fff;border:3px solid #1e1a2e;border-radius:16px;padding:12px 14px;box-shadow:3px 3px 0 #1e1a2e}
+li b.n{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:50%;background:#ffb703;font-size:16px}
+.addr{display:block;margin:8px 0 4px;font-size:30px;font-weight:900;letter-spacing:1px;user-select:all}
+.btn{display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:14px;border:3px solid #1e1a2e;border-radius:14px;background:#ff7a59;color:#fff;font:inherit;font-weight:800;text-align:center;text-decoration:none}
+.btn.light{background:#fff;color:#1e1a2e}.tip{margin:14px 2px 0;font-size:14px;color:#5a5466}[hidden]{display:none!important}
+</style></head><body>
+<h1>✅ 手套已连上</h1><p class="sub">这个小窗传不了文件，换到浏览器用：</p>
+<ol>
+ <li id="s-android" hidden><b class="n">1</b>点下面按钮，用浏览器打开<a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></li>
+ <li><b class="n" id="n-copy">1</b>复制网址<span class="addr">192.168.4.1</span><button id="copy" class="btn light" type="button">复制网址</button></li>
+ <li><b class="n" id="n-close">2</b><span id="close-text">关掉这个小窗</span></li>
+ <li><b class="n" id="n-browser">3</b><span id="browser-text">打开浏览器，粘贴网址打开</span></li>
+</ol>
+<p class="tip">打不开：先关掉手机的「移动数据」再试。<span id="in-browser"><br>已经在浏览器里？<a href="http://192.168.4.1/">点这里进控制页</a></span></p>
+<script>
+(function(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua),$=function(i){return document.getElementById(i)},mini=(android&&/; wv\)/.test(ua))||(ios&&!/Safari\//.test(ua));if(mini)$('in-browser').hidden=true;
+if(ios){$('close-text').textContent='点右上角「取消」，再选「不连接互联网使用」';$('browser-text').textContent='打开 Safari，粘贴网址打开';}
+if(android){$('s-android').hidden=false;$('n-copy').textContent='2';$('n-close').textContent='3';$('n-browser').textContent='4';
+ $('close-text').textContent='没跳过去：点返回关掉小窗，问“保持连接”选是';$('browser-text').textContent='打开浏览器，粘贴网址打开';
+ var intent='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+ $('open').href=intent;if(/; wv\)/.test(ua)){setTimeout(function(){try{location.href=intent;}catch(e){}},600);}}
+$('copy').onclick=function(){var t='http://192.168.4.1',b=$('copy'),ok=function(){b.textContent='已复制 ✓';};
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fallback);}else fallback();
+ function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按上面网址复制';}a.remove();}};
+})();
+</script></body></html>
