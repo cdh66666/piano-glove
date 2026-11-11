@@ -3,8 +3,20 @@
 'use strict';
 const valid = value => typeof value==='number' && Number.isFinite(value);
 class DeviceClock {
-  constructor(){this.state=null;this.anchor=0;this.rtt=0;}
-  sync(state,began,ended){this.state={...state};this.anchor=(began+ended)/2;this.rtt=Math.max(0,ended-began);}
+  constructor(){this.state=null;this.anchor=0;this.rtt=0;this.minRtt=Infinity;}
+  // 11-11 用户：手机上音符进度一抖一抖。Wi-Fi 每次来回时间忽长忽短，按单次中点对时会前后跳几十到几百毫秒。
+  // 改成：小偏差慢慢追（来回快的读数追得快、慢的追得少），进度不往回退；开始/跳转/暂停等大变化才直接对齐。
+  sync(state,began,ended){
+    const rtt=Math.max(0,ended-began),prevState=this.state,running=s=>!!(s&&s.active&&!s.initializing&&!s.clock_paused);
+    this.minRtt=Math.min(rtt,Number.isFinite(this.minRtt)?this.minRtt*1.02+1:rtt);
+    const prev=prevState?this.position(ended):null;
+    this.state={...state};this.anchor=(began+ended)/2;this.rtt=rtt;
+    if(prev===null||!running(prevState)||!running(this.state)||Number(prevState.tempo)!==Number(this.state.tempo))return;
+    const raw=this.position(ended),diff=raw-prev;
+    if(Math.abs(diff)>600)return;
+    const k=rtt<=this.minRtt*1.5+20?0.35:0.08,target=Math.max(prev,prev+diff*k);
+    this.state.elapsed_ms=target;this.anchor=ended;
+  }
   position(now){const s=this.state;if(!s)return 0;let ms=Number(s.elapsed_ms)||0;if(s.active&&!s.initializing&&!s.clock_paused)ms+=Math.max(0,now-this.anchor)*this.rate;return Math.min(Math.max(0,ms),this.limit);}
   get rate(){return Math.max(.01,Number(this.state?.tempo)||100)/100;}
   get paused(){return !this.state?.active||!!this.state.initializing||!!this.state.clock_paused;}

@@ -193,7 +193,7 @@ def _review_edits_only(review):
 
 
 # 11-10 用户：程序名后面要带版本号（文件名 钢琴手套_V1.0.exe、窗口标题都显示），每次发新版加一
-APP_VERSION = 'V1.9'
+APP_VERSION = 'V2.0'
 
 class DesktopAPI(NativeAPI):
     def __init__(self, session):
