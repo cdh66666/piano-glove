@@ -1,31 +1,37 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>钢琴手套已连上</title>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>钢琴手套</title>
 <style>
-body{margin:0;padding:18px 16px 28px;background:#fff8e6;color:#1e1a2e;font:17px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-h1{font-size:24px;margin:0 0 4px}.sub{margin:0 0 16px;color:#5a5466}
-ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-li{background:#fff;border:3px solid #1e1a2e;border-radius:16px;padding:12px 14px;box-shadow:3px 3px 0 #1e1a2e}
-li b.n{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;border-radius:50%;background:#ffb703;font-size:16px}
-.addr{display:block;margin:8px 0 4px;font-size:30px;font-weight:900;letter-spacing:1px;user-select:all}
-.btn{display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:14px;border:3px solid #1e1a2e;border-radius:14px;background:#ff7a59;color:#fff;font:inherit;font-weight:800;text-align:center;text-decoration:none}
-.btn.light{background:#fff;color:#1e1a2e}.tip{margin:14px 2px 0;font-size:14px;color:#5a5466}[hidden]{display:none!important}
+body{margin:0;padding:16px;background:#1e1a2e;color:#fff;font:18px/1.45 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.step{margin:0 0 14px;padding:16px;border-radius:18px;background:#fff;color:#1e1a2e}
+.no{display:inline-grid;place-items:center;width:34px;height:34px;margin-right:10px;border-radius:50%;background:#1e1a2e;color:#ffd23f;font-weight:900;vertical-align:middle}
+.big{font-size:24px;font-weight:900;vertical-align:middle}
+.hot{background:#ffd23f;animation:glow 1.2s ease-in-out infinite alternate}
+@keyframes glow{from{box-shadow:0 0 0 0 #ffd23f}to{box-shadow:0 0 0 8px #ffd23f66}}
+.small{display:block;margin-top:6px;font-size:15px;color:#4a4458}
+.btn{display:block;margin-top:12px;padding:18px;border-radius:16px;background:#ff5a36;color:#fff;font:inherit;font-size:22px;font-weight:900;text-align:center;text-decoration:none;border:0;width:100%;box-sizing:border-box}
+.addr{font-size:30px;font-weight:900;letter-spacing:1px;user-select:all}
+.foot{margin-top:6px;font-size:15px;color:#cfc9dc}.foot a{color:#ffd23f}[hidden]{display:none!important}
 </style></head><body>
-<h1>✅ 手套已连上</h1><p class="sub">这个小窗传不了文件，换到浏览器用：</p>
-<ol>
- <li id="s-android" hidden><b class="n">1</b>点下面按钮，用浏览器打开<a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></li>
- <li><b class="n" id="n-copy">1</b>复制网址<span class="addr">192.168.4.1</span><button id="copy" class="btn light" type="button">复制网址</button></li>
- <li><b class="n" id="n-close">2</b><span id="close-text">关掉这个小窗</span></li>
- <li><b class="n" id="n-browser">3</b><span id="browser-text">打开浏览器，粘贴网址打开</span></li>
-</ol>
-<p class="tip">打不开：先关掉手机的「移动数据」再试。<span id="in-browser"><br>已经在浏览器里？<a href="http://192.168.4.1/">点这里进控制页</a></span></p>
+<div id="android" hidden>
+ <div class="step hot"><span class="no">1</span><span class="big">关掉「移动数据」</span><span class="small">下拉通知栏，点一下「移动数据」变灰。不关就打不开。</span></div>
+ <div class="step"><span class="no">2</span><span class="big">点下面按钮</span><a id="open" class="btn" href="http://192.168.4.1/">用浏览器打开</a></div>
+ <p class="foot">还是不行：浏览器地址栏输入 <b>192.168.4.1</b></p>
+</div>
+<div id="ios" hidden>
+ <div class="step hot"><span class="no">1</span><span class="big">点「复制」</span><button class="btn copy" type="button">复制网址</button></div>
+ <div class="step"><span class="no">2</span><span class="big">右上角「取消」</span><span class="small">再选「不连接互联网使用」</span></div>
+ <div class="step"><span class="no">3</span><span class="big">打开 Safari，粘贴</span></div>
+</div>
+<div id="other" hidden>
+ <div class="step hot"><span class="no">1</span><span class="big">关掉「移动数据」</span></div>
+ <div class="step"><span class="no">2</span><span class="big">浏览器打开</span><span class="addr"> 192.168.4.1</span><button class="btn copy" type="button">复制网址</button></div>
+</div>
+<p class="foot" id="in-browser">已经在浏览器里？<a href="http://192.168.4.1/">进控制页</a></p>
 <script>
-(function(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua),$=function(i){return document.getElementById(i)},mini=(android&&/; wv\)/.test(ua))||(ios&&!/Safari\//.test(ua));if(mini)$('in-browser').hidden=true;
-if(ios){$('close-text').textContent='点右上角「取消」，再选「不连接互联网使用」';$('browser-text').textContent='打开 Safari，粘贴网址打开';}
-if(android){$('s-android').hidden=false;$('n-copy').textContent='2';$('n-close').textContent='3';$('n-browser').textContent='4';
- $('close-text').textContent='没跳过去：点返回关掉小窗，问“保持连接”选是';$('browser-text').textContent='打开浏览器，粘贴网址打开';
- var intent='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
- $('open').href=intent;if(/; wv\)/.test(ua)){setTimeout(function(){try{location.href=intent;}catch(e){}},600);}}
-$('copy').onclick=function(){var t='http://192.168.4.1',b=$('copy'),ok=function(){b.textContent='已复制 ✓';};
- if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fallback);}else fallback();
- function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按上面网址复制';}a.remove();}};
+(function(){var ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua),$=function(i){return document.getElementById(i)},mini=(android&&/; wv\)/.test(ua))||(ios&&!/Safari\//.test(ua));
+$(ios?'ios':android?'android':'other').hidden=false;if(mini)$('in-browser').hidden=true;
+if(android)$('open').href='intent://192.168.4.1/#Intent;scheme=http;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+[].forEach.call(document.querySelectorAll('.copy'),function(b){b.onclick=function(){var t='http://192.168.4.1',ok=function(){b.textContent='已复制 ✓';};
+ function fallback(){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){b.textContent='长按复制：192.168.4.1';}a.remove();}
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,fallback);else fallback();};});
 })();
 </script></body></html>
