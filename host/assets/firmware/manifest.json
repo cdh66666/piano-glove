@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "2.2.5-r30.0",
+  "version": "2.2.5-r30.1",
   "board": "esp32dev",
   "chip": "esp32",
   "baud": 230400,
@@ -37,11 +37,11 @@
       "name": "firmware.bin",
       "offset": "0x10000",
       "offset_int": 65536,
-      "bytes": 985680,
-      "sha256": "677bc56f229cc580b87ea6a8c7f65f467cc62c1eb2525d4cf4cf162a5080a678"
+      "bytes": 987744,
+      "sha256": "cbdc235c119bb6ba0a13defa7218cabb4699726ac4224e973a7d803e69ffa88a"
     }
   ],
-  "built_at": "2026-11-11T01:47:28-06:00",
-  "git_commit": "a4c4e42",
+  "built_at": "2026-11-11T02:49:08-06:00",
+  "git_commit": "a61bacc",
   "note": "现场只烧录这份冻结镜像；不在客户机上编译。"
 }

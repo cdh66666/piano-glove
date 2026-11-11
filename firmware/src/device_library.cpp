@@ -422,6 +422,8 @@ static void recordPortal(const char*kind){
 static String portalStatus(){return "{\"ap\":"+String(ap?"true":"false")+",\"stations\":"+String(WiFi.softAPgetStationNum())+",\"dhcp_dns_ready\":"+String(portalDhcpReady?"true":"false")+",\"dns_ready\":"+String(portalDnsReady?"true":"false")+",\"dhcp_dns_before\":"+String(portalDnsOfferBefore)+",\"dhcp_dns_after\":"+String(portalDnsOfferAfter)+",\"dhcp_error\":"+String(portalDhcpError)+",\"dns_queries\":"+String(portalDnsQueries)+",\"probe_hits\":"+String(portalProbes)+",\"landing_hits\":"+String(portalLandings)+",\"redirects\":"+String(portalRedirects)+",\"last_at_ms\":"+String(portalLastAt)+",\"last_path\":\""+escape(portalLastPath)+"\",\"last_host\":\""+escape(portalLastHost)+"\",\"last_agent\":\""+escape(portalLastAgent)+"\",\"last_dns\":\""+escape(portalLastDns)+"\",\"url\":\"http://"+ip()+"/\"}";}
 static void __attribute__((noinline)) printPortalStatus(){Serial.printf("LIB_PORTAL %s\n",portalStatus().c_str());Serial.println("OK LIB PORTAL");}
 static void redirectPortal(bool probe){if(probe){++portalProbes;recordPortal("probe");}else recordPortal("redirect");++portalRedirects;portalCacheHeaders();String url="http://"+ip()+"/";web.sendHeader("Location",url,true);web.send(302,"text/html; charset=utf-8","<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\"><meta http-equiv=refresh content=\"0;url="+url+"\"><title>钢琴手套</title><p>正在打开钢琴手套控制页面…</p><p><a href=\""+url+"\">打开手套控制页</a></p>");}
+static void answerOnline(int code,const char*body){++portalProbes;recordPortal("online");portalCacheHeaders();if(code==204)web.send(204);else web.send(code,"text/html",body);}
+static bool appleProbeHost(){String h=web.header("Host");h.toLowerCase();return h.indexOf("apple.com")>=0||h.indexOf("appleiphonecell")>=0||h.indexOf("itools.info")>=0||h.indexOf("ibook.info")>=0||h.indexOf("airport.us")>=0||h.indexOf("thinkdifferent.us")>=0;}
 static void servePortalPage(){++portalLandings;recordPortal("landing");portalCacheHeaders();web.send_P(200,"text/html; charset=utf-8",SOFTWARE_HTML);}
 void begin(){
  ready=SPIFFS.begin(false);
@@ -443,9 +445,16 @@ void begin(){
  const char*headers[]={"X-Piano-Controller","Host","User-Agent"};web.collectHeaders(headers,3);
  web.setWaitHandler([]{serviceHttpWait();});
  if(ap){portalDnsReady=portalDns.begin(53)==1;portalDhcpReady=configurePortalDhcp();Serial.printf("LIB_PORTAL_READY dhcp_dns=%d dns=%d offer_before=%u offer_after=%u error=%d\n",portalDhcpReady,portalDnsReady,unsigned(portalDnsOfferBefore),unsigned(portalDnsOfferAfter),portalDhcpError);}
- for(const char*route:{"/generate_204","/gen_204","/generate204","/hotspot-detect.html","/library/test/success.html","/success.html","/connecttest.txt","/ncsi.txt","/fwlink","/redirect","/canonical.html","/check_network_status.txt","/mobile/status.php","/checknet","/check_network","/portal","/captive"})web.on(route,HTTP_ANY,[]{redirectPortal(true);});
+ // 11-11 用户实测：热点自动弹出的“登录”小窗里选不了文件、也下载不了，按钮也跳不出去。
+ // 所以各家手机的联网检测都答“已联网”，不再弹小窗；手机用自带浏览器打开 192.168.4.1（能选文件、能下载）。
+ for(const char*route:{"/generate_204","/gen_204","/generate204","/fwlink","/redirect","/check_network_status.txt","/mobile/status.php","/checknet","/check_network","/portal","/captive"})web.on(route,HTTP_ANY,[]{answerOnline(204,"");});
+ for(const char*route:{"/hotspot-detect.html","/library/test/success.html","/success.html"})web.on(route,HTTP_ANY,[]{answerOnline(200,"<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");});
+ web.on("/connecttest.txt",HTTP_ANY,[]{answerOnline(200,"Microsoft Connect Test");});
+ web.on("/ncsi.txt",HTTP_ANY,[]{answerOnline(200,"Microsoft NCSI");});
+ web.on("/success.txt",HTTP_ANY,[]{answerOnline(200,"success\n");});
+ web.on("/canonical.html",HTTP_ANY,[]{answerOnline(200,"<meta http-equiv=\"refresh\" content=\"0;url=https://support.mozilla.org/kb/captive-portal\"/>");});
  web.onNotFound([](){if(web.uri().startsWith("/api/"))web.send(404,"application/json","{\"error\":\"unknown_api\"}");else redirectPortal(false);});
- web.on("/",HTTP_GET,[]{servePortalPage();});
+ web.on("/",HTTP_GET,[]{if(appleProbeHost()){answerOnline(200,"<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");return;}servePortalPage();});
  web.on("/software.html",HTTP_GET,[]{servePortalPage();});
  web.on("/software.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_JS);});
  web.on("/software-audio.js",HTTP_GET,[]{web.send_P(200,"application/javascript; charset=utf-8",SOFTWARE_AUDIO_JS);});
