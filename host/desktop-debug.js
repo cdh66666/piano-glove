@@ -109,8 +109,8 @@
    if(progress)new MutationObserver(()=>{if(/单指、组合或交替/.test(progress.textContent)){try{root.localStorage.setItem('piano-hand-fitted','1');}catch{}label();}}).observe(progress,{childList:true,characterData:true,subtree:true});
   }
   // 会改动手套的按钮再确认一次（第一次调手套不问）。
-  const guarded={demoCalStart:'重新校准？上次的校准会被换掉。',demoEnrollStart:'重新编号会改动 6 个舵机的编号，弄错了手套就动不了。确定要重新编号吗？',demoFlash:'烧录会改写手套里的程序，中途断开可能让手套无法使用。确定要烧录吗？'};
-  root.addEventListener('click',event=>{const button=event.target.closest?.('button'),warning=button&&!button.disabled&&guarded[button.id];if(button?.dataset.appConfirmed==='1'){delete button.dataset.appConfirmed;return;}if(warning&&(button.id!=='demoCalStart'||(handFitted()&&!root.deliveryDemoBusy?.()))){event.preventDefault();event.stopImmediatePropagation();(root.AppConfirm?root.AppConfirm(warning):Promise.resolve(root.confirm(warning))).then(ok=>{if(ok){button.dataset.appConfirmed='1';button.click();}});}},true);
+  const guarded={demoCalStart:'重新校准会作废现在的校准，中途停下就要从头再调。确定开始吗？',demoEnrollStart:'重新编号会改动 6 个舵机的编号，弄错了手套就动不了。确定要重新编号吗？',demoFlash:'烧录会改写手套里的程序，中途断开可能让手套无法使用。确定要烧录吗？'};
+  root.addEventListener('click',event=>{const button=event.target.closest?.('button'),warning=button&&!button.disabled&&guarded[button.id];if(button?.dataset.appConfirmed==='1'){delete button.dataset.appConfirmed;return;}if(warning&&(button.id!=='demoCalStart'||((handFitted()||root.PianoDeliveryHooks?.getState?.().info?.calibrated==='1')&&!root.deliveryDemoBusy?.()))){ /* 11-10：手套里已有校准就一定先问 */event.preventDefault();event.stopImmediatePropagation();(root.AppConfirm?root.AppConfirm(warning):Promise.resolve(root.confirm(warning))).then(ok=>{if(ok){button.dataset.appConfirmed='1';button.click();}});}},true);
   // 11-04 用户：调手套是客户收到后自己做的（每个人手不一样）→ 默认进「按我的手调」，说明三步；舵机编号挪到最后标「售后」
   fitForCustomer();
   if(!root.deliveryDemoBusy?.()){
