@@ -63,3 +63,8 @@ input[type=range]::-webkit-slider-thumb{width:30px;height:30px}
 #upload-page .upload{display:flex;flex-direction:column;gap:12px;align-items:stretch}
 
 .mini-window{margin:0 0 12px;padding:12px;border:3px solid #222;border-radius:14px;background:#fff3b0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mini-window[hidden]{display:none}.mini-window b{flex:1 0 100%;font-size:17px}.mini-open{display:inline-block;padding:10px 16px;border-radius:12px;background:#ff7a59;color:#fff;font-weight:700;text-decoration:none;border:2px solid #222}.mini-window p{flex:1 0 100%;margin:0;font-size:14px}
+
+/* 11-11 用户：速度调节占太多地方——快捷键一行小按钮，其余收进「更多设置」 */
+.settings{padding:10px 12px}.tempo-steps{flex-wrap:nowrap;gap:4px;margin:6px 0 2px}.tempo-steps button{flex:1 1 0;min-width:0;min-height:34px;padding:0 2px;font-size:13px;border-width:1.5px;border-radius:9px}
+.more-settings{margin-top:6px}.more-settings summary{cursor:pointer;font-size:14px;font-weight:700;color:#6b6578;padding:4px 0;list-style:none}.more-settings summary::before{content:"▸ "}.more-settings[open] summary::before{content:"▾ "}.more-settings summary::-webkit-details-marker{display:none}
+.settings>label:first-child{display:flex!important;align-items:center;gap:10px;width:100%;margin:0}.settings>label:first-child input{flex:1;width:auto!important;min-width:0}.tempo-steps{width:100%}.tempo-steps button{font-size:15px}.tempo-steps button[data-step]{font-size:20px;font-weight:900;flex:0.7 1 0}
