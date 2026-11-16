@@ -1731,7 +1731,7 @@ function onBridgeWaiting(st){
     scanUI("bad", "串口尚未连接", "日常调试点击“重新扫描并连接”；烧录只需 USB，无需先连接调试。");
     $("#connMsg").className="msg";$("#connMsg").textContent="自动连接已关闭，不会自行试探串口。";
     const desc=document.querySelector('#p-connect .card:first-child .desc');if(desc)desc.textContent='主控 USB 接好后，日常调试点击“重新扫描并连接”。烧录无需先连接调试。';
-    const hint=document.querySelector('#p-connect .card:first-child > p.hint');if(hint)hint.textContent='烧录时断开舵机动力电源、摘下手套，仅保留主控 USB。正常动作调试再按操作要求接通动力电源。';
+    const hint=document.querySelector('#p-connect .card:first-child > p.hint');if(hint)hint.textContent='烧录约 1 分钟，别拔 USB；舵机会先松开，戴着手套也没关系。';
     return;
   }
   const ports = st.ports || [];
@@ -5146,7 +5146,7 @@ window.addEventListener('pagehide',()=>{
 (()=>{
 if(new URLSearchParams(location.search).get('simple')==='1')return;
 const q=id=>document.getElementById(id),card=document.createElement('div');card.className='card';card.id='mainFirmware';
-card.innerHTML=`<h2>主控固件</h2><p class="desc">更新手套主控程序：先断开舵机动力电源、摘下手套，仅保留主控 USB 接线。<b>固件已经随程序打包好，这里不需要编译。</b></p><p id="fwVersion" class="hint">正在读取固件信息…</p><div class="fw-actions"><select id="fwPort" aria-label="主控USB串口"></select><button id="fwRefresh">刷新</button><button id="fwFlash" class="primary">烧录主控</button></div><label><input id="fwPowerOff" type="checkbox"> 我已断开动力电源、未穿戴手套，主控 USB 已接好</label><p class="hint">固定微雪 ESP32 板型 · 烧录速率 230400 · 不清空校准 · 完成后不自动运动</p><progress id="fwProgress" max="100" value="0"></progress><p id="fwStatus" class="msg" role="status" aria-live="polite">等待固件服务</p><details><summary>烧录日志</summary><pre id="fwLog">尚无日志</pre></details>`;
+card.innerHTML=`<h2>主控固件</h2><p class="desc">更新手套主控程序：约 1 分钟，别拔 USB；舵机会先松开，戴着手套也没关系。<b>固件已经随程序打包好，这里不需要编译。</b></p><p id="fwVersion" class="hint">正在读取固件信息…</p><div class="fw-actions"><select id="fwPort" aria-label="主控USB串口"></select><button id="fwRefresh">刷新</button><button id="fwFlash" class="primary">烧录主控</button></div><label><input id="fwPowerOff" type="checkbox"> 主控 USB 已接好，烧录中不拔线</label><p class="hint">固定微雪 ESP32 板型 · 烧录速率 230400 · 不清空校准 · 完成后不自动运动</p><progress id="fwProgress" max="100" value="0"></progress><p id="fwStatus" class="msg" role="status" aria-live="polite">等待固件服务</p><details><summary>烧录日志</summary><pre id="fwLog">尚无日志</pre></details>`;
 q('p-connect').append(card);
 let status=null,requesting=false,polling=false,lastActionError='';
 const moving=()=>S.playing||!!window.pianoStrictTrainingActive?.()||!!window.pianoMountBusy?.();
